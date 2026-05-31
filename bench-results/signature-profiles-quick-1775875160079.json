@@ -1,0 +1,85 @@
+{
+  "generatedAt": "2026-04-11T02:39:20.079Z",
+  "profile": "quick",
+  "iterations": 2000,
+  "payloadSizes": [
+    256,
+    1024,
+    4096,
+    16384
+  ],
+  "results": [
+    {
+      "profile": "quick",
+      "payloadBytes": 256,
+      "algorithm": "HS256",
+      "signUsPerOp": 16.5,
+      "verifyUsPerOp": 14.176,
+      "signOpsPerSecond": 60606.367,
+      "verifyOpsPerSecond": 70539.362
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 256,
+      "algorithm": "ED25519",
+      "signUsPerOp": 45.6,
+      "verifyUsPerOp": 119.231,
+      "signOpsPerSecond": 21929.753,
+      "verifyOpsPerSecond": 8387.068
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 1024,
+      "algorithm": "HS256",
+      "signUsPerOp": 23.745,
+      "verifyUsPerOp": 18.396,
+      "signOpsPerSecond": 42113.324,
+      "verifyOpsPerSecond": 54360.747
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 1024,
+      "algorithm": "ED25519",
+      "signUsPerOp": 51.284,
+      "verifyUsPerOp": 106.092,
+      "signOpsPerSecond": 19499.138,
+      "verifyOpsPerSecond": 9425.777
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 4096,
+      "algorithm": "HS256",
+      "signUsPerOp": 18.235,
+      "verifyUsPerOp": 20.365,
+      "signOpsPerSecond": 54839.636,
+      "verifyOpsPerSecond": 49103.017
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 4096,
+      "algorithm": "ED25519",
+      "signUsPerOp": 53.216,
+      "verifyUsPerOp": 101.756,
+      "signOpsPerSecond": 18791.24,
+      "verifyOpsPerSecond": 9827.469
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 16384,
+      "algorithm": "HS256",
+      "signUsPerOp": 33.59,
+      "verifyUsPerOp": 32.805,
+      "signOpsPerSecond": 29770.829,
+      "verifyOpsPerSecond": 30483.215
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 16384,
+      "algorithm": "ED25519",
+      "signUsPerOp": 96.924,
+      "verifyUsPerOp": 141.141,
+      "signOpsPerSecond": 10317.338,
+      "verifyOpsPerSecond": 7085.133
+    }
+  ]
+}

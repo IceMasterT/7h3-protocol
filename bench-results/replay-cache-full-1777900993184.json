@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-05-04T13:23:13.169Z",
+  "profile": "full",
+  "iterations": 500000,
+  "batchSize": 128,
+  "singleOpsPerSecond": 1943753.028,
+  "batchOpsPerSecond": 2330929.665,
+  "singleUsPerOp": 0.514,
+  "batchUsPerOp": 0.429
+}

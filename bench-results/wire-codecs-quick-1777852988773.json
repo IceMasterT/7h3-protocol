@@ -1,0 +1,93 @@
+{
+  "generatedAt": "2026-05-04T00:03:08.773Z",
+  "profile": "quick",
+  "iterations": 10000,
+  "payloadSizes": [
+    256,
+    1024,
+    4096,
+    16384
+  ],
+  "results": [
+    {
+      "profile": "quick",
+      "payloadBytes": 256,
+      "format": "compact-json",
+      "encodedBytes": 498,
+      "encodeUsPerOp": 0.928,
+      "decodeUsPerOp": 0.998,
+      "encodeOpsPerSecond": 1077222.296,
+      "decodeOpsPerSecond": 1002359.153
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 256,
+      "format": "binary",
+      "encodedBytes": 426,
+      "encodeUsPerOp": 9.007,
+      "decodeUsPerOp": 5.207,
+      "encodeOpsPerSecond": 111021.021,
+      "decodeOpsPerSecond": 192040.512
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 1024,
+      "format": "compact-json",
+      "encodedBytes": 1269,
+      "encodeUsPerOp": 1.653,
+      "decodeUsPerOp": 1.536,
+      "encodeOpsPerSecond": 605105.273,
+      "decodeOpsPerSecond": 650963.39
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 1024,
+      "format": "binary",
+      "encodedBytes": 1197,
+      "encodeUsPerOp": 10.03,
+      "decodeUsPerOp": 3.831,
+      "encodeOpsPerSecond": 99703.346,
+      "decodeOpsPerSecond": 260999.94
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 4096,
+      "format": "compact-json",
+      "encodedBytes": 4341,
+      "encodeUsPerOp": 3.829,
+      "decodeUsPerOp": 2.066,
+      "encodeOpsPerSecond": 261178.001,
+      "decodeOpsPerSecond": 484047.372
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 4096,
+      "format": "binary",
+      "encodedBytes": 4269,
+      "encodeUsPerOp": 9.683,
+      "decodeUsPerOp": 3.768,
+      "encodeOpsPerSecond": 103270.991,
+      "decodeOpsPerSecond": 265385.597
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 16384,
+      "format": "compact-json",
+      "encodedBytes": 16632,
+      "encodeUsPerOp": 7.781,
+      "decodeUsPerOp": 4.407,
+      "encodeOpsPerSecond": 128521.079,
+      "decodeOpsPerSecond": 226927.648
+    },
+    {
+      "profile": "quick",
+      "payloadBytes": 16384,
+      "format": "binary",
+      "encodedBytes": 16560,
+      "encodeUsPerOp": 15.02,
+      "decodeUsPerOp": 5.285,
+      "encodeOpsPerSecond": 66578.233,
+      "decodeOpsPerSecond": 189230.026
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "@7h3/protocol",
+  "version": "0.1.0",
+  "description": "7h3 Protocol — AIP (Aurelion Interaction Protocol): deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version aip/0.1.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/aip/index.js",
+  "types": "./dist/aip/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/aip/index.d.ts",
+      "import": "./dist/aip/index.js"
+    },
+    "./aip": {
+      "types": "./dist/aip/index.d.ts",
+      "import": "./dist/aip/index.js"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IceMasterT/7h3-protocol-aip.git"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "vitest run",
+    "build:aip": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
+    "package:aip": "npm run build:aip && tsx scripts/prepare-aip-package.ts",
+    "bench:protocol": "vitest bench src/protocol.bench.ts",
+    "bench:e2e:quick": "tsx scripts/bench-protocol-e2e.ts --profile quick",
+    "bench:e2e:full": "tsx scripts/bench-protocol-e2e.ts --profile full",
+    "aip:quickstart": "tsx scripts/aip-quickstart.ts",
+    "aip:framework:quickstart": "tsx scripts/aip-framework-quickstart.ts",
+    "aip:mcp:gateway": "tsx scripts/aip-mcp-gateway.ts",
+    "bench:openloop:quick": "tsx scripts/bench-protocol-openloop.ts --profile quick --adaptive --p99-threshold 200 --drop-threshold-pct 2",
+    "bench:openloop:full": "tsx scripts/bench-protocol-openloop.ts --profile full --adaptive --p99-threshold 200 --drop-threshold-pct 2 --adaptive-max-doublings 6 --adaptive-binary-steps 8",
+    "bench:openloop:stress:quick": "tsx scripts/bench-protocol-openloop.ts --profile quick",
+    "bench:openloop:stress:full": "tsx scripts/bench-protocol-openloop.ts --profile full",
+    "bench:signatures:quick": "tsx scripts/bench-signature-profiles.ts --profile quick",
+    "bench:signatures:full": "tsx scripts/bench-signature-profiles.ts --profile full",
+    "bench:wire:quick": "tsx scripts/bench-wire-codecs.ts --profile quick",
+    "bench:wire:full": "tsx scripts/bench-wire-codecs.ts --profile full",
+    "bench:replay:quick": "tsx scripts/bench-replay-cache.ts --profile quick",
+    "bench:replay:full": "tsx scripts/bench-replay-cache.ts --profile full",
+    "conformance:binary": "tsx scripts/build-binary-conformance.ts",
+    "release:gate": "tsx scripts/release-gate.ts",
+    "policy:validate": "tsx scripts/validate-runtime-policy.ts",
+    "canary:plan": "tsx scripts/canary-rollout.ts",
+    "release:dashboard": "tsx scripts/build-release-dashboard.ts",
+    "bench:diff": "tsx scripts/bench-diff.ts",
+    "conformance:python": "PYTHONPATH=sdk/python python3 -m unittest discover -s sdk/python/tests -v",
+    "conformance:rust": "cargo test --manifest-path sdk/rust/Cargo.toml"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4",
+    "vitest": "^4.0.18",
+    "ws": "^8.18.3"
+  }
+}

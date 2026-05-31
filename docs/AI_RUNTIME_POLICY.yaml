@@ -1,0 +1,110 @@
+version: "1.0"
+name: "gluv-runtime-policy"
+status: "active"
+owner: "platform-ai-ops"
+updated_at: "2026-05-10"
+
+purpose:
+  summary: "Deterministic runtime policy for selecting GLUV transport, batching, retries, and safety controls."
+  intent: "Maximize sustainable throughput while preserving protocol integrity and low drop rates."
+
+hard_invariants:
+  require_signature_verification: true
+  require_canonicalization: true
+  require_replay_defense: true
+  require_ttl_clock_skew_enforcement: true
+  disallow_invariant_bypass: true
+
+slo_defaults:
+  drop_pct_max: 0.1
+  p99_ms_max: 20
+  enforce_over_window: "5m"
+  fail_release_on_breach: true
+
+mode_selection:
+  rules:
+    - when:
+        concurrency_gte: 100
+      use: "http-binary-batch"
+      fallback: "ws-binary-batch"
+      rationale: "High-concurrency lanes require binary+batch to avoid plain-http collapse."
+    - when:
+        latency_sensitive: true
+        concurrency_lt: 100
+      use: "ws-batch"
+      rationale: "Balanced p99 and throughput."
+    - when:
+        compatibility_first: true
+        concurrency_lt: 100
+      use: "http"
+      rationale: "Lowest integration friction for low/medium load."
+
+guardrails:
+  block_plain_http_high_concurrency: true
+  plain_http_block_threshold_concurrency: 100
+  allow_override_flag: "--allow-unsafe-http"
+  override_allowed_only_for: "stress-benchmarks"
+
+tuning:
+  batch_size:
+    low_traffic: [4, 8]
+    medium_traffic: [8, 32]
+    high_traffic: [32, 64]
+  inflight_cap:
+    low_traffic: [16, 64]
+    medium_traffic: [64, 256]
+    high_traffic: [256, 1024]
+  retry_backoff_ms:
+    low_traffic: [1, 2]
+    medium_traffic: [2, 8]
+    high_traffic: [4, 16]
+  max_retry_attempts: 3
+  retriable_status_codes: [503]
+
+adaptive_flow:
+  enabled: true
+  ewma_latency_alpha: 0.15
+  degrade_if_latency_ms_gt: 25
+  recover_if_latency_ms_lt: 8
+  reduce_inflight_factor_on_error: 0.85
+  reduce_batch_factor_on_error: 0.8
+
+benchmark_policy:
+  production_readiness:
+    require_adaptive_mode: true
+    commands:
+      - "npm run bench:openloop:quick"
+      - "npm run bench:openloop:full"
+  stress_characterization:
+    allowed: true
+    commands:
+      - "npm run bench:openloop:stress:quick"
+      - "npm run bench:openloop:stress:full"
+    note: "Stress outputs must not be used as direct SLO acceptance."
+
+runtime_decision_tree:
+  - if: "concurrency >= 100"
+    then: "use http-binary-batch"
+  - if: "drop_pct > drop_pct_max"
+    then:
+      - "reduce inflight cap"
+      - "reduce batch size"
+      - "increase retry backoff"
+      - "switch to binary-batch mode"
+  - if: "p99_ms > p99_ms_max"
+    then:
+      - "reduce batch size"
+      - "reduce inflight cap"
+      - "re-run adaptive benchmark"
+
+operator_handoff_required_fields:
+  - mode
+  - payload_bytes
+  - concurrency
+  - benchmark_type
+  - p50_ms
+  - p95_ms
+  - p99_ms
+  - drop_pct
+  - retry_count
+  - overload_signals

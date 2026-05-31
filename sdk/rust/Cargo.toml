@@ -1,0 +1,16 @@
+[package]
+name = "aip7h3"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "aip7h3"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = "0.22"
+ed25519-dalek = { version = "2", features = ["pkcs8"] }
+hmac = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
