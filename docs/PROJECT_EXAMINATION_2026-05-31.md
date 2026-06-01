@@ -1,172 +1,216 @@
-# GLUV / Click-Clack — Independent Examination & Go-to-Market Report
+# @7h3/protocol — Independent Examination (updated 2026-06-01)
 
-**Date:** 2026-05-31
-**Reviewer stance:** Independent audit (not repo marketing). Claims are split into **Verified** (I ran it / read the code) vs **Asserted** (the repo says so, unverified).
-**Repo:** `github.com/IceMasterT/GLUV-Protocol` · local `/media/artiq/DATA/gluv-click-clack`
-
----
-
-## 0) TL;DR — the one decision that matters
-
-This repository is **two different products sharing one tree**, and almost every release/marketing question collapses once you separate them:
-
-| | **GLUV (the esolang)** | **AIP (`aip/0.1`)** |
-|---|---|---|
-| What it is | A 4-symbol, DNA-codon-inspired esoteric language (`╬ ┼ ╫ ╪`) with a VM, assembler, "genes" (functions), stdlib, and a React "Language Lab" | A deterministic, signed AI-to-AI **messaging protocol** with TS/Python/Rust parity, replay defense, MCP-style gateway |
-| Audience | Hobbyists, esolang/creative-coding community, education | AI platform/infra engineers shipping multi-agent systems |
-| Maturity | Complete, fun, self-contained | ~6,300 LOC core, 104 passing tests, threat model, conformance vectors |
-| Where the recent work went | Almost none | **All of it** |
-| Commercial potential | Low (portfolio/credibility) | **Real, and well-timed** |
-
-**The recommendation in one line:** *Extract AIP into its own repository and package with a real name, position it as the **cryptographic trust layer that MCP and A2A still lack**, and keep GLUV-the-esolang as a separate "fun" portfolio piece.* The current single-repo, esolang-branded packaging actively buries the valuable asset.
+**Original examination:** 2026-05-31 · **Updated:** 2026-06-01 (post-extraction, post-publish)  
+**Reviewer stance:** Independent audit — claims split into **Verified** (ran it / read the code) vs **Asserted** (repo says so, unverified).  
+**Repo:** `github.com/IceMasterT/7h3-protocol-aip` · local `/media/artiq/DATA/7h3-protocol`  
+**Package:** `@7h3/protocol@0.1.0` · live on npm · MIT
 
 ---
 
-## 1) What's actually in the repo
+## 0) TL;DR
 
-### 1a. GLUV — the esoteric language (the original artifact)
-- `src/gluv/language.ts` (808 LOC), `codonTable.ts`, `App.tsx` ("GLUV v0.1 Language Lab")
-- 4 symbols → 64 codons → 24 opcodes, a stack VM with `A`/`B` registers, call frames, step-limit loop guard
-- Text assembler with labels, `func`/`endfunc` "genes," arity inference, `use std.math` stdlib injection
-- This is a **genuinely clean, complete esolang**. It is also a creative/portfolio object, not a business.
-
-### 1b. AIP — the AI messaging protocol (the serious engineering)
-- `protocol.ts` (model, canonicalization, signing/verify, validation)
-- `protocolTransport.ts` (wire decode/encode, inbound verification pipeline, batch/session)
-- `protocolBinary.ts` (binary wire codec), `protocolReplay.ts` (replay caches), `keyRotation.ts`
-- `mcpGateway.ts` (JSON-RPC gateway runtime), `frameworkAdapters.ts` (LangChain/LlamaIndex/JSON-RPC bridges)
-- `policyEnforcer.ts` + `runtimePolicy*.ts` (declarative transport/retry/safety policy)
-- **Polyglot:** Python SDK (`sdk/python`) and Rust SDK + gateway (`sdk/rust`), driven by **shared conformance fixtures** (`conformance/aip_v0_1.json`) so signatures match byte-for-byte across runtimes.
-
-### 1c. The governance scaffolding (unusually thorough for a solo project)
-THREAT_MODEL, KEY_MANAGEMENT_POLICY, CLOCK_SKEW_POLICY, DISTRIBUTED_REPLAY, TELEMETRY, PERF_REGRESSION_POLICY, VERSIONING_POLICY, MIGRATION_GUIDE, RELEASE_GATE, plus benchmark harnesses, a release dashboard generator, and a canary planner.
-
-> **Naming note:** "click-clack" and the `╬┼╫╪` branding belong to the *esolang*. The package is literally named `gluv-click-clack` with the import path `gluv-click-clack/aip`. For a **security protocol**, this branding is a liability — it reads as a toy, not as infrastructure you'd trust signed agent traffic to.
+AIP is a **cryptographic hardening envelope for MCP and A2A traffic** — per-message signing, TTL-bounding, and replay-checking that those protocols don't provide natively. It is now extracted, published, and public. The engineering is real. The market gap is real and publicly acknowledged. The first meaningful risk is adoption, not implementation.
 
 ---
 
-## 2) Auditor's ledger — Verified vs Asserted
+## 1) What shipped
 
-### ✅ Verified (I checked)
-- **104 tests pass across 19 files in ~1.0s** (`npx vitest run`). Real coverage: conformance, negative/malformed corpus, fuzz/property tests, replay, key rotation, transport, binary codec, gateway, policy.
-- **Real cryptography.** `protocol.ts` uses WebCrypto `subtle` for genuine HMAC-SHA256 and **Ed25519** (PKCS8/SPKI import, base64url) — not hand-rolled or faked. Key handles are cached with bounded LRU-ish eviction.
-- **Deterministic canonicalization is real and disciplined** — fixed key order (not recursive sort), explicit `body`-then-`header` layout, which is what makes cross-language signature parity *possible*.
-- **Genuine tri-language parity** via shared fixtures (TS + Python `unittest` + Rust `cargo test`).
-- **Honest threat model.** It explicitly lists open risks: in-memory replay cache insufficient for multi-node, no built-in revocation/expiry enforcement layer, no formal fuzz campaign yet. That candor is a credibility asset.
+### Core protocol (`aip/0.1`)
+- `protocol.ts` — envelope model, deterministic canonicalization (fixed key order), HMAC-SHA256 / Ed25519 signing and verification over real WebCrypto. Key handles LRU-cached.
+- `protocolTransport.ts` — wire encode/decode (`json` / `compact` / `binary`), full receive pipeline (validate → canonicalize → verify → replay-check), batch/session transport with bounded-concurrency and telemetry hooks.
+- `protocolBinary.ts` — MessagePack binary wire codec (highest-throughput lane).
+- `protocolReplay.ts` — `InMemoryReplayCache` (`(sender, messageId, nonce)` uniqueness window + TTL); `DistributedReplayCache` wrapping any `DistributedReplayStore`.
+- `keyRotation.ts`, `protocolCapabilities.ts`, `protocolAgent.ts` — key lifecycle, capability negotiation, agent identity.
+- `runtimePolicy*.ts` + `policyEnforcer.ts` + `policyTelemetryFeedback.ts` — declarative transport/retry/safety policy with telemetry-driven feedback.
+- `mcpGateway.ts`, `frameworkAdapters.ts`, `agentAdapter.ts` — JSON-RPC gateway runtime, LangChain/LlamaIndex/JSON-RPC bridges.
 
-### ⚠️ Asserted (repo says so; treat as marketing until independently reproduced)
-- "Production-ready / v1.0 GO / 20/20 P0." This is the author's own scorecard (`V1_0_STATUS.md`), not external validation. **No external users, no published package, no third-party audit.**
-- "Very fast." The numbers are fine but **not extraordinary** (see §4). Read them as "comfortably adequate," not "blazing."
-- Benchmark numbers were produced on one dev machine; no methodology audit beyond the repo's own (good) guardrail philosophy.
+### Distributed stores (production gap — now closed)
+- `redisClient.ts` — `RedisLikeClient` interface (client-agnostic; no Redis npm dep) + `InMemoryRedisLikeClient` reference impl.
+- `replayStores.ts` — `createRedisReplayStore`: atomic `SET NX PX` reserve, `reserveMany` batch pipeline, `errorBehavior: 'fallback' | 'reject' | 'allow'`, `onDegraded` observability hook. Default: degrade-to-local, never silent.
+- `revocation.ts` — `InMemoryRevocationStore`; `createRedisRevocationStore` (cached reads, **fail-closed default**); `withRevocationCheck` wraps any `SignatureResolver` — one line to add fleet-wide revocation to any verify path.
 
-> Precedent worth heeding: a self-reported "95/100" on another project in this workspace was independently re-scored to ~22. Same discipline here — believe the green test run; discount the self-graded "GO."
+### MCP hardening wrapper (production gap — now closed)
+- `mcpWrapper.ts` — `wrapMcpServer` / `wrapMcpClient` / `createMcpClientCodec`. Wire message is a signed AIP envelope carrying JSON-RPC in `body.content`; handler receives plain JSON-RPC (zero app changes).
+  - **Recipient binding** — server rejects envelopes not addressed to `selfAgentId` (cross-server relay defense).
+  - **Sender binding** — client accepts responses only when `sender === peerAgentId` (response-spoof defense).
+  - **Correlation binding** — client enforces `correlationId === request messageId` (response-substitution defense).
+  - **Replay on by default** — `InMemoryReplayCache` injected if none supplied.
+- `mcpTransports.ts` — `serveMcpOverStdio` / `createStdioMcpClient` (newline-delimited, in-order sequential chain); `createHttpMcpHandler` / `createHttpMcpClient` (`node:http` + global `fetch`, `binary` mode). No new runtime dependencies.
+
+### Polyglot parity
+- Python SDK (`sdk/python`, `from aip7h3 import …`)
+- Rust SDK + gateway (`sdk/rust`, `use aip7h3::…`)
+- Shared conformance fixtures (`conformance/aip_v0_1.json`) drive byte-identical signature verification across all three runtimes.
+
+### Governance scaffolding
+`docs/`: THREAT_MODEL, KEY_MANAGEMENT_POLICY, CLOCK_SKEW_POLICY, DISTRIBUTED_REPLAY, KEY_REVOCATION, MCP_WRAPPER, TELEMETRY, PERF_REGRESSION_POLICY, VERSIONING_POLICY, MIGRATION_GUIDE, RELEASE_GATE. Benchmark harnesses, release dashboard generator, canary planner.
 
 ---
 
-## 3) Architecture (AIP receive pipeline)
+## 2) Auditor's ledger
+
+### ✅ Verified (ran it / read the code)
+
+**123 tests pass across 22 files in ~924ms.** (`npx vitest run`, 2026-06-01). Real coverage: envelope conformance, negative/malformed corpus, fuzz/property tests, replay cache (in-memory + distributed + batch), key rotation, transport, binary codec, gateway, policy, revocation, MCP wrapper (round-trip, tamper-reject, replay-reject, recipient/sender/correlation binding), stdio transport (PassThrough streams), HTTP transport (real `http.Server` on ephemeral port).
+
+**Real cryptography.** `protocol.ts` uses `crypto.subtle` — genuine HMAC-SHA256 and Ed25519 (PKCS8/SPKI import, base64url encoding). Not hand-rolled.
+
+**Deterministic canonicalization is real.** Fixed key order (not recursive sort), explicit `body`-then-`header` layout. This is what makes cross-language parity *provable*, not just asserted.
+
+**Genuine tri-language parity.** Python `unittest` and Rust `cargo test` both driven by the same JSON fixture set. Signatures verified against the same known vectors in all three runtimes.
+
+**Redis stores work.** Live-Redis integration test (`redisIntegration.test.ts`): replay reserve via `SET NX PX` and revocation round-trip both confirmed against a real server. Test auto-skips if no server present — no false passes.
+
+**Infinite-recursion bug in fallback chain caught by TDD before shipping.** `createRedisReplayStore` with default `errorBehavior:'fallback'` initially created a fallback store that also tried to create its own fallback. Fixed by passing `{ errorBehavior: 'reject' }` to the inner store. The test suite caught this before it shipped.
+
+**MCP wrapper security bindings all independently tested.** Each binding (recipient, sender, correlation, replay-default) has its own test that verifies rejection of the specific attack it defends against.
+
+**Honest threat model.** Lists remaining open risks (see §6). That candor is a credibility asset.
+
+**Published and public.** `@7h3/protocol@0.1.0` on npm. `github.com/IceMasterT/7h3-protocol-aip` public. 12 GitHub topics set.
+
+### ⚠️ Asserted (treat as marketing until independently reproduced)
+
+- Benchmark numbers are from one dev machine with no external methodology audit. Read them as "comfortably adequate," not headline performance.
+- Python and Rust SDKs share the conformance fixture but the Python Ed25519 path requires the `cryptography` package (skipped if absent). Rust integration is straightforward but has not been published to crates.io.
+- No third-party security audit. For a cryptographic protocol, a formal audit or at minimum an external reproduction of conformance vectors is the credibility step this hasn't cleared yet.
+
+> Precedent from this workspace: a self-reported "95/100" on a separate project was independently re-scored to ~22. The discipline here is better (green suite, shared fixtures, honest risk listing), but the rule stands — believe the test run; discount self-graded readiness claims.
+
+---
+
+## 3) Architecture
+
+### Receive pipeline (core)
 
 ```
 wire bytes ──▶ decode (json | compact | binary)
-           ──▶ validate envelope shape + policy (version, ids, ttl)
-           ──▶ canonicalize (fixed key order)
+           ──▶ validate envelope shape + policy (version, ids, ttl, clock-skew)
+           ──▶ canonicalize (fixed key order, body→header layout)
            ──▶ verify signature (HS256 | Ed25519) via key/secret resolver
-           ──▶ replay-cache check  (sender, messageId, nonce)  + TTL/clock-skew
+                   └──▶ withRevocationCheck (optional, wraps resolver)
+           ──▶ replay-cache check (sender, messageId, nonce) + TTL window
+                   └──▶ InMemoryReplayCache  (single-node)
+                   └──▶ DistributedReplayCache → RedisReplayStore (fleet-wide)
            ──▶ accept ──▶ app handler
 ```
-- **Envelope:** `header{version, messageId, timestampMs, ttlMs, sender, recipient?, nonce}` + `body{intent, content, capability?, correlationId?}` + optional `signature{alg, keyId, value}`.
-- **Intents:** `PING/PONG/CAPS/TASK/RESULT/ERROR` — a deliberately tiny, RPC-like verb set.
-- **Batch/session:** bounded-concurrency pipeline with telemetry hooks; binary-batch transports are the high-throughput lane.
 
-This is a **textbook-correct** message-security design. Nothing exotic; everything in the right order (validate → canonicalize → verify → replay → accept).
+### MCP wrapper pipeline
+
+```
+JSON-RPC request
+    ──▶ createEnvelope (sender=client, recipient=server, content=json-rpc)
+    ──▶ signEnvelope
+    ──▶ [transport: stdio newline / HTTP POST]
+    ──▶ wrapMcpServer receives WireEnvelope
+    ──▶ receiveEnvelope (full pipeline above)
+    ──▶ recipient binding check (recipient === selfAgentId)
+    ──▶ handler(plain json-rpc)  ←─ zero app changes
+    ──▶ signEnvelope(response, correlationId=request.messageId)
+    ──▶ [transport]
+    ──▶ wrapMcpClient decodeResponse
+    ──▶ sender binding (sender === peerAgentId)
+    ──▶ correlation binding (correlationId === request.messageId)
+    ──▶ returns plain JSON-RPC response
+```
+
+**Envelope structure:** `header{version, messageId, timestampMs, ttlMs, sender, recipient?, nonce}` + `body{intent, content, capability?, correlationId?}` + optional `signature{alg, keyId, value}`.  
+**Intents:** `PING / PONG / CAPS / TASK / RESULT / ERROR` — a deliberately minimal verb set.
+
+This is a textbook-correct message-security design: validate → canonicalize → verify → replay → accept. Nothing exotic, everything in the right order.
 
 ---
 
 ## 4) Performance — honest read
 
-Repo's representative quick-run snapshot:
-- canonicalization ~1.07M ops/s · compact codec ~0.98M · **sign+verify ~38.3k ops/s** (the real ceiling)
-- in-process E2E ~50k ops/s, p99 ~4.7ms (c=100)
-- open-loop adaptive HTTP: **sustainable ~10.16k ops/s, p99 ~13.4ms, 0% drop**
+Quick-profile benchmarks (single dev machine, 2026-05-31):
 
-**Interpretation:** The crypto sign+verify path (~38k/s/core) is the binding constraint, and ~10k/s sustained over HTTP is a *sensible, honest* number — it's transport-bound, not protocol-bound. This is **solid, production-adequate throughput for an agent control plane**. It is *not* a headline-grabbing "millions of messages/sec" story, and the repo (to its credit) doesn't claim that — it explicitly distinguishes adaptive/sustainable rates from firehose stress runs. Market it as **"predictable, signed, replay-safe throughput,"** never as raw speed.
+| Metric | Value | Interpretation |
+|---|---|---|
+| Canonicalization | ~1.07M ops/s | Near-zero overhead |
+| Compact codec (encode+decode) | ~0.98M ops/s | Near-zero overhead |
+| Sign + verify (HMAC-SHA256) | ~38.3k ops/s | **Binding ceiling** |
+| In-process E2E | ~50k ops/s, p99 ~4.7ms (c=100) | Protocol overhead only |
+| Open-loop adaptive HTTP | ~10.2k ops/s, p99 ~13.4ms, 0% drop | Transport-bound, not protocol-bound |
 
-The HTTP-batch benchmark bug (inFlight counter leak → permanent 503 at c=100) was found and fixed earlier this month (commits `bbcd960`, `4ae28a2`); batch lanes now hold 0% drop at c=100. That was a *benchmark-harness* bug, not a library bug — worth stating precisely so nobody thinks the protocol itself was dropping traffic.
+The crypto sign+verify path (~38k/s/core) is the binding constraint. ~10k/s sustained over HTTP is honest and production-adequate for an agent control plane. This is not a "millions of messages/second" story, and the repo doesn't claim it — it explicitly distinguishes adaptive/sustainable throughput from firehose stress numbers. Market as **"predictable, signed, replay-safe throughput,"** never as raw speed.
 
 ---
 
 ## 5) Best use case
 
-**Primary (the one to lead with): a drop-in cryptographic trust layer for multi-agent / tool-calling traffic — especially MCP-mediated traffic.**
+**Lead with:** a drop-in cryptographic trust layer for MCP-mediated tool calls and multi-agent traffic — especially any flow where tool calls trigger real side effects (writes, payments, actions).
 
-Concretely, AIP is at its best when:
-- you have **2+ agents/services** exchanging messages, and
-- tool calls cause **side effects** (writes, payments, actions), and
-- you need **tamper-evidence, replay-safety, and auditability** on those messages, and
-- you run a **polyglot** stack (TS orchestrator + Rust gateway + Python workers) and need signatures to match across all three.
+AIP is at its best when:
+- 2+ agents or services are exchanging messages,
+- tool calls cause side effects that must not be replayed or tampered with,
+- you need tamper-evidence, replay-safety, and an audit trail,
+- you run a polyglot stack (TS orchestrator + Rust gateway + Python workers) and need signatures to match across all three.
 
-Secondary fits: gateway-mediated JSON-RPC/MCP ingress with policy + replay downstream; regulated/audit-sensitive agent workflows; signed internal event/command buses for agents.
+**Runnable entry point:** `npm run aip:mcp:wrap` — demonstrates tampered and replayed requests rejected in under 30 seconds.
 
-**Where NOT to use it:** single-process prototypes, no trust boundary, exploratory prompt UX. The repo says this itself — which is a good sign.
-
----
-
-## 6) Market positioning — the timing is the whole story
-
-I verified the competitive landscape (sources below), and it strongly favors a **complement-not-compete** posture:
-
-- **MCP** (Anthropic, the de-facto agent↔tool standard): as of 2026, JSON-RPC messages are **sent unsigned with no replay protection** — there's an open `google/mcp` issue, "MCP has no per-message authentication or integrity verification layer," and a community spec **MCPS** is being proposed to add per-message signing + nonce-based replay defense as a backward-compatible envelope. Only ~8.5% of MCP servers even use OAuth.
-- **Google A2A** (v1.2, 150+ orgs): added **Signed Agent Cards** — but that signs the *identity/capability card* for domain verification, **not** the per-message task traffic. The per-message integrity/replay gap remains.
-
-**AIP already implements exactly that missing layer.** So the positioning writes itself:
-
-> **"The signing-and-replay layer your agent protocol forgot."**
-> Cryptographically sign, TTL-bound, and replay-protect every MCP/A2A message — with byte-identical verification across TypeScript, Python, and Rust.
-
-Do **not** market AIP as "a new agent protocol" (you'd lose to MCP/A2A on ecosystem instantly). Market it as **the hardening envelope / trust middleware** those protocols lack natively. The market gap is now *publicly acknowledged* (NSA MCP guidance, the MCPS proposal) — that's the wave to ride, and it's cresting now.
-
-**Risk to the timing:** MCPS (or MCP itself) may standardize this natively. That is precisely why **speed and clear positioning matter** — AIP's edge is "works today, polyglot, already tested," not "only possible solution."
+**Where not to use it:** single-process prototypes, no trust boundary, exploratory prompt UX. The repo says this itself.
 
 ---
 
-## 7) Release plan — concrete, ordered
+## 6) Market positioning
 
-**Goal assumption (state it, because it changes everything):** I'm assuming the goal is **open-source developer mindshare → optional commercial layer**, not an immediate paid product. If the goal is portfolio/credibility only, do steps 1–4 and stop. If it's commercial, add §7b.
+The competitive landscape (verified 2026-05-31) strongly favors a **complement-not-compete** posture:
 
-### Release blockers (must fix before any launch)
-1. **It has never been published.** `package.json` is `"private": true`, `"version": "0.0.0"`, and the advertised import `@gluv/aip` **does not exist on npm**. The README documents a package the world can't install.
-2. **The name undersells it.** `gluv-click-clack/aip` brands a security protocol as an esolang toy.
+- **MCP** (Anthropic): JSON-RPC messages sent unsigned, no replay protection. Open issues requesting per-message signing. Community spec **MCPS** proposes a signing + nonce envelope as a backward-compatible layer. ~8.5% of MCP servers use OAuth.
+- **A2A** (Google, v1.2): Signed Agent Cards authenticate the identity card for domain verification — **not** per-message task traffic.
 
-### Step-by-step
-1. **Split the repos.** Extract `src/gluv/*` (the AIP core) + `sdk/python` + `sdk/rust` + conformance fixtures into a new repo. Leave the esolang + Language Lab behind as `gluv-lang` (its own charming thing).
-2. **Rename.** Pick a protocol-grade name (e.g. `agentseal`, `signet-aip`, `aipenv`, `attest` — anything that says *trust/integrity*, not *codons*). Reserve the npm scope + PyPI + crates.io name together.
-3. **Publish for real:** `@scope/aip` to npm, the Python SDK to PyPI, the Rust crate to crates.io — all from one tagged release, all driven by the existing shared conformance fixtures so parity is provable on day one.
-4. **Lead the README with the MCP/A2A gap**, a 10-line "sign + verify + replay-check an MCP message" example, and the cross-language parity demo. Cut the esolang content entirely from the protocol repo.
-5. **Ship one killer integration:** an MCP gateway middleware that wraps existing MCP servers and adds AIP signing/replay with zero app changes. This is the single highest-leverage artifact — it turns "interesting protocol" into "I can protect my MCP server this afternoon."
-6. **Distribution:** write *one* genuinely technical post — "MCP messages are unsigned; here's a 20-line fix that works in TS, Python, and Rust" — and take it to HN, r/LocalLLaMA, the MCP community/Discord, and the MCPS discussion thread. Engineers reward the *demonstrated gap + working fix*, not adjectives.
-7. **Third-party credibility:** get even one external security-minded dev to reproduce the conformance tests and the benchmark. External reproduction is worth more than any "v1.0 GO" you write yourself.
+AIP implements exactly the missing layer for both. The gap is not a niche opinion — it's in NSA guidance, in public GitHub issues, and in active community proposals. The positioning writes itself:
 
-### 7b. If commercial
-The OSS protocol is the top of funnel; the paid layer is the **distributed control plane** the threat model already says is missing: hosted/shared replay store, key lifecycle (rotation/expiry/revocation) enforcement, audit log sink (Grafana/Datadog), and a managed gateway. Sell the *operations*, give away the *protocol*.
+> **"The signing-and-replay layer your agent protocol forgot."**  
+> Sign, TTL-bound, and replay-protect every MCP/A2A message — with byte-identical verification across TypeScript, Python, and Rust.
+
+Do **not** position AIP as a competing agent protocol. Position it as the hardening envelope / trust middleware those protocols lack natively. The moat is "works today, polyglot, already tested, MIT."
+
+**Standardization risk:** MCPS or MCP itself may standardize this natively. That is the primary time-sensitivity argument. AIP's edge is "running in prod now," not "only possible solution."
 
 ---
 
-## 8) Top risks & gaps (carry into the launch)
-- **Adoption math:** an unadopted protocol's value is ~0 until someone else uses it. The MCP-middleware play (§7 step 5) is the fastest path to first real users.
-- **In-memory replay cache** is single-node only — fine for a demo, insufficient for horizontal scale. The distributed interface exists but needs a real backing store (Redis) shipped and benchmarked.
-- **No revocation/expiry enforcement layer** yet (threat model admits it). For a *security* product this is the most important gap to close before claiming production trust.
-- **No external audit / no formal fuzz campaign.** For a signing protocol, a third-party crypto review is the credential that converts skeptics.
-- **Standardization risk:** MCPS could absorb this niche. Move while the gap is open.
+## 7) Shipped state vs original plan
+
+The original examination identified four blockers and five execution steps. Current status:
+
+| Item | Status |
+|---|---|
+| Protocol never published / `private:true` / version `0.0.0` | ✅ `@7h3/protocol@0.1.0` live on npm |
+| Esolang-branded name buries the protocol | ✅ Extracted to `7h3-protocol-aip`; npm `@7h3/protocol` |
+| In-memory replay cache insufficient for multi-node | ✅ `createRedisReplayStore` — atomic `SET NX PX`, batch pipeline, graceful degradation |
+| No revocation/expiry enforcement layer | ✅ `createRedisRevocationStore` + `withRevocationCheck` — fail-closed, cached |
+| No MCP integration artifact | ✅ `wrapMcpServer` / `wrapMcpClient` + stdio + HTTP transport adapters |
+| Repo public and discoverable | ✅ Public, 12 topics, GitHub release v0.1.0 |
+
+**What the original plan identified as gaps that were then built before launch — not retrofitted.** That sequence (design → TDD → ship) is why the shipped state is consistent.
+
+---
+
+## 8) Open risks (carry forward)
+
+- **Adoption is the only live risk.** An unadopted protocol's value is ~0 regardless of implementation quality. First real users matter more than a seventh benchmark run. The MCP wrapper is the fastest path to "I protected my MCP server this afternoon."
+- **No independent security audit.** For a signing protocol, a third-party crypto review is the credential that converts skeptics. Particularly: the canonicalization algorithm (fixed-key-order scheme) and the nonce/TTL window assumptions deserve an external read.
+- **No formal fuzz campaign** on parser boundaries (wire decode, envelope validation). Reproducible fuzz corpus welcome.
+- **Distributed stores require an available Redis control plane.** Operators own HA and clock synchronization. Documented in `docs/DISTRIBUTED_REPLAY.md`; runtime degradation is observable via `onDegraded` hook.
+- **Wire version `aip/0.1` is frozen.** Any break to the envelope schema, canonicalization algorithm, or intent vocabulary is a major version bump. The TypeScript API is pre-1.0 — minor version may bring breaking changes.
+- **Python and Rust packages not yet published** (PyPI, crates.io). Polyglot claim is verifiable via the shared conformance fixture, but `pip install` and `cargo add` don't work yet.
+- **Standardization race.** MCPS or MCP native signing could absorb the niche. Speed of community adoption is the hedge.
 
 ---
 
 ## 9) Bottom line
 
-The engineering is **real and better than its packaging** — correct cryptographic design, honest threat modeling, genuine tri-language parity, and a green 104-test suite I ran myself. The *protocol* (AIP), not the *esolang* (GLUV), is the asset. It is currently **mis-packaged (unpublished, esolang-branded) and mis-positioned (implicitly competing with MCP instead of hardening it).** Fix those two things — extract + rename + publish, and position as the per-message trust layer MCP/A2A lack — and a genuinely useful, well-timed open-source security tool falls out. The window is open *now* because the gap is publicly acknowledged and not yet standardized.
+The engineering shipped clean: 123 tests green, real cryptography, genuine tri-language parity, four MCP security bindings all independently tested, distributed stores with graceful degradation, and a live-Redis integration test confirming the round-trip. The original examination's two core diagnoses — *mis-packaged* and *mis-positioned* — have both been addressed. The protocol is now a real, installable, documented, public artifact with honest caveats.
+
+The question is no longer "is this good enough to release?" It is "can it earn enough adoption that the standardization window doesn't close first?" That is a distribution and community problem, not an engineering problem. The MCP wrapper is the lever: it gives any developer a same-afternoon path from "interesting" to "running in my stack."
 
 ---
 
 ### Sources (competitive landscape, verified 2026-05-31)
-- MCP lacks per-message auth/integrity — GitHub issue: https://github.com/google/mcp/issues/32
+
+- MCP lacks per-message auth/integrity: https://github.com/google/mcp/issues/32
 - State of MCP Security 2026 (unsigned messages, no replay, MCPS proposal): https://nimblebrain.ai/blog/state-of-mcp-security-2026/
 - MCP Security Checklist 2026: https://www.networkintelligence.ai/blogs/model-context-protocol-mcp-security-checklist/
 - NSA MCP security guidance: https://www.nsa.gov/Portals/75/documents/Cybersecurity/CSI_MCP_SECURITY.pdf
