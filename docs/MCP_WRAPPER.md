@@ -13,9 +13,13 @@ Source: `src/mcpWrapper.ts`. Runnable demo: `npm run aip:mcp:wrap`.
 | Threat | Covered by |
 |---|---|
 | Message tampering (params/method altered in flight) | Canonical signature over the envelope (HS256 / Ed25519) |
-| Replay / duplicate execution | `(sender, messageId, nonce)` replay cache + TTL |
-| Spoofed responses | The client verifies the server's signature on every response |
+| Replay / duplicate execution | `(sender, messageId, nonce)` replay cache + TTL; **on by default** (`InMemoryReplayCache` if none supplied) |
+| Cross-server relay (valid envelope for server A replayed to server B) | **Recipient binding** — the server runs the handler only when `recipient === selfAgentId` |
+| Response spoofing (another valid signer answers) | **Sender binding** — the client accepts a response only when `sender === peerAgentId` (peerAgentId is required) |
+| Response substitution (a valid response to request A returned for request B) | **Correlation binding** — the client requires `correlationId === the request's messageId` |
 | Compromised key still in use | Compose `withRevocationCheck` into `receive.signatureResolver` |
+
+`encodeRequest` returns `{ raw, messageId }`; pass `messageId` to `decodeResponse(raw, { expectCorrelationId })` to enforce the correlation binding (`wrapMcpClient` does this for you).
 
 ## Server side — wrap an existing handler
 
@@ -58,7 +62,10 @@ const result = await call({ jsonrpc: '2.0', id: 1, method: 'tools/call', params:
 ```
 
 `createMcpClientCodec(options)` exposes `encodeRequest` / `decodeResponse` directly
-when you need to manage the transport send yourself.
+when you manage the transport send yourself. `encodeRequest` returns
+`{ raw, messageId }`; pass that `messageId` as `decodeResponse(raw, { expectCorrelationId })`
+to bind each response to its request. `peerAgentId` is required so responses can be
+bound to the expected sender.
 
 ## Composes with the rest of the stack
 

@@ -44,14 +44,14 @@ async function main(): Promise<void> {
   })
 
   // 1) Clean call ────────────────────────────────────────────────────────────
-  const cleanWire = await codec.encodeRequest({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'planner' } })
-  const cleanResult = await codec.decodeResponse(await securedServer(cleanWire))
+  const clean = await codec.encodeRequest({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'planner' } })
+  const cleanResult = await codec.decodeResponse(await securedServer(clean.raw), { expectCorrelationId: clean.messageId })
   console.log('[1] clean call        ->', JSON.stringify(cleanResult))
 
   // 2) Tampered call ───────────────────────────────────────────────────────── (attacker edits the signed body in flight)
-  const victimWire = await codec.encodeRequest({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'planner' } })
+  const victim = await codec.encodeRequest({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'planner' } })
   const tampered = ((): WireEnvelope => {
-    const env = JSON.parse(victimWire as string)
+    const env = JSON.parse(victim.raw as string)
     env.body.content = env.body.content.replace('planner', 'rm -rf /') // swap the tool
     return JSON.stringify(env)
   })()
@@ -59,9 +59,9 @@ async function main(): Promise<void> {
   console.log('[2] tampered call     ->', JSON.stringify(tamperedResult), '(rejected: signature no longer matches)')
 
   // 3) Replayed call ──────────────────────────────────────────────────────── (attacker re-sends a previously valid message)
-  const onceWire = await codec.encodeRequest({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'deploy' } })
-  const firstResult = await codec.decodeResponse(await securedServer(onceWire))
-  const replayResult = await codec.decodeResponse(await securedServer(onceWire))
+  const once = await codec.encodeRequest({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'deploy' } })
+  const firstResult = await codec.decodeResponse(await securedServer(once.raw))
+  const replayResult = await codec.decodeResponse(await securedServer(once.raw))
   console.log('[3] first delivery    ->', JSON.stringify(firstResult))
   console.log('[3] replayed delivery ->', JSON.stringify(replayResult), '(rejected: messageId/nonce already consumed)')
 }
