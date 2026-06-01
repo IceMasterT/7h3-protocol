@@ -31,6 +31,7 @@
     "aip:quickstart": "tsx scripts/aip-quickstart.ts",
     "aip:framework:quickstart": "tsx scripts/aip-framework-quickstart.ts",
     "aip:mcp:gateway": "tsx scripts/aip-mcp-gateway.ts",
+    "aip:mcp:wrap": "tsx scripts/aip-mcp-wrap-demo.ts",
     "bench:openloop:quick": "tsx scripts/bench-protocol-openloop.ts --profile quick --adaptive --p99-threshold 200 --drop-threshold-pct 2",
     "bench:openloop:full": "tsx scripts/bench-protocol-openloop.ts --profile full --adaptive --p99-threshold 200 --drop-threshold-pct 2 --adaptive-max-doublings 6 --adaptive-binary-steps 8",
     "bench:openloop:stress:quick": "tsx scripts/bench-protocol-openloop.ts --profile quick",

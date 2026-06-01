@@ -55,6 +55,7 @@ Python and Rust SDKs live under `sdk/python` (`from aip7h3 import …`) and `sdk
 - ✅ Core test suite green (TS); real HMAC + Ed25519; genuine TS/Python/Rust conformance parity; a live-Redis integration test for the distributed stores.
 - ✅ **Distributed replay** — Redis-backed store with atomic `SET NX PX`, batch pipeline, and graceful degradation (`docs/DISTRIBUTED_REPLAY.md`).
 - ✅ **Fleet-wide key revocation** — shared revocation store consulted on the verify path, cached + fail-closed (`docs/KEY_REVOCATION.md`).
+- ✅ **MCP hardening wrapper** — sign + replay-protect an existing MCP server with zero handler changes (`docs/MCP_WRAPPER.md`; demo `npm run aip:mcp:wrap`).
 - ⚠️ The distributed stores require an available Redis (or equivalent) control plane — operators own its HA and clock sync.
 - ⚠️ No formal fuzz campaign for parser boundaries; not yet independently security-audited. Reproductions welcome.
 
