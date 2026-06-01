@@ -4,9 +4,9 @@
 
 This model covers `aip/0.1` envelope transport and verification paths in:
 
-- `src/gluv/protocol.ts`
-- `src/gluv/protocolTransport.ts`
-- `src/gluv/mcpGateway.ts`
+- `src/protocol.ts`
+- `src/protocolTransport.ts`
+- `src/mcpGateway.ts`
 - `sdk/rust/src/lib.rs`
 
 ## Assets
@@ -62,14 +62,28 @@ This model covers `aip/0.1` envelope transport and verification paths in:
   - authorization policy hook
   - rate-limit policy hook with context-aware keys
 
+## Mitigated risks
+
+- **Distributed replay** — a Redis-backed `DistributedReplayStore` is shipped
+  (`createRedisReplayStore`, `src/replayStores.ts`). It uses atomic `SET NX PX`,
+  batches via pipeline (`reserveMany`), and degrades to a local store on a Redis
+  outage so a node never blindly accepts replays and never hard-stops. See
+  `DISTRIBUTED_REPLAY.md`.
+- **Fleet-wide key revocation** — a shared `RevocationStore`
+  (`createRedisRevocationStore`, `src/revocation.ts`) is consulted on the verify
+  path via `withRevocationCheck`. A key revoked on one node is rejected on all
+  nodes; reads are cached and fail **closed** by default. See `KEY_REVOCATION.md`.
+
 ## Remaining risks (open)
 
-- In-memory replay cache is not sufficient for distributed multi-node deployments.
-- No built-in key revocation or expiry enforcement layer yet.
 - No formal fuzz campaign yet for parser/canonicalization boundaries.
+- Revocation/replay stores rely on a correctly provisioned, available Redis (or
+  equivalent) control plane; operators own its HA and clock synchronization.
+- No third-party cryptographic audit yet.
 
-## v1.0 required mitigations
+## Required production mitigations
 
 - Keep signature verification enabled by default in production paths.
-- Deploy a shared replay store for horizontally scaled gateways.
-- Enforce key lifecycle policy (rotation, expiry, revocation) in control plane.
+- Deploy a shared replay store (`createRedisReplayStore`) for horizontally scaled gateways.
+- Wire a shared revocation store (`createRedisRevocationStore` + `withRevocationCheck`)
+  and enforce key lifecycle policy (rotation, expiry, revocation) in the control plane.

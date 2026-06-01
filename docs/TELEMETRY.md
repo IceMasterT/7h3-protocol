@@ -16,7 +16,7 @@ Transport-level telemetry can be attached to `receiveEnvelope` via `telemetry` c
 ## Usage
 
 ```ts
-import { receiveEnvelope } from './src/gluv/protocolTransport'
+import { receiveEnvelope } from './src/protocolTransport'
 
 await receiveEnvelope(rawEnvelope, {
   nowMs: Date.now(),

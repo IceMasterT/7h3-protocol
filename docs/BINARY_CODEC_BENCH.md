@@ -1,6 +1,6 @@
 # Binary Codec Benchmark
 
-GLUV includes a binary wire codec prototype in `src/gluv/protocolBinary.ts`.
+GLUV includes a binary wire codec prototype in `src/protocolBinary.ts`.
 
 ## Run comparison
 

@@ -28,6 +28,11 @@
   - host compromise
   - failed integrity investigation
 - Revoked keys must fail verification in resolver control plane within SLA.
+- For multi-node deployments, back revocation with a shared `RevocationStore`
+  (`createRedisRevocationStore`) and wrap the verification resolver with
+  `withRevocationCheck` so a revoke on one node is enforced fleet-wide. The
+  store fails **closed** by default: if the revocation list is unreachable, the
+  key is treated as revoked. See `KEY_REVOCATION.md`.
 
 ## Storage requirements
 
@@ -40,7 +45,7 @@
 - Production endpoints require signatures by default.
 - `HS256` is recommended for tightly controlled private clusters.
 - `ED25519` is recommended for cross-domain or multi-tenant federation.
-- Use `RollingKeyring` (`src/gluv/keyRotation.ts`) for overlap windows, verify-only periods, and revocation enforcement.
+- Use `RollingKeyring` (`src/keyRotation.ts`) for overlap windows, verify-only periods, and revocation enforcement.
 
 ## Audit requirements
 

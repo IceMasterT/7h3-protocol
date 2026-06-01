@@ -12,6 +12,11 @@ export interface ReplayCache {
 
 export interface DistributedReplayStore {
   reserve(key: string, expiresAtMs: number, nowMs: number): boolean | Promise<boolean>
+  /** Optional batch reserve; enables single round-trip checks for batched envelopes. */
+  reserveMany?(
+    entries: Array<{ key: string; expiresAtMs: number }>,
+    nowMs: number,
+  ): boolean[] | Promise<boolean[]>
 }
 
 interface ExpiryEntry {
@@ -172,6 +177,16 @@ export class DistributedReplayCache implements ReplayCache {
   }
 
   async consumeMany(envelopes: ProtocolEnvelope[], nowMs = Date.now()): Promise<ReplayCheckResult[]> {
+    if (this.store.reserveMany) {
+      const entries = envelopes.map((envelope) => ({
+        key: this.makeKey(envelope),
+        expiresAtMs: envelope.header.timestampMs + envelope.header.ttlMs,
+      }))
+      const reserved = await this.store.reserveMany(entries, nowMs)
+      return reserved.map((ok) =>
+        ok ? { ok: true } : { ok: false, reason: 'Replay detected for sender/messageId/nonce' },
+      )
+    }
     return Promise.all(envelopes.map((envelope) => this.consume(envelope, nowMs)))
   }
 }

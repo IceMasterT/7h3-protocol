@@ -13,7 +13,7 @@ Messages with `header.timestampMs > nowMs + maxClockSkewMs` are rejected with:
 ## Usage
 
 ```ts
-import { receiveEnvelope } from './src/gluv/protocolTransport'
+import { receiveEnvelope } from './src/protocolTransport'
 
 const result = await receiveEnvelope(rawEnvelope, {
   nowMs: Date.now(),

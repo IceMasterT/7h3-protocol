@@ -52,10 +52,11 @@ Python and Rust SDKs live under `sdk/python` (`from aip7h3 import …`) and `sdk
 
 ## Status & honest scope
 
-- ✅ 87-test core suite green (TS); real HMAC + Ed25519; genuine TS/Python/Rust conformance parity.
-- ⚠️ The in-memory replay cache is single-node — use the distributed-cache interface (`docs/DISTRIBUTED_REPLAY.md`) with a shared store for horizontal scale.
-- ⚠️ No built-in key revocation/expiry enforcement layer yet (see `docs/THREAT_MODEL.md` for the full open-risk list).
-- Not yet independently security-audited. Reproductions welcome.
+- ✅ Core test suite green (TS); real HMAC + Ed25519; genuine TS/Python/Rust conformance parity; a live-Redis integration test for the distributed stores.
+- ✅ **Distributed replay** — Redis-backed store with atomic `SET NX PX`, batch pipeline, and graceful degradation (`docs/DISTRIBUTED_REPLAY.md`).
+- ✅ **Fleet-wide key revocation** — shared revocation store consulted on the verify path, cached + fail-closed (`docs/KEY_REVOCATION.md`).
+- ⚠️ The distributed stores require an available Redis (or equivalent) control plane — operators own its HA and clock sync.
+- ⚠️ No formal fuzz campaign for parser boundaries; not yet independently security-audited. Reproductions welcome.
 
 ## Docs
 

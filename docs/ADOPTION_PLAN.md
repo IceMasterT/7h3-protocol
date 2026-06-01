@@ -11,7 +11,7 @@ This plan turns `aip/0.1` into a production-ready protocol for agentic AI system
 
 ## Protocol Productization (Weeks 1-2)
 
-- Freeze protocol semantics from executable sources in `src/gluv/protocol.ts`, `src/gluv/protocolTransport.ts`, and `src/gluv/protocolReplay.ts`.
+- Freeze protocol semantics from executable sources in `src/protocol.ts`, `src/protocolTransport.ts`, and `src/protocolReplay.ts`.
 - Publish `AIP RFC v0.1` with normative language (`MUST`, `SHOULD`, `MAY`) covering:
   - canonicalization rules (field order + optional fields)
   - signature requirements and key identifiers
