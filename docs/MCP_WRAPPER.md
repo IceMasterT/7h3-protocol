@@ -77,6 +77,46 @@ everything the transport pipeline offers:
 - **Ed25519** — sign with `signEnvelopeEd25519` and resolve material via `signatureResolver`.
 - **Clock skew / TTL / telemetry** — `maxClockSkewMs`, `telemetry`, etc.
 
+## Transports
+
+The wrapper is transport-agnostic (it operates on wire envelopes). Two adapters
+connect it to real transports; both keep the handler on plain JSON-RPC.
+
+### stdio (newline-delimited)
+
+```ts
+import { wrapMcpServer, serveMcpOverStdio, createStdioMcpClient, wrapMcpClient } from '@7h3/protocol'
+
+// server process: read envelopes from stdin, write replies to stdout
+serveMcpOverStdio(wrapMcpServer(myMcpServer, serverOpts)) // defaults to process.stdin/stdout
+
+// client process: spawn the server and talk to it
+const stdio = createStdioMcpClient({ input: child.stdout, output: child.stdin })
+const call = wrapMcpClient(stdio.send, clientOpts)
+const result = await call({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'planner' } })
+```
+
+Stdio frames one envelope per line, so it supports the `json` and `compact` wire
+formats. For `binary`, use HTTP.
+
+### HTTP
+
+```ts
+import http from 'node:http'
+import { wrapMcpServer, createHttpMcpHandler, createHttpMcpClient, wrapMcpClient } from '@7h3/protocol'
+
+// server: any node:http-compatible host
+http.createServer(createHttpMcpHandler(wrapMcpServer(myMcpServer, serverOpts))).listen(8787)
+
+// client: POSTs each request envelope, returns the reply envelope (global fetch)
+const httpClient = createHttpMcpClient({ url: 'http://localhost:8787' })
+const call = wrapMcpClient(httpClient.send, clientOpts)
+const result = await call({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'planner' } })
+```
+
+Pass `{ binary: true }` to both `createHttpMcpHandler` and `createHttpMcpClient`
+to use the `binary` wire format over HTTP.
+
 ## Notes
 
 - Both peers must be wrapped: the on-wire message is an AIP envelope, not plain
