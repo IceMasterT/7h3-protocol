@@ -45,6 +45,39 @@ const secured = wrapMcpServer(myMcpServer, {
 // `secured(rawWireEnvelope) => Promise<rawWireEnvelope>` — drop it into your stdio/HTTP transport read loop.
 ```
 
+## HMAC vs Ed25519
+
+| | HMAC (HS256) | Ed25519 |
+|---|---|---|
+| Secret model | Shared secret — both sides can sign and verify | Keypair — only you can sign; peers verify with your public key |
+| Peer compromise | A compromised peer can forge messages | A compromised peer cannot forge your messages |
+| Key distribution | One secret distributed to all trusted peers | Public key is safe to publish; private key never leaves the signer |
+| When to use | Dev, testing, fully trusted internal infra | Production, multi-tenant, or any boundary where you do not control both sides |
+
+**Use HMAC when** you own both sides of the wire (same team, same trusted cluster) and want the simplest possible setup.
+
+**Use Ed25519 in production.** If a worker/peer node is compromised, the attacker gains verify capability only — they cannot impersonate the signer.
+
+Ed25519 server example (replace the HMAC `sign`/`receive` block above):
+
+```ts
+import { wrapMcpServer, signEnvelopeEd25519 } from '@7h3/protocol'
+
+// Generate keys once: npx @7h3/protocol-mcp → aip_generate_keypair
+// Set AIP_PRIVATE_KEY (server) and distribute AIP_CLIENT_PUBLIC_KEY (client's pubkey)
+
+const secured = wrapMcpServer(myMcpServer, {
+  selfAgentId: 'agent.mcp-server',
+  sign: (e) => signEnvelopeEd25519(e, process.env.AIP_PRIVATE_KEY!, 'k1'),
+  receive: {
+    signatureResolver: async (sig) =>
+      sig.alg === 'ED25519'
+        ? { alg: 'ED25519' as const, publicKey: process.env.AIP_CLIENT_PUBLIC_KEY! }
+        : undefined,
+  },
+})
+```
+
 ## Client side — sign requests, verify responses
 
 ```ts

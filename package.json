@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "7h3 Protocol — AIP (Aurelion Interaction Protocol): deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version aip/0.1.",
   "type": "module",
   "license": "MIT",
@@ -55,6 +55,7 @@
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
+    "fast-check": "^4.8.0",
     "globals": "^16.5.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.3",

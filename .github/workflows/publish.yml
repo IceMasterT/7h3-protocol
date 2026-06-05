@@ -1,0 +1,59 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-aip:
+    name: publish @7h3/protocol
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build dist/npm-aip
+        run: npm run package:aip
+
+      - name: Publish @7h3/protocol
+        run: npm publish --provenance --access public
+        working-directory: dist/npm-aip
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-mcp:
+    name: publish @7h3/protocol-mcp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: mcp-server
+
+      - name: Build mcp-server
+        run: npm run build
+        working-directory: mcp-server
+
+      - name: Publish @7h3/protocol-mcp
+        run: npm publish --provenance --access public
+        working-directory: mcp-server
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

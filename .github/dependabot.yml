@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # Root package (npm)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      npm-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  # mcp-server sub-package (npm)
+  - package-ecosystem: "npm"
+    directory: "/mcp-server"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      npm-mcp-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"

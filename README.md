@@ -42,6 +42,22 @@ const ok = await verifyEnvelopeHmac(envelope, secret) // tamper + auth check
 // → replay-check downstream via the transport's InMemoryReplayCache (or a shared store)
 ```
 
+> **Production recommendation:** use Ed25519. HMAC is a shared secret — any peer that can verify can also forge. Ed25519 is asymmetric: you sign with a private key, peers verify with your public key. Compromising a peer does not compromise your signing key.
+>
+> ```ts
+> import {
+>   generateEd25519KeypairBase64Url, createEnvelope,
+>   signEnvelopeEd25519, verifyEnvelopeEd25519,
+> } from '@7h3/protocol'
+>
+> const { privateKey, publicKey } = await generateEd25519KeypairBase64Url()
+> const envelope = await signEnvelopeEd25519(
+>   createEnvelope({ sender: 'planner', recipient: 'worker', intent: 'TASK', content: 'do-the-thing' }),
+>   privateKey, 'k1',
+> )
+> const ok = await verifyEnvelopeEd25519(envelope, publicKey)
+> ```
+
 ## Install
 
 ```bash
@@ -62,6 +78,12 @@ Python and Rust SDKs live under `sdk/python` (`from aip7h3 import …`) and `sdk
 ## Docs
 
 Architecture, threat model, key management, benchmarking methodology, and release governance live in [`docs/`](./docs). Independent examination: [`docs/PROJECT_EXAMINATION_2026-05-31.md`](./docs/PROJECT_EXAMINATION_2026-05-31.md).
+
+## Security
+
+Report vulnerabilities via the coordinated disclosure process in [`SECURITY.md`](./SECURITY.md). Do not open a public issue for security findings.
+
+No independent security audit has been performed on this library. The cryptographic primitives are standard (WebCrypto Ed25519 / HMAC-SHA256), but the envelope parsing, canonicalization, and replay-cache logic have not been formally reviewed or fuzz-tested. Treat this accordingly in high-stakes deployments.
 
 ## License
 

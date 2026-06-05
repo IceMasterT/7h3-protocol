@@ -6,6 +6,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.1.2] — 2026-06-05
+
+### Added
+- `SECURITY.md` — coordinated vulnerability disclosure process, 48h acknowledgement / 14-day critical patch SLA, Hall of Thanks
+- `CONTRIBUTING.md` — test commands, wire-freeze policy, conformance fixture update requirement, PR workflow
+- `GOVERNANCE.md` — LF Minimum Viable Governance style: single-maintainer stage, decision process, co-maintainership path
+- `.github/dependabot.yml` — weekly npm and GitHub Actions dependency updates; non-security updates grouped to reduce noise
+- `.github/workflows/scorecard.yml` — OpenSSF Scorecard workflow (activates when Actions billing is restored)
+- `.github/workflows/publish.yml` — provenance-enabled npm publish workflow for both `@7h3/protocol` and `@7h3/protocol-mcp` (activates when Actions billing is restored)
+- `src/protocolFuzz.advanced.test.ts` — 8 property-based fuzz tests via fast-check: wire decoder resilience (never throws on arbitrary input), canonicalization determinism (field-order invariant), replay cache uniqueness properties
+
+### Changed
+- README: added Ed25519 production recommendation with code snippet; added Security section linking to SECURITY.md
+- `docs/MCP_WRAPPER.md`: added HMAC vs Ed25519 comparison table and Ed25519 `wrapMcpServer` example
+- `mcp-server`: updated `aip_wrap_mcp_server` tool description to guide toward Ed25519 for production; HMAC boilerplate now includes a production upgrade comment
+
+### Fixed
+- README: corrected overstated fuzz status (now accurately notes property-based tests exist; formal fuzzing campaign still not done)
+
+---
+
+## [0.1.1] — 2026-06-05
+
+### Fixed
+- Published package was missing 21 individual `.d.ts` module files — only `index.d.ts` was included, causing TS2305 errors in any consumer using NodeNext or bundler moduleResolution. All 22 declaration files now ship with the package.
+- `scripts/prepare-aip-package.ts`: copy all `.d.ts` files from `dist/aip/` instead of only `index.d.ts`
+
+### Added
+- `@7h3/protocol-mcp@0.1.0` — MCP server installable into Claude Code (`claude mcp add aip -- npx @7h3/protocol-mcp`). Five tools: `aip_generate_secret`, `aip_generate_keypair`, `aip_wrap_mcp_server`, `aip_sign`, `aip_verify`
+
+---
+
 ## [0.1.0] — 2026-06-01
 
 ### Added
