@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, copyFile, readdir } from 'node:fs/promises'
 import process from 'node:process'
 
 interface RootPackageJson {
@@ -23,7 +23,15 @@ async function main(): Promise<void> {
 
   await mkdir(outDir, { recursive: true })
   await copyFile('dist/aip/index.js', `${outDir}/index.js`)
-  await copyFile('dist/aip/index.d.ts', `${outDir}/index.d.ts`)
+
+  // Copy all .d.ts files — index.d.ts re-exports from the individual module files,
+  // so all of them must be present for TypeScript consumers to resolve types.
+  const distFiles = await readdir('dist/aip')
+  for (const file of distFiles) {
+    if (file.endsWith('.d.ts')) {
+      await copyFile(`dist/aip/${file}`, `${outDir}/${file}`)
+    }
+  }
 
   const packageJson = {
     name: '@7h3/protocol',
@@ -38,7 +46,7 @@ async function main(): Promise<void> {
         types: './index.d.ts',
       },
     },
-    files: ['index.js', 'index.d.ts', 'README.md'],
+    files: ['index.js', '*.d.ts', 'README.md'],
     license: 'MIT',
     repository: {
       type: 'git',
