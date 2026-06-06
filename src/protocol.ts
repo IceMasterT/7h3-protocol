@@ -350,6 +350,7 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
   const version = typeof header.version === 'string' ? header.version : ''
   const messageId = typeof header.messageId === 'string' ? header.messageId : ''
   const sender = typeof header.sender === 'string' ? header.sender : ''
+  const nonce = typeof header.nonce === 'string' ? header.nonce : ''
   const timestampMs = typeof header.timestampMs === 'number' ? header.timestampMs : 0
   const ttlMs = typeof header.ttlMs === 'number' ? header.ttlMs : 0
   const content = typeof body.content === 'string' ? body.content : ''
@@ -362,6 +363,9 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
   }
   if (!sender.trim()) {
     diagnostics.push({ level: 'error', message: 'Missing sender identity' })
+  }
+  if (!nonce.trim()) {
+    diagnostics.push({ level: 'error', message: 'Missing nonce — replay protection requires a unique nonce per message' })
   }
   if (ttlMs <= 0) {
     diagnostics.push({ level: 'error', message: 'ttlMs must be greater than zero' })

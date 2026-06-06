@@ -100,7 +100,9 @@ export class InMemoryReplayCache implements ReplayCache {
   }
 
   private makeKey(envelope: ProtocolEnvelope): string {
-    return `${envelope.header.sender}|${envelope.header.messageId}|${envelope.header.nonce}`
+    // encodeURIComponent escapes '|' so sender/messageId/nonce can never collide
+    // across field boundaries (e.g. sender="a|b" vs messageId="a|b").
+    return `${encodeURIComponent(envelope.header.sender)}|${encodeURIComponent(envelope.header.messageId)}|${encodeURIComponent(envelope.header.nonce)}`
   }
 
   prune(nowMs = Date.now()): void {
@@ -163,7 +165,7 @@ export class DistributedReplayCache implements ReplayCache {
   }
 
   private makeKey(envelope: ProtocolEnvelope): string {
-    return `${envelope.header.sender}|${envelope.header.messageId}|${envelope.header.nonce}`
+    return `${encodeURIComponent(envelope.header.sender)}|${encodeURIComponent(envelope.header.messageId)}|${encodeURIComponent(envelope.header.nonce)}`
   }
 
   async consume(envelope: ProtocolEnvelope, nowMs = Date.now()): Promise<ReplayCheckResult> {

@@ -268,8 +268,8 @@ npm run conformance:rust          # Rust cargo test (7 tests)
 | MCP hardening wrapper | ✅ 4 bindings; all independently tested |
 | Property-based fuzz tests | ✅ 8 properties via fast-check (wire decoder, canonicalization, replay) |
 | Live-Redis integration test | ✅ Auto-skips if no server present — no false passes |
-| Formal fuzz campaign | ✅ Mutation harnesses (50k/20k rounds, 0 crashes) + cargo-fuzz targets — see [`docs/FUZZ_CAMPAIGN.md`](./docs/FUZZ_CAMPAIGN.md) |
-| Independent security audit | ⚠️ Not yet performed — cryptographic primitives are standard WebCrypto; parsing/replay logic unaudited |
+| Formal fuzz campaign | ✅ TypeScript mutation harnesses run clean (50k/20k rounds, 0 crashes); Rust targets authored, not yet executed (`cargo-fuzz` not installed) — see [`docs/FUZZ_CAMPAIGN.md`](./docs/FUZZ_CAMPAIGN.md) |
+| Independent security audit | ⚠️ Not yet performed by an external reviewer — internal AI-assisted review completed 2026-06-05, 2 bugs found and fixed (see [`docs/SECURITY_REVIEW_2026-06-05.md`](./docs/SECURITY_REVIEW_2026-06-05.md)); cryptographic primitives are standard WebCrypto; parsing/replay/canonicalization logic remains unaudited by a qualified third party |
 | Python Ed25519 | ✅ Pure-Python fallback — no external packages required; tries `cryptography` → `PyNaCl` → pure Python in order |
 | Rust crates.io publish | ✅ Metadata complete; `cargo publish --dry-run` passes — publish with `cargo publish` when ready |
 | Redis HA | ✅ Sentinel, Cluster, and Upstash adapter patterns documented in [`docs/DISTRIBUTED_REPLAY.md`](./docs/DISTRIBUTED_REPLAY.md) |
@@ -290,6 +290,7 @@ npm run conformance:rust          # Rust cargo test (7 tests)
 | [`docs/MIGRATION_GUIDE.md`](./docs/MIGRATION_GUIDE.md) | Breaking-change upgrade paths |
 | [`docs/OPERATORS.md`](./docs/OPERATORS.md) | Deployment and operations reference |
 | [`docs/TELEMETRY.md`](./docs/TELEMETRY.md) | Telemetry hooks and observability |
+| [`docs/SECURITY_REVIEW_2026-06-05.md`](./docs/SECURITY_REVIEW_2026-06-05.md) | AI-assisted internal security review — findings, fixes, positive findings |
 | [`docs/PROJECT_EXAMINATION_2026-05-31.md`](./docs/PROJECT_EXAMINATION_2026-05-31.md) | Independent examination — verified vs asserted |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Full version history |
 
