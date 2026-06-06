@@ -246,7 +246,7 @@ See `docs/TELEMETRY.md`, `docs/AI_DECISION_CARD.md`, `docs/OPERATORS.md`.
 All three SDKs are driven by the same conformance fixture set at `conformance/aip_v0_1.json`. Signatures verified against known vectors in all three runtimes:
 
 ```bash
-npm test                          # TypeScript (123 tests / 22 files)
+npm test                          # TypeScript (131 tests / 23 files)
 npm run conformance:python        # Python unittest
 npm run conformance:rust          # Rust cargo test (7 tests)
 ```
@@ -259,7 +259,7 @@ npm run conformance:rust          # Rust cargo test (7 tests)
 
 | What | Status |
 |---|---|
-| Core test suite | ✅ 123 tests / 22 files — all green |
+| Core test suite | ✅ 131 tests / 23 files — all green |
 | Cryptography | ✅ Real WebCrypto — HMAC-SHA256 + Ed25519 (no hand-rolled crypto) |
 | Deterministic canonicalization | ✅ Fixed key order; byte-identical across runtimes |
 | TS/Python/Rust parity | ✅ Shared conformance fixtures; all pass |
@@ -268,7 +268,7 @@ npm run conformance:rust          # Rust cargo test (7 tests)
 | MCP hardening wrapper | ✅ 4 bindings; all independently tested |
 | Property-based fuzz tests | ✅ 8 properties via fast-check (wire decoder, canonicalization, replay) |
 | Live-Redis integration test | ✅ Auto-skips if no server present — no false passes |
-| Formal fuzz campaign | ✅ TypeScript mutation harnesses run clean (50k/20k rounds, 0 crashes); Rust targets authored, not yet executed (`cargo-fuzz` not installed) — see [`docs/FUZZ_CAMPAIGN.md`](./docs/FUZZ_CAMPAIGN.md) |
+| Formal fuzz campaign | ✅ TypeScript mutation harnesses run clean (50k/20k rounds, 0 crashes); Rust targets built and run (4.9M iterations, no panics in `canonicalize_envelope`/`decode_envelope`) — see [`docs/FUZZ_CAMPAIGN.md`](./docs/FUZZ_CAMPAIGN.md) |
 | Independent security audit | ⚠️ Not yet performed by an external reviewer — internal AI-assisted review completed 2026-06-05, 2 bugs found and fixed (see [`docs/SECURITY_REVIEW_2026-06-05.md`](./docs/SECURITY_REVIEW_2026-06-05.md)); cryptographic primitives are standard WebCrypto; parsing/replay/canonicalization logic remains unaudited by a qualified third party |
 | Python Ed25519 | ✅ Pure-Python fallback — no external packages required; tries `cryptography` → `PyNaCl` → pure Python in order |
 | Rust crates.io publish | ✅ Metadata complete; `cargo publish --dry-run` passes — publish with `cargo publish` when ready |
