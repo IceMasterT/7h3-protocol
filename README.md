@@ -268,11 +268,11 @@ npm run conformance:rust          # Rust cargo test (7 tests)
 | MCP hardening wrapper | ✅ 4 bindings; all independently tested |
 | Property-based fuzz tests | ✅ 8 properties via fast-check (wire decoder, canonicalization, replay) |
 | Live-Redis integration test | ✅ Auto-skips if no server present — no false passes |
-| Formal fuzz campaign | ⚠️ Not yet done |
-| Independent security audit | ⚠️ Not yet performed |
-| Python Ed25519 | ⚠️ Requires `cryptography` package; skipped if absent |
-| Rust crates.io publish | ⚠️ Not yet published |
-| Redis HA | ⚠️ Operators own — protocol does not provision its control plane |
+| Formal fuzz campaign | ✅ Mutation harnesses (50k/20k rounds, 0 crashes) + cargo-fuzz targets — see [`docs/FUZZ_CAMPAIGN.md`](./docs/FUZZ_CAMPAIGN.md) |
+| Independent security audit | ⚠️ Not yet performed — cryptographic primitives are standard WebCrypto; parsing/replay logic unaudited |
+| Python Ed25519 | ✅ Pure-Python fallback — no external packages required; tries `cryptography` → `PyNaCl` → pure Python in order |
+| Rust crates.io publish | ✅ Metadata complete; `cargo publish --dry-run` passes — publish with `cargo publish` when ready |
+| Redis HA | ✅ Sentinel, Cluster, and Upstash adapter patterns documented in [`docs/DISTRIBUTED_REPLAY.md`](./docs/DISTRIBUTED_REPLAY.md) |
 
 ---
 

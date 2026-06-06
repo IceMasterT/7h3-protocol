@@ -69,8 +69,74 @@ automatically by `DistributedReplayCache.consumeMany` when present.
 
 Every degraded decision fires `onDegraded` so the condition is observable — degradation is never silent.
 
+## High-availability topologies
+
+### Redis Sentinel
+
+ioredis connects to Sentinel transparently. The adapter wrapper is identical to standalone Redis:
+
+```ts
+import Redis from 'ioredis'
+
+const redis = new Redis({
+  sentinels: [
+    { host: 'sentinel-1', port: 26379 },
+    { host: 'sentinel-2', port: 26379 },
+    { host: 'sentinel-3', port: 26379 },
+  ],
+  name: 'mymaster',
+})
+
+const aipRedis = {
+  set: async (key: string, value: string, opts: { nx?: boolean; pxMs?: number } = {}) => {
+    const args: (string | number)[] = []
+    if (opts.pxMs !== undefined) args.push('PX', opts.pxMs)
+    if (opts.nx) args.push('NX')
+    return (await redis.set(key, value, ...(args as [string, number, string]))) === 'OK'
+      ? ('OK' as const)
+      : null
+  },
+}
+
+const replayCache = new DistributedReplayCache(
+  createRedisReplayStore(aipRedis, { errorBehavior: 'fallback' }),
+)
+```
+
+Sentinel handles leader election automatically. During failover (typically < 30 s), `errorBehavior` controls whether requests are rejected or degrade to local replay protection.
+
+### Redis Cluster
+
+AIP replay keys (`aip:replay:{sender}:{messageId}:{nonce}`) and revocation keys (`aip:revoked:{keyId}`) are independent — no cross-slot transactions required. Cluster mode works without modification. Adapt a Cluster client the same way as standalone.
+
+```ts
+const cluster = new Redis.Cluster([
+  { host: 'node-1', port: 7000 },
+  { host: 'node-2', port: 7001 },
+  { host: 'node-3', port: 7002 },
+])
+// adapter wrapper identical to standalone
+```
+
+### Upstash (serverless / edge)
+
+Upstash's `@upstash/redis` client's `set` method matches `RedisLikeClient` directly:
+
+```ts
+import { Redis } from '@upstash/redis'
+
+const redis = new Redis({ url: process.env.UPSTASH_URL!, token: process.env.UPSTASH_TOKEN! })
+
+const aipRedis = {
+  set: async (key: string, value: string, opts: { nx?: boolean; pxMs?: number } = {}) =>
+    redis.set(key, value, { nx: opts.nx, px: opts.pxMs }),
+}
+```
+
 ## Operational guidance
 
 - Use a distributed replay cache for any horizontally scaled gateway.
-- Keep clocks synchronized (NTP) to minimize TTL-skew edge cases.
-- Monitor replay reject rate and `onDegraded` rate as security/health signals.
+- Keep clocks synchronized (NTP / PTP) — AIP TTL checks require clocks within the configured skew window (default ±30 s) across all nodes and Sentinel/Cluster members.
+- Monitor replay reject rate and `onDegraded` rate as security / health signals.
+- During Redis failover, `errorBehavior: 'fallback'` keeps traffic flowing under single-node replay protection. `errorBehavior: 'reject'` is safer but means failover = downtime for inbound envelopes. Choose the posture that matches your threat model.
+- The replay store is the only component AIP requires Redis for. The revocation store (`createRedisRevocationStore`) uses the same `RedisLikeClient` interface and the same HA patterns apply.

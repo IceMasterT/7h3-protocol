@@ -4,6 +4,47 @@
  * The library stays client-agnostic: any Redis client (ioredis, node-redis,
  * Upstash, a cluster proxy, ...) can be adapted to this interface, so
  * `@7h3/protocol` ships with no Redis dependency of its own.
+ *
+ * # High-Availability topologies
+ *
+ * ## Redis Sentinel
+ * ioredis connects to a Sentinel group transparently — adapt the same client
+ * to `RedisLikeClient` with the same three-line wrapper. The library requires
+ * no topology-specific changes:
+ *
+ * ```ts
+ * import Redis from 'ioredis'
+ * import { adaptIoredis } from './adaptIoredis'  // your adapter module
+ *
+ * const client = new Redis({
+ *   sentinels: [
+ *     { host: 'sentinel-1', port: 26379 },
+ *     { host: 'sentinel-2', port: 26379 },
+ *     { host: 'sentinel-3', port: 26379 },
+ *   ],
+ *   name: 'mymaster',
+ * })
+ * const aipRedis = adaptIoredis(client)  // same adapter as standalone Redis
+ * ```
+ *
+ * ## Redis Cluster
+ * Cluster mode shards keys across nodes using CRC16. AIP replay keys
+ * (`aip:replay:{sender}:{messageId}:{nonce}`) and revocation keys
+ * (`aip:revoked:{keyId}`) are independent — no cross-slot transactions are
+ * required. Adapt a Cluster client the same way as a standalone client.
+ *
+ * ## Upstash / serverless Redis
+ * Upstash's HTTP-based Redis client exposes a `set(key, value, options)`
+ * interface compatible with `RedisLikeClient` without any wrapping.
+ *
+ * ## Operational requirements
+ * - **Clock sync**: AIP TTL checks require clocks within the configured skew
+ *   window (default ±30 s). NTP or PTP is required across all nodes.
+ * - **HA of the replay store itself**: the protocol degrades gracefully on
+ *   Redis outage (`errorBehavior: 'fallback'` or `'allow'`), but a hard
+ *   `'reject'` posture prevents replay-store outage from becoming a
+ *   denial-of-service vector. Choose the posture that matches your threat model.
+ * - See `docs/DISTRIBUTED_REPLAY.md` for full operational guidance.
  */
 
 export interface RedisSetOptions {

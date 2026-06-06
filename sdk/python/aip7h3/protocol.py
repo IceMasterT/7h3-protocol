@@ -7,6 +7,10 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, TypedDict
 
+# ---------------------------------------------------------------------------
+# Optional native Ed25519 backend — try cryptography, then PyNaCl
+# ---------------------------------------------------------------------------
+
 try:
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -15,8 +19,162 @@ try:
     )
 
     _HAS_CRYPTOGRAPHY = True
-except Exception:  # pragma: no cover - optional dependency
+except Exception:
     _HAS_CRYPTOGRAPHY = False
+
+try:
+    import nacl.signing as _nacl_signing  # type: ignore[import]
+
+    _HAS_NACL = True
+except Exception:
+    _HAS_NACL = False
+
+# ---------------------------------------------------------------------------
+# Pure-Python Ed25519 fallback (no external dependencies)
+#
+# Uses extended twisted Edwards coordinates (X:Y:Z:T) to eliminate the
+# expensive field inversion from the inner loop — inversion runs once at
+# point compression only. ~10–50 ms/op in CPython; correct for conformance
+# testing. Install 'cryptography' for production-grade performance.
+#
+# Based on the reference implementation: https://ed25519.cr.yp.to/software.html
+# ---------------------------------------------------------------------------
+
+_P = 2**255 - 19
+_L = 2**252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_SQRT_M1 = pow(2, (_P - 1) // 4, _P)
+
+# Base point G in extended coordinates (X:Y:Z:T)
+_GY = 4 * pow(5, _P - 2, _P) % _P
+_GX_SQ = (_GY * _GY - 1) * pow(_D * _GY * _GY + 1, _P - 2, _P) % _P
+_GX = pow(_GX_SQ, (_P + 3) // 8, _P)
+if (_GX * _GX - _GX_SQ) % _P != 0:
+    _GX = _GX * _SQRT_M1 % _P
+if _GX & 1:
+    _GX = _P - _GX
+_G_BASE = (_GX, _GY, 1, _GX * _GY % _P)
+
+
+def _point_add(P: tuple, Q: tuple) -> tuple:
+    A = (P[1] - P[0]) * (Q[1] - Q[0]) % _P
+    B = (P[1] + P[0]) * (Q[1] + Q[0]) % _P
+    C = 2 * P[3] * Q[3] * _D % _P
+    D_ = 2 * P[2] * Q[2] % _P
+    E = B - A
+    F = D_ - C
+    G_ = D_ + C
+    H = B + A
+    return (E * F % _P, G_ * H % _P, F * G_ % _P, E * H % _P)
+
+
+def _point_mul(s: int, P: tuple) -> tuple:
+    Q: tuple = (0, 1, 1, 0)  # neutral element
+    while s > 0:
+        if s & 1:
+            Q = _point_add(Q, P)
+        P = _point_add(P, P)
+        s >>= 1
+    return Q
+
+
+def _compress(P: tuple) -> bytes:
+    zi = pow(P[2], _P - 2, _P)
+    x = P[0] * zi % _P
+    y = P[1] * zi % _P
+    return int.to_bytes(y | ((x & 1) << 255), 32, "little")
+
+
+def _decompress(b: bytes) -> Optional[tuple]:
+    y = int.from_bytes(b, "little")
+    sign = y >> 255
+    y &= (1 << 255) - 1
+    x2 = (y * y - 1) * pow(_D * y * y + 1, _P - 2, _P) % _P
+    if x2 == 0:
+        return (0, y, 1, 0) if sign == 0 else None
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P != 0:
+        x = x * _SQRT_M1 % _P
+    if (x * x - x2) % _P != 0:
+        return None
+    if x & 1 != sign:
+        x = _P - x
+    return (x, y, 1, x * y % _P)
+
+
+def _py_ed25519_sign(seed: bytes, message: bytes) -> bytes:
+    h = hashlib.sha512(seed).digest()
+    a_bytes = bytearray(h[:32])
+    a_bytes[0] &= 248
+    a_bytes[31] &= 127
+    a_bytes[31] |= 64
+    a = int.from_bytes(a_bytes, "little")
+    prefix = h[32:]
+    A = _compress(_point_mul(a, _G_BASE))
+    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % _L
+    R = _compress(_point_mul(r, _G_BASE))
+    S = (r + int.from_bytes(hashlib.sha512(R + A + message).digest(), "little") * a) % _L
+    return R + int.to_bytes(S, 32, "little")
+
+
+def _py_ed25519_verify(pub_bytes: bytes, message: bytes, sig: bytes) -> bool:
+    if len(sig) != 64 or len(pub_bytes) != 32:
+        return False
+    A = _decompress(pub_bytes)
+    if A is None:
+        return False
+    R_pt = _decompress(sig[:32])
+    if R_pt is None:
+        return False
+    s = int.from_bytes(sig[32:], "little")
+    if s >= _L:
+        return False
+    h = int.from_bytes(hashlib.sha512(sig[:32] + pub_bytes + message).digest(), "little")
+    sB = _point_mul(s, _G_BASE)
+    hA = _point_mul(h, A)
+    return _compress(sB) == _compress(_point_add(R_pt, hA))
+
+
+# ---------------------------------------------------------------------------
+# DER key extraction helpers
+#
+# WebCrypto exports Ed25519 keys as PKCS8 (private) and SPKI (public) DER.
+# Both formats have a fixed structure for Ed25519 with known byte offsets:
+#
+#   PKCS8 v0 (48 bytes):
+#     30 2e 02 01 00 30 05 06 03 2b 65 70 04 22 04 20 [32-byte seed]
+#
+#   SPKI (44 bytes):
+#     30 2a 30 05 06 03 2b 65 70 03 21 00 [32-byte public key]
+# ---------------------------------------------------------------------------
+
+# fmt: off
+_PKCS8_ED25519_LEN = 48  # 30 2e 02 01 00 30 05 06 03 2b 65 70 04 22 04 20 [32-byte seed]
+_SPKI_ED25519_LEN  = 44  # 30 2a 30 05 06 03 2b 65 70 03 21 00 [32-byte public key]
+# fmt: on
+
+
+def _seed_from_pkcs8(pkcs8_der: bytes) -> bytes:
+    if len(pkcs8_der) != 48:
+        raise ValueError(
+            f"Ed25519 PKCS8 DER must be 48 bytes, got {len(pkcs8_der)}. "
+            "Ensure the key was exported with SubtleCrypto.exportKey('pkcs8', key)."
+        )
+    return pkcs8_der[16:48]
+
+
+def _pubkey_from_spki(spki_der: bytes) -> bytes:
+    if len(spki_der) != 44:
+        raise ValueError(
+            f"Ed25519 SPKI DER must be 44 bytes, got {len(spki_der)}. "
+            "Ensure the key was exported with SubtleCrypto.exportKey('spki', key)."
+        )
+    return spki_der[12:44]
+
+
+# ---------------------------------------------------------------------------
+# Protocol types
+# ---------------------------------------------------------------------------
 
 
 class ProtocolHeader(TypedDict, total=False):
@@ -54,6 +212,11 @@ class ProtocolDiagnostic:
     message: str
 
 
+# ---------------------------------------------------------------------------
+# Utility
+# ---------------------------------------------------------------------------
+
+
 def _json_string(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
@@ -65,6 +228,11 @@ def _base64url(data: bytes) -> str:
 def _base64url_decode(value: str) -> bytes:
     padding = "=" * ((4 - (len(value) % 4)) % 4)
     return base64.urlsafe_b64decode(value + padding)
+
+
+# ---------------------------------------------------------------------------
+# Canonicalization
+# ---------------------------------------------------------------------------
 
 
 def canonicalize_envelope(envelope: Dict[str, Any]) -> str:
@@ -99,6 +267,11 @@ def canonicalize_envelope(envelope: Dict[str, Any]) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# HMAC-SHA256 (HS256)
+# ---------------------------------------------------------------------------
+
+
 def sign_canonical_payload_hmac(canonical_payload: str, secret: str) -> str:
     digest = hmac.new(
         secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256
@@ -113,38 +286,70 @@ def verify_canonical_payload_hmac(
     return hmac.compare_digest(signature, expected)
 
 
+# ---------------------------------------------------------------------------
+# Ed25519 — tries cryptography → PyNaCl → pure-Python in order
+# ---------------------------------------------------------------------------
+
+
 def sign_canonical_payload_ed25519(
     canonical_payload: str, private_key_pkcs8_base64url: str
 ) -> str:
-    if not _HAS_CRYPTOGRAPHY:
-        raise RuntimeError("cryptography package is required for ED25519 operations")
-
     private_der = _base64url_decode(private_key_pkcs8_base64url)
-    private_key = serialization.load_der_private_key(private_der, password=None)
-    if not isinstance(private_key, Ed25519PrivateKey):
-        raise ValueError("Invalid ED25519 private key")
-    signature = private_key.sign(canonical_payload.encode("utf-8"))
-    return _base64url(signature)
+    msg = canonical_payload.encode("utf-8")
+
+    if _HAS_CRYPTOGRAPHY:
+        key = serialization.load_der_private_key(private_der, password=None)
+        if not isinstance(key, Ed25519PrivateKey):
+            raise ValueError("DER key is not an Ed25519 private key")
+        return _base64url(key.sign(msg))
+
+    if _HAS_NACL:
+        seed = _seed_from_pkcs8(private_der)
+        sk = _nacl_signing.SigningKey(seed)
+        return _base64url(bytes(sk.sign(msg).signature))
+
+    # Pure-Python fallback
+    seed = _seed_from_pkcs8(private_der)
+    return _base64url(_py_ed25519_sign(seed, msg))
 
 
 def verify_canonical_payload_ed25519(
     canonical_payload: str, signature: str, public_key_spki_base64url: str
 ) -> bool:
-    if not _HAS_CRYPTOGRAPHY:
-        raise RuntimeError("cryptography package is required for ED25519 operations")
-
     public_der = _base64url_decode(public_key_spki_base64url)
-    public_key = serialization.load_der_public_key(public_der)
-    if not isinstance(public_key, Ed25519PublicKey):
-        return False
+    msg = canonical_payload.encode("utf-8")
+    sig_bytes = _base64url_decode(signature)
 
+    if _HAS_CRYPTOGRAPHY:
+        try:
+            key = serialization.load_der_public_key(public_der)
+            if not isinstance(key, Ed25519PublicKey):
+                return False
+            key.verify(sig_bytes, msg)
+            return True
+        except Exception:
+            return False
+
+    if _HAS_NACL:
+        try:
+            pub_bytes = _pubkey_from_spki(public_der)
+            vk = _nacl_signing.VerifyKey(pub_bytes)
+            vk.verify(msg, sig_bytes)
+            return True
+        except Exception:
+            return False
+
+    # Pure-Python fallback
     try:
-        public_key.verify(
-            _base64url_decode(signature), canonical_payload.encode("utf-8")
-        )
-        return True
+        pub_bytes = _pubkey_from_spki(public_der)
+        return _py_ed25519_verify(pub_bytes, msg, sig_bytes)
     except Exception:
         return False
+
+
+# ---------------------------------------------------------------------------
+# Envelope-level sign/verify helpers
+# ---------------------------------------------------------------------------
 
 
 def sign_envelope_hmac(
@@ -197,6 +402,11 @@ def verify_envelope_ed25519(
     return verify_canonical_payload_ed25519(
         canonical, signature.get("value", ""), public_key_spki_base64url
     )
+
+
+# ---------------------------------------------------------------------------
+# Wire encode/decode
+# ---------------------------------------------------------------------------
 
 
 def encode_envelope_compact(envelope: Dict[str, Any]) -> str:
@@ -258,10 +468,7 @@ def decode_envelope(raw: str) -> Dict[str, Any]:
     if "cid" in parsed:
         body["correlationId"] = parsed["cid"]
 
-    envelope: Dict[str, Any] = {
-        "header": header,
-        "body": body,
-    }
+    envelope: Dict[str, Any] = {"header": header, "body": body}
     if parsed.get("sig"):
         envelope["signature"] = {
             "alg": parsed["sig"].get("a", "HS256"),
@@ -269,6 +476,11 @@ def decode_envelope(raw: str) -> Dict[str, Any]:
             "value": parsed["sig"]["v"],
         }
     return envelope
+
+
+# ---------------------------------------------------------------------------
+# Envelope validation
+# ---------------------------------------------------------------------------
 
 
 def validate_envelope(

@@ -1,0 +1,29 @@
+[package]
+name = "aip7h3-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.aip7h3]
+path = ".."
+
+# Each fuzz target is a separate binary
+[[bin]]
+name = "fuzz_decode"
+path = "fuzz_targets/fuzz_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_canonicalize"
+path = "fuzz_targets/fuzz_canonicalize.rs"
+test = false
+doc = false
+bench = false
