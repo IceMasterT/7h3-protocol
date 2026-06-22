@@ -1,8 +1,22 @@
-# @7h3/protocol
+<div align="center">
+  <img src="./docs/assets/banner.png" alt="@7h3/protocol — AIP: Sign every message. Reject every replay." width="100%">
 
-**AIP — Aurelion Interaction Protocol.** A deterministic, signed, replay-safe messaging layer for AI-to-AI and agent-to-agent traffic. Wire version: `aip/0.1`. TypeScript-first with byte-identical parity across Python and Rust.
+  <br/><br/>
 
-> The signing-and-replay layer your agent protocol forgot.
+  [![npm](https://img.shields.io/npm/v/@7h3/protocol?style=flat-square&color=818cf8&logo=npm&logoColor=white&label=%407h3%2Fprotocol)](https://www.npmjs.com/package/@7h3/protocol)
+  [![npm mcp](https://img.shields.io/npm/v/@7h3/protocol-mcp?style=flat-square&color=6366f1&logo=npm&logoColor=white&label=%407h3%2Fprotocol-mcp)](https://www.npmjs.com/package/@7h3/protocol-mcp)
+  [![Tests](https://img.shields.io/badge/tests-131%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol-aip/tree/main/src)
+  [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white)](./tsconfig.json)
+  [![License](https://img.shields.io/badge/license-MIT-94a3b8?style=flat-square)](./LICENSE)
+  [![Wire](https://img.shields.io/badge/wire-aip%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
+
+  <br/>
+
+  **The signing-and-replay layer your agent protocol forgot.**
+
+  <br/>
+</div>
 
 ---
 
