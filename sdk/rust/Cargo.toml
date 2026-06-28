@@ -1,6 +1,6 @@
 [package]
 name = "protocol-7h3"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "7h3 Protocol — Rust SDK. Deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python parity. Wire version 7h3/0.1."
 license = "MIT"

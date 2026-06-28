@@ -1,0 +1,19 @@
+# Node modules — rebuilt inside the image by npm ci
+node_modules
+
+# Git history — not needed in image layers
+.git
+
+# Log files
+*.log
+
+# Compiled TypeScript output from local dev builds (the Dockerfile
+# builder stage produces its own clean dist/)
+dist
+
+# Rust build artefacts from the SDK sub-crate — large and irrelevant
+# to the Node.js runtime image
+sdk/rust/target
+
+# Benchmark result JSON snapshots — not needed at runtime
+bench-results

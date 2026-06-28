@@ -1,0 +1,77 @@
+# 7h3 Protocol — Docker Compose development stack
+# Brings up:
+#   gateway — verifying AIP proxy (port 8080)
+#   api     — minimal example upstream (port 3000, internal only)
+#
+# Quick start:
+#   docker compose up --build
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # gateway — 7h3 Protocol verifying HTTP proxy
+  # ---------------------------------------------------------------------------
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    command:
+      - "--port"
+      - "8080"
+      - "--upstream"
+      - "http://api:3000"
+      - "--require"
+      - "ed25519"
+    environment:
+      # Override these at runtime to enable response signing:
+      #   GATEWAY_PRIVATE_KEY=<base64url private key>
+      #   GATEWAY_SENDER=gateway@my-service.example.com
+      NODE_ENV: production
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # api — minimal example upstream service
+  #
+  # This is a self-contained inline Node.js server that demonstrates the
+  # headers the gateway injects after successful envelope verification:
+  #   x-7h3-sender   — verified sender identity from the AIP envelope
+  #   x-7h3-verified — always "true" when the gateway passed the request
+  #
+  # Replace this service with your actual application in production.
+  # ---------------------------------------------------------------------------
+  api:
+    image: node:22-alpine
+    command: >
+      node -e "
+        const http = require('http');
+        const server = http.createServer((req, res) => {
+          const sender = req.headers['x-7h3-sender'] || null;
+          const verified = req.headers['x-7h3-verified'] === 'true';
+          const body = JSON.stringify({
+            ok: true,
+            path: req.url,
+            sender,
+            verified,
+            method: req.method,
+          });
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(body);
+        });
+        server.listen(3000, () => {
+          process.stderr.write('example api listening on port 3000\n');
+        });
+      "
+    expose:
+      - "3000"
+    restart: unless-stopped

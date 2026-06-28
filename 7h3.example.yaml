@@ -1,0 +1,125 @@
+# 7h3 Protocol — Gateway Configuration Example
+# Wire version: 7h3/0.1
+# Reference: docs/GATEWAY.md
+#
+# All fields shown below are optional unless marked (required).
+
+# ---------------------------------------------------------------------------
+# Core proxy settings
+# ---------------------------------------------------------------------------
+
+# (required) URL of the upstream service to proxy requests to.
+# The gateway strips AIP envelopes, verifies signatures, and forwards clean
+# HTTP requests to this address. The request path is appended verbatim.
+upstream: http://api:3000
+
+# Port the gateway HTTP server binds to (default: 8080).
+port: 8080
+
+# ---------------------------------------------------------------------------
+# Gateway identity — needed only when sign_responses: true
+# ---------------------------------------------------------------------------
+
+# The sender identifier this gateway uses when signing response envelopes.
+# Must match the key-id advertised in your /.well-known/7h3-keys document
+# if you are using key-discovery.
+sender: gateway@my-service.example.com
+
+# Ed25519 private key (PKCS8, base64url-encoded) used to sign responses.
+# Generate one with:  7h3 keygen --output my-keys.json
+# Keep this value secret — store it in a mounted secret or environment
+# variable and reference it as $GATEWAY_PRIVATE_KEY instead.
+#
+# private_key: <base64url-encoded PKCS8 private key>   # or use $GATEWAY_PRIVATE_KEY
+
+# Whether the gateway should sign every upstream response it proxies.
+# Requires private_key and sender to be set. (default: false)
+sign_responses: false
+
+# ---------------------------------------------------------------------------
+# Default policy
+# ---------------------------------------------------------------------------
+
+# What to do when an incoming request does not match any entry in the
+# `policies` list below.
+#
+#   allow — pass the request through without signature verification
+#           (use for development or fully-open APIs)
+#   deny  — reject with HTTP 403
+#           (use for production; whitelist routes explicitly via policies)
+#
+# default: allow
+default_policy: deny
+
+# ---------------------------------------------------------------------------
+# Key registry — maps sender identities to their public keys
+# ---------------------------------------------------------------------------
+
+keys:
+  # The gateway's own public key (used to verify self-signed test requests
+  # or to advertise via the /.well-known/7h3-keys endpoint).
+  private_key: <base64url-encoded PKCS8 private key>
+
+  # Registry maps senderID (any opaque string) → Ed25519 SPKI public key
+  # (base64url-encoded). Add one entry per trusted agent or service.
+  registry:
+    # Internal orchestrator service
+    orchestrator@my-service.example.com: <base64url-encoded SPKI public key>
+
+    # Admin automation agent with elevated privileges
+    admin-agent@my-service.example.com: <base64url-encoded SPKI public key>
+
+    # Third-party partner integration
+    partner-bot@partner.example.com: <base64url-encoded SPKI public key>
+
+# ---------------------------------------------------------------------------
+# Route policies
+# ---------------------------------------------------------------------------
+# Evaluated in order — the first matching policy wins.
+# Glob syntax:
+#   /exact/path      — exact match
+#   /api/*           — single segment wildcard (no slashes)
+#   /api/**          — multi-segment wildcard (crosses slashes)
+#   /users/?d        — single character wildcard
+#
+# Policy fields:
+#   path             — glob pattern (required)
+#   require          — signature algorithm: ed25519 | hmac | any | none
+#   allowed_senders  — list of senderIDs permitted on this route
+#                      (omit to allow any verified sender)
+#   rate_limit       — sliding-window limit applied per sender
+#     requests       — max requests in the window
+#     window_ms      — window duration in milliseconds
+#   sign_response    — override sign_responses for this route only
+
+policies:
+  # -- Admin endpoints -------------------------------------------------
+  # Require Ed25519 signatures and restrict to explicitly named agents.
+  # No rate limit — admin tooling is expected to be low-volume.
+  - path: /api/admin/**
+    require: ed25519
+    allowed_senders:
+      - admin-agent@my-service.example.com
+      - orchestrator@my-service.example.com
+    sign_response: true     # always sign admin responses so callers can verify
+
+  # -- General API endpoints -------------------------------------------
+  # Require Ed25519; any verified sender may call; rate-limit per sender
+  # to 1 000 requests per 60-second sliding window.
+  - path: /api/**
+    require: ed25519
+    rate_limit:
+      requests: 1000
+      window_ms: 60000    # 60 seconds
+
+  # -- Health check ----------------------------------------------------
+  # Completely open — no signature needed. Suitable for load-balancer
+  # probes, uptime monitors, and Kubernetes liveness/readiness checks.
+  - path: /health
+    require: none
+
+  # -- Public read-only endpoints --------------------------------------
+  # No signature required; these routes serve unauthenticated traffic
+  # (documentation, status pages, marketing content, etc.).
+  - path: /public/**
+    require: none
