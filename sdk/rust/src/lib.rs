@@ -276,7 +276,7 @@ pub fn decode_envelope(raw: &str) -> Result<ProtocolEnvelope, String> {
 
     let compact: CompactEnvelope = serde_json::from_value(parsed)
         .map_err(|_| "Envelope JSON shape is not recognized".to_string())?;
-    if compact.v != "aip/0.1" {
+    if compact.v != "7h3/0.1" {
         return Err("Envelope JSON shape is not recognized".to_string());
     }
 
@@ -310,7 +310,7 @@ pub fn validate_envelope(
 ) -> Vec<ProtocolDiagnostic> {
     let mut diagnostics: Vec<ProtocolDiagnostic> = Vec::new();
 
-    if envelope.header.version != "aip/0.1" {
+    if envelope.header.version != "7h3/0.1" {
         diagnostics.push(ProtocolDiagnostic {
             level: "error".to_string(),
             message: format!("Unsupported protocol version '{}'", envelope.header.version),
@@ -435,7 +435,7 @@ pub fn create_envelope(
 ) -> ProtocolEnvelope {
     ProtocolEnvelope {
         header: ProtocolHeader {
-            version: "aip/0.1".to_string(),
+            version: "7h3/0.1".to_string(),
             message_id: format!("msg-{}-{}", now_ms, sender),
             timestamp_ms: now_ms,
             ttl_ms,

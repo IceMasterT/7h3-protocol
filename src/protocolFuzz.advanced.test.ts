@@ -92,7 +92,7 @@ const intentKindArb = fc.constantFrom(
 )
 
 const headerArb: fc.Arbitrary<ProtocolHeader> = fc.record({
-  version: fc.constant('aip/0.1' as const),
+  version: fc.constant('7h3/0.1' as const),
   messageId: fc.string({ minLength: 1, maxLength: 64 }),
   timestampMs: fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER }),
   ttlMs: fc.integer({ min: 1, max: 86_400_000 }),
@@ -175,7 +175,7 @@ const tripleArb = fc.record({
 function makeEnvelope(sender: string, messageId: string, nonce: string, nowMs: number) {
   return {
     header: {
-      version: 'aip/0.1' as const,
+      version: '7h3/0.1' as const,
       sender,
       messageId,
       nonce,

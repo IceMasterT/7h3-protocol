@@ -7,7 +7,7 @@ export default defineConfig({
       formats: ['es'],
       fileName: () => 'index.js',
     },
-    outDir: 'dist/aip',
+    outDir: 'dist/protocol',
     emptyOutDir: false,
     rollupOptions: {
       external: [],

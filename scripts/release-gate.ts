@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 const commands: Array<[string, string[]]> = [
   ['npm', ['run', 'policy:validate']],
   ['npm', ['run', 'test']],
-  ['npm', ['run', 'build:aip']],
+  ['npm', ['run', 'build:protocol']],
   ['npm', ['run', 'lint']],
   ['npm', ['run', 'bench:wire:quick']],
   ['npm', ['run', 'bench:openloop:adaptive:ci']],

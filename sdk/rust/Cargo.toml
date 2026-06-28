@@ -1,19 +1,19 @@
 [package]
-name = "aip7h3"
-version = "0.1.0"
+name = "7h3-protocol"
+version = "0.2.0"
 edition = "2021"
-description = "AIP (Aurelion Interaction Protocol) — Rust SDK. Deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python parity. Wire version aip/0.1."
+description = "7h3 Protocol — Rust SDK. Deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python parity. Wire version 7h3/0.1."
 license = "MIT"
 repository = "https://github.com/IceMasterT/7h3-protocol-aip"
 homepage = "https://github.com/IceMasterT/7h3-protocol-aip"
-documentation = "https://docs.rs/aip7h3"
-keywords = ["aip", "agent", "protocol", "ed25519", "mcp"]
+documentation = "https://docs.rs/7h3-protocol"
+keywords = ["7h3", "agent", "protocol", "ed25519", "mcp"]
 categories = ["cryptography", "network-programming", "web-programming::http-server"]
 readme = "README.md"
 include = ["src/**/*", "README.md", "Cargo.toml"]
 
 [lib]
-name = "aip7h3"
+name = "protocol_7h3"
 path = "src/lib.rs"
 
 [dependencies]

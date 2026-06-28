@@ -239,7 +239,7 @@ export function decodeEnvelopeBinary(payload: Uint8Array, options: BinaryDecodeO
 
     const envelope: ProtocolEnvelope = {
       header: {
-        version: reader.readString() as 'aip/0.1',
+        version: reader.readString() as '7h3/0.1',
         messageId: reader.readString(),
         timestampMs,
         ttlMs,
@@ -252,7 +252,7 @@ export function decodeEnvelopeBinary(payload: Uint8Array, options: BinaryDecodeO
       },
     }
 
-    if (envelope.header.version !== 'aip/0.1') {
+    if (envelope.header.version !== '7h3/0.1') {
       return {
         ok: false,
         diagnostics: [{ level: 'error', message: `Unsupported protocol version '${envelope.header.version}'` }],

@@ -748,7 +748,7 @@ async function runScenario(profile: Profile, scenario: Scenario): Promise<Scenar
   const payload = payloadOfSize(scenario.payloadBytes)
   const template: BenchEnvelopeTemplate = {
     headerBase: {
-      version: 'aip/0.1',
+      version: '7h3/0.1',
       ttlMs: 120_000,
       sender: 'bench.sender',
       recipient: 'bench.receiver',

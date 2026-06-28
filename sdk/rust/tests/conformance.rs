@@ -1,4 +1,4 @@
-use aip7h3::{
+use protocol_7h3::{
     canonicalize_envelope, decode_envelope, encode_envelope_compact, sign_canonical_payload_hmac,
     sign_envelope_ed25519, sign_envelope_hmac, validate_envelope, verify_canonical_payload_ed25519,
     verify_canonical_payload_hmac, verify_envelope_ed25519, verify_envelope_hmac, ProtocolEnvelope,
@@ -41,7 +41,7 @@ struct Ed25519VectorFixture {
 
 fn load_fixtures() -> Fixtures {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../../conformance/aip_v0_1.json");
+    path.push("../../conformance/7h3_v0_1.json");
     let raw = fs::read_to_string(path).expect("conformance fixture should exist");
     serde_json::from_str(&raw).expect("conformance fixture should be valid JSON")
 }
@@ -121,7 +121,7 @@ fn ed25519_vectors_match_canonical_and_signatures() {
             vector.id
         );
 
-        let signature = aip7h3::sign_canonical_payload_ed25519(&canonical, &vector.private_key)
+        let signature = protocol_7h3::sign_canonical_payload_ed25519(&canonical, &vector.private_key)
             .expect("ed25519 sign should succeed");
         assert_eq!(
             signature, vector.signature,

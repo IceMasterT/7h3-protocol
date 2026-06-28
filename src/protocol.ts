@@ -1,4 +1,4 @@
-export type ProtocolVersion = 'aip/0.1'
+export type ProtocolVersion = '7h3/0.1'
 
 export type IntentKind =
   | 'PING'
@@ -355,7 +355,7 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
   const ttlMs = typeof header.ttlMs === 'number' ? header.ttlMs : 0
   const content = typeof body.content === 'string' ? body.content : ''
 
-  if (version !== 'aip/0.1') {
+  if (version !== '7h3/0.1') {
     diagnostics.push({ level: 'error', message: `Unsupported protocol version '${version}'` })
   }
   if (!messageId.trim()) {
@@ -395,7 +395,7 @@ export function createEnvelope(input: {
   const nowMs = input.nowMs ?? Date.now()
   return {
     header: {
-      version: 'aip/0.1',
+      version: '7h3/0.1',
       messageId: input.messageId ?? `msg-${nowMs}-${Math.random().toString(36).slice(2, 10)}`,
       timestampMs: nowMs,
       ttlMs: input.ttlMs ?? 60_000,

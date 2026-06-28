@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { decodeEnvelope } from '../../src/index.js'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
-const VECTORS_PATH = join(__dir, '../../conformance/aip_v0_1.json')
+const VECTORS_PATH = join(__dir, '../../conformance/7h3_v0_1.json')
 const ROUNDS = parseInt(process.env.FUZZ_ROUNDS ?? '50000', 10)
 
 const { vectors, ed25519Vectors = [] } = JSON.parse(readFileSync(VECTORS_PATH, 'utf-8'))
@@ -86,7 +86,7 @@ const mutators: Mutator[] = [
   },
   // replace a known token with another
   (s, r) => {
-    const tokens = ['aip/0.1', 'TASK', 'PING', 'RESULT', 'HS256', 'ED25519', '"sender"', '"body"']
+    const tokens = ['7h3/0.1', 'TASK', 'PING', 'RESULT', 'HS256', 'ED25519', '"sender"', '"body"']
     const replacements = ['aip/0.2', 'INVALID', '', '0', 'NONE', 'RSA', '"SENDER"', '"Body"']
     const i = Math.floor(r() * tokens.length)
     return s.split(tokens[i]).join(replacements[i])

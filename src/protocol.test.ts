@@ -29,7 +29,7 @@ describe('GLUV AIP protocol', () => {
     })
 
     expect(canonicalizeEnvelope(envelope)).toBe(
-      '{"body":{"capability":"task.plan","content":"compute route","correlationId":"c-1","intent":"TASK"},"header":{"messageId":"m0","nonce":"n0","recipient":"agent.beta","sender":"agent.alpha","timestampMs":500,"ttlMs":10000,"version":"aip/0.1"}}',
+      '{"body":{"capability":"task.plan","content":"compute route","correlationId":"c-1","intent":"TASK"},"header":{"messageId":"m0","nonce":"n0","recipient":"agent.beta","sender":"agent.alpha","timestampMs":500,"ttlMs":10000,"version":"7h3/0.1"}}',
     )
   })
 

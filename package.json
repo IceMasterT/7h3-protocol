@@ -1,19 +1,19 @@
 {
   "name": "@7h3/protocol",
-  "version": "0.1.2",
-  "description": "7h3 Protocol — AIP (Aurelion Interaction Protocol): deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version aip/0.1.",
+  "version": "0.2.0",
+  "description": "7h3 Protocol: deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version 7h3/0.1.",
   "type": "module",
   "license": "MIT",
-  "main": "./dist/aip/index.js",
-  "types": "./dist/aip/index.d.ts",
+  "main": "./dist/protocol/index.js",
+  "types": "./dist/protocol/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/aip/index.d.ts",
-      "import": "./dist/aip/index.js"
+      "types": "./dist/protocol/index.d.ts",
+      "import": "./dist/protocol/index.js"
     },
-    "./aip": {
-      "types": "./dist/aip/index.d.ts",
-      "import": "./dist/aip/index.js"
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "import": "./dist/protocol/index.js"
     }
   },
   "repository": {
@@ -23,8 +23,8 @@
   "scripts": {
     "lint": "eslint .",
     "test": "vitest run",
-    "build:aip": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
-    "package:aip": "npm run build:aip && tsx scripts/prepare-aip-package.ts",
+    "build:protocol": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
+    "package:protocol": "npm run build:protocol && tsx scripts/prepare-aip-package.ts",
     "bench:protocol": "vitest bench src/protocol.bench.ts",
     "bench:e2e:quick": "tsx scripts/bench-protocol-e2e.ts --profile quick",
     "bench:e2e:full": "tsx scripts/bench-protocol-e2e.ts --profile full",

@@ -2,7 +2,7 @@ import json
 import pathlib
 import unittest
 
-from aip7h3.protocol import (
+from protocol_7h3.protocol import (
     canonicalize_envelope,
     decode_envelope,
     encode_envelope_compact,
@@ -19,7 +19,7 @@ from aip7h3.protocol import (
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-VECTORS_PATH = ROOT / "conformance" / "aip_v0_1.json"
+VECTORS_PATH = ROOT / "conformance" / "7h3_v0_1.json"
 
 
 class ConformanceTests(unittest.TestCase):

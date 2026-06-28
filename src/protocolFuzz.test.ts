@@ -77,7 +77,7 @@ describe('AIP property and fuzz checks', () => {
       'fuzz-k1',
     )
 
-    const malformedPayloads = ['{', '[]', '{"v":"aip/0.1"}', '{"header":{},"body":{}}', '{"hello":"world"}']
+    const malformedPayloads = ['{', '[]', '{"v":"7h3/0.1"}', '{"header":{},"body":{}}', '{"hello":"world"}']
     for (const raw of malformedPayloads) {
       const result = await receiveEnvelope(raw, {
         nowMs: 1_700_000_001_001,

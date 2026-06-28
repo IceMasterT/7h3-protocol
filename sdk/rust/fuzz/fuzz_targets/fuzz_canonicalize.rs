@@ -21,9 +21,9 @@ fuzz_target!(|data: &[u8]| {
     let mid = String::from_utf8_lossy(mid_bytes).to_string();
     let content = String::from_utf8_lossy(content_bytes).to_string();
 
-    let envelope = aip7h3::ProtocolEnvelope {
-        header: aip7h3::ProtocolHeader {
-            version: "aip/0.1".to_string(),
+    let envelope = protocol_7h3::ProtocolEnvelope {
+        header: protocol_7h3::ProtocolHeader {
+            version: "7h3/0.1".to_string(),
             message_id: mid,
             timestamp_ms: 1_700_000_000_000,
             ttl_ms: 30_000,
@@ -31,7 +31,7 @@ fuzz_target!(|data: &[u8]| {
             recipient: None,
             nonce: "nonce-fuzz".to_string(),
         },
-        body: aip7h3::ProtocolBody {
+        body: protocol_7h3::ProtocolBody {
             intent: "PING".to_string(),
             content,
             capability: None,
@@ -40,7 +40,7 @@ fuzz_target!(|data: &[u8]| {
         signature: None,
     };
 
-    let c1 = aip7h3::canonicalize_envelope(&envelope);
-    let c2 = aip7h3::canonicalize_envelope(&envelope);
+    let c1 = protocol_7h3::canonicalize_envelope(&envelope);
+    let c2 = protocol_7h3::canonicalize_envelope(&envelope);
     assert_eq!(c1, c2, "canonicalize_envelope must be idempotent");
 });

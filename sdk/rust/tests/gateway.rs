@@ -1,4 +1,4 @@
-use aip7h3::{
+use protocol_7h3::{
     create_aip_mcp_gateway_runtime, create_signed_task_from_jsonrpc,
     jsonrpc_response_from_envelope, AipMcpGatewayOptions, JsonRpcBridgeConfig, JsonRpcId,
     JsonRpcRequestLike,
@@ -27,8 +27,8 @@ fn jsonrpc_bridge_creates_signed_task_with_capability() {
         "gateway-k1",
         1_700_000_000_000,
         &config,
-        Option::<fn(&JsonRpcRequestLike, &aip7h3::JsonRpcPolicyContext) -> bool>::None,
-        Option::<fn(&str, &JsonRpcRequestLike, &aip7h3::JsonRpcPolicyContext) -> bool>::None,
+        Option::<fn(&JsonRpcRequestLike, &protocol_7h3::JsonRpcPolicyContext) -> bool>::None,
+        Option::<fn(&str, &JsonRpcRequestLike, &protocol_7h3::JsonRpcPolicyContext) -> bool>::None,
     )
     .expect("bridge should produce envelope");
 
@@ -60,8 +60,8 @@ fn jsonrpc_bridge_blocks_disallowed_method() {
         "gateway-k1",
         1_700_000_000_000,
         &config,
-        Option::<fn(&JsonRpcRequestLike, &aip7h3::JsonRpcPolicyContext) -> bool>::None,
-        Option::<fn(&str, &JsonRpcRequestLike, &aip7h3::JsonRpcPolicyContext) -> bool>::None,
+        Option::<fn(&JsonRpcRequestLike, &protocol_7h3::JsonRpcPolicyContext) -> bool>::None,
+        Option::<fn(&str, &JsonRpcRequestLike, &protocol_7h3::JsonRpcPolicyContext) -> bool>::None,
     )
     .expect_err("bridge should reject disallowed methods");
 
@@ -103,9 +103,9 @@ fn gateway_runtime_handles_line_success_and_errors() {
 
 #[test]
 fn jsonrpc_response_maps_error_intent() {
-    let envelope = aip7h3::ProtocolEnvelope {
-        header: aip7h3::ProtocolHeader {
-            version: "aip/0.1".to_string(),
+    let envelope = protocol_7h3::ProtocolEnvelope {
+        header: protocol_7h3::ProtocolHeader {
+            version: "7h3/0.1".to_string(),
             message_id: "m1".to_string(),
             timestamp_ms: 1,
             ttl_ms: 1,
@@ -113,7 +113,7 @@ fn jsonrpc_response_maps_error_intent() {
             recipient: Some("agent.gateway".to_string()),
             nonce: "n1".to_string(),
         },
-        body: aip7h3::ProtocolBody {
+        body: protocol_7h3::ProtocolBody {
             intent: "ERROR".to_string(),
             content: "permission denied".to_string(),
             capability: Some("mcp.tools/call".to_string()),

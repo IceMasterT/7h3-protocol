@@ -445,7 +445,7 @@ def decode_envelope(raw: str) -> Dict[str, Any]:
     if "header" in parsed and "body" in parsed:
         return parsed
 
-    if parsed.get("v") != "aip/0.1" or "mid" not in parsed or "i" not in parsed:
+    if parsed.get("v") != "7h3/0.1" or "mid" not in parsed or "i" not in parsed:
         raise ValueError("Envelope JSON shape is not recognized")
 
     header: Dict[str, Any] = {
@@ -491,7 +491,7 @@ def validate_envelope(
     current = int(now_ms if now_ms is not None else 0)
     diagnostics: list[ProtocolDiagnostic] = []
 
-    if header.get("version") != "aip/0.1":
+    if header.get("version") != "7h3/0.1":
         diagnostics.append(
             ProtocolDiagnostic(
                 level="error",

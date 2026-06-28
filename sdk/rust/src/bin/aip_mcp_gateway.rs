@@ -1,4 +1,4 @@
-use aip7h3::{create_aip_mcp_gateway_runtime, AipMcpGatewayOptions};
+use protocol_7h3::{create_aip_mcp_gateway_runtime, AipMcpGatewayOptions};
 use std::io::{self, BufRead, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 

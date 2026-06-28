@@ -23,11 +23,11 @@ async function run(): Promise<void> {
 
   await mkdir('conformance', { recursive: true })
   await writeFile(
-    'conformance/aip_v0_1_binary.json',
+    'conformance/7h3_v0_1_binary.json',
     `${JSON.stringify({ generatedAt: new Date().toISOString(), vectors: [...hmac, ...ed25519] }, null, 2)}\n`,
     'utf8',
   )
-  console.log('Wrote conformance/aip_v0_1_binary.json')
+  console.log('Wrote conformance/7h3_v0_1_binary.json')
 }
 
 run().catch((error: unknown) => {

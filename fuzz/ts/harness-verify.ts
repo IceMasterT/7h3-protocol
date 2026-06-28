@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { createEnvelope, signEnvelopeHmac, verifyEnvelopeHmac } from '../../src/index.js'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
-const VECTORS_PATH = join(__dir, '../../conformance/aip_v0_1.json')
+const VECTORS_PATH = join(__dir, '../../conformance/7h3_v0_1.json')
 const ROUNDS = parseInt(process.env.FUZZ_ROUNDS ?? '20000', 10)
 
 const { vectors } = JSON.parse(readFileSync(VECTORS_PATH, 'utf-8'))

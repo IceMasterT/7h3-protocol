@@ -22,7 +22,7 @@ interface CompactSignature {
 }
 
 interface CompactEnvelope {
-  v: 'aip/0.1'
+  v: '7h3/0.1'
   mid: string
   ts: number
   ttl: number
@@ -128,7 +128,7 @@ function isProtocolEnvelope(value: unknown): value is ProtocolEnvelope {
 function isCompactEnvelope(value: unknown): value is CompactEnvelope {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<CompactEnvelope>
-  return candidate.v === 'aip/0.1' && typeof candidate.mid === 'string' && typeof candidate.i === 'string'
+  return candidate.v === '7h3/0.1' && typeof candidate.mid === 'string' && typeof candidate.i === 'string'
 }
 
 function compactToEnvelope(compact: CompactEnvelope): ProtocolEnvelope {

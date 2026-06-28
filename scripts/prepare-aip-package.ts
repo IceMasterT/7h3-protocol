@@ -19,24 +19,24 @@ async function readRootVersion(): Promise<string> {
 
 async function main(): Promise<void> {
   const version = parseVersionArg(process.argv) ?? (await readRootVersion())
-  const outDir = 'dist/npm-aip'
+  const outDir = 'dist/npm-protocol'
 
   await mkdir(outDir, { recursive: true })
-  await copyFile('dist/aip/index.js', `${outDir}/index.js`)
+  await copyFile('dist/protocol/index.js', `${outDir}/index.js`)
 
   // Copy all .d.ts files — index.d.ts re-exports from the individual module files,
   // so all of them must be present for TypeScript consumers to resolve types.
-  const distFiles = await readdir('dist/aip')
+  const distFiles = await readdir('dist/protocol')
   for (const file of distFiles) {
     if (file.endsWith('.d.ts')) {
-      await copyFile(`dist/aip/${file}`, `${outDir}/${file}`)
+      await copyFile(`dist/protocol/${file}`, `${outDir}/${file}`)
     }
   }
 
   const packageJson = {
     name: '@7h3/protocol',
     version,
-    description: '7h3 Protocol — AIP (Aurelion Interaction Protocol): deterministic, signed, replay-safe AI-to-AI message envelopes (wire aip/0.1).',
+    description: '7h3 Protocol: deterministic, signed, replay-safe AI-to-AI message envelopes (wire 7h3/0.1).',
     type: 'module',
     main: './index.js',
     types: './index.d.ts',
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const readme = [
     '# @7h3/protocol',
     '',
-    '7h3 Protocol implements **AIP — the Aurelion Interaction Protocol** (wire version `aip/0.1`):',
+    '7h3 Protocol (wire version `7h3/0.1`):',
     'deterministic, signed, replay-safe AI-to-AI message envelopes.',
     '',
     'Install:',
