@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "7h3 Protocol: deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version 7h3/0.1.",
   "type": "module",
   "license": "MIT",
@@ -14,7 +14,14 @@
     "./protocol": {
       "types": "./dist/protocol/index.d.ts",
       "import": "./dist/protocol/index.js"
-    }
+    },
+    "./http": { "types": "./dist/protocol/httpBinding.d.ts", "import": "./dist/protocol/httpBinding.js" },
+    "./webhook": { "types": "./dist/protocol/webhookBinding.d.ts", "import": "./dist/protocol/webhookBinding.js" },
+    "./queue": { "types": "./dist/protocol/queueBinding.d.ts", "import": "./dist/protocol/queueBinding.js" },
+    "./ws": { "types": "./dist/protocol/wsBinding.d.ts", "import": "./dist/protocol/wsBinding.js" },
+    "./grpc": { "types": "./dist/protocol/grpcBinding.d.ts", "import": "./dist/protocol/grpcBinding.js" },
+    "./keys": { "types": "./dist/protocol/keyInfra.d.ts", "import": "./dist/protocol/keyInfra.js" },
+    "./key-registry": { "types": "./dist/protocol/keyRegistry.d.ts", "import": "./dist/protocol/keyRegistry.js" }
   },
   "repository": {
     "type": "git",
