@@ -271,9 +271,14 @@ Messages are wrapped in `{ envelope, payload }` JSON. The consumer verifies the 
 
 ```mermaid
 flowchart LR
-    P[Producer] -->|{envelope, payload}| Q[Queue]
-    Q --> C[Consumer]
-    C -->|verify envelope\nthen process payload| H[Handler]
+    P[Producer]
+    Q[Queue]
+    C[Consumer]
+    H[Handler]
+
+    P -->|Envelope and payload| Q
+    Q --> C
+    C -->|Verify then process| H
 ```
 
 ```ts
