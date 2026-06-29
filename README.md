@@ -194,10 +194,16 @@ Signed envelopes travel in the `x-7h3-envelope` request header. The gateway veri
 
 ```mermaid
 flowchart LR
-    A[Client] -->|POST /api/action\nx-7h3-envelope: {...signed...}| B[API Gateway]
-    B -->|verify signature\nrate limit check| C{Policy match?}
-    C -->|✅ pass| D[Upstream Service\nx-7h3-sender: agent.alice\nx-7h3-verified: true]
-    C -->|❌ fail| E[401 / 403 / 429]
+    A["Client"]
+    B["API Gateway"]
+    C{"Policy match?"}
+    D["Upstream Service<br/>x-7h3-sender: agent.alice<br/>x-7h3-verified: true"]
+    E["401 / 403 / 429"]
+
+    A -->|"POST /api/action<br/>x-7h3-envelope: {...signed...}"| B
+    B -->|"Verify signature<br/>Rate limit check"| C
+    C -->|"Pass"| D
+    C -->|"Fail"| E
 ```
 
 ```ts
