@@ -1,5 +1,5 @@
 import {
-  signEnvelopeEd25519, signEnvelopeHmac,
+  signEnvelopeEd25519,
   verifyEnvelopeEd25519, verifyEnvelopeHmac,
   createEnvelope, validateEnvelope,
   type ProtocolEnvelope,
@@ -50,11 +50,11 @@ export async function verifyGrpcCall(
 ): Promise<GrpcVerifyResult> {
   const key = opts.metadataKey ?? GRPC_METADATA_KEY
   const raw = metadata[key]
-  const rawStr = Array.isArray(raw) ? raw[0] : (Buffer.isBuffer(raw) ? raw.toString('utf8') : raw)
+  const rawStr = Array.isArray(raw) ? raw[0] : (raw instanceof Uint8Array ? new TextDecoder().decode(raw) : raw)
   if (!rawStr) return { ok: false, code: 16, message: '7h3: missing gRPC envelope metadata' }
 
   let envelope: ProtocolEnvelope
-  try { envelope = JSON.parse(typeof rawStr === 'string' ? rawStr : rawStr.toString()) as ProtocolEnvelope }
+  try { envelope = JSON.parse(typeof rawStr === 'string' ? rawStr : String(rawStr)) as ProtocolEnvelope }
   catch { return { ok: false, code: 3, message: '7h3: malformed envelope metadata' } }
 
   if (opts.strictTtl !== false) {
@@ -74,7 +74,7 @@ export async function verifyGrpcCall(
     const valid = await verifyEnvelopeEd25519(envelope, publicKey)
     if (!valid) return { ok: false, code: 16, message: '7h3: invalid signature' }
   } else if (alg === 'HS256') {
-    const secret = await opts.keyRegistry.getSharedSecret?.(envelope.signature.keyId)
+    const secret = await opts.keyRegistry.getSharedSecret?.(envelope.signature!.keyId)
     if (!secret) return { ok: false, code: 16, message: '7h3: unknown key' }
     const valid = await verifyEnvelopeHmac(envelope, secret)
     if (!valid) return { ok: false, code: 16, message: '7h3: invalid signature' }

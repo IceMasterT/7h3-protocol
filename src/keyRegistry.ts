@@ -1,5 +1,3 @@
-import type { ProtocolEnvelope } from './protocol'
-
 // Core interface all bindings use to look up keys
 export interface KeyRegistry {
   getPublicKey(senderId: string): Promise<string | null>  // Ed25519 SPKI base64url

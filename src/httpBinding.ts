@@ -7,7 +7,6 @@ import {
   signEnvelopeHmac,
   createEnvelope,
   validateEnvelope,
-  canonicalizeEnvelope,
 } from './protocol'
 import type { KeyRegistry } from './keyRegistry'
 
