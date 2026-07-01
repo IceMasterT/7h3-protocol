@@ -1,0 +1,42 @@
+{
+  "name": "@7h3/protocol-pq",
+  "version": "0.5.0",
+  "description": "7h3 Protocol — Post-quantum signatures (ML-DSA-65, ML-DSA-87) via @noble/post-quantum",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "dependencies": {
+    "@noble/post-quantum": "^0.2.0"
+  },
+  "peerDependencies": {
+    "@7h3/protocol": "^0.5.0"
+  },
+  "license": "MIT",
+  "keywords": [
+    "7h3",
+    "protocol",
+    "post-quantum",
+    "ml-dsa",
+    "dilithium",
+    "signing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IceMasterT/7h3-protocol.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run src/index.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

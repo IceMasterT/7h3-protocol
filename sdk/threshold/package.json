@@ -1,0 +1,39 @@
+{
+  "name": "@7h3/protocol-threshold",
+  "version": "0.5.0",
+  "description": "7h3 Protocol — M-of-N threshold signatures via BLS12-381",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "dependencies": {
+    "@noble/curves": "^1.4.0"
+  },
+  "peerDependencies": {
+    "@7h3/protocol": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "scripts": {
+    "test": "vitest run src/index.test.ts",
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "keywords": [
+    "7h3",
+    "protocol",
+    "threshold",
+    "bls",
+    "bls12-381",
+    "m-of-n",
+    "multisig"
+  ]
+}

@@ -4,8 +4,20 @@ import {
   generateEd25519KeypairBase64Url, type ProtocolEnvelope
 } from './protocol'
 import type { KeyRegistry } from './keyRegistry'
+import {
+  SignedStreamWriter,
+  signStream,
+  verifyStream,
+  decodeStreamChunk,
+  encodeStreamChunk,
+  type StreamSignerOpts,
+  type StreamVerifierOpts,
+  type StreamVerifyResult,
+  type StreamChunk,
+} from './stream'
 
 export { type KeyRegistry, generateEd25519KeypairBase64Url }
+export type { StreamSignerOpts, StreamVerifierOpts, StreamVerifyResult, StreamChunk }
 
 // Minimal WebSocket interface (works with browser WebSocket, ws library, etc.)
 export interface WebSocketLike {
@@ -97,4 +109,93 @@ export function wrapWebSocket(ws: WebSocketLike, opts: WsBindingOptions): Protec
     onMessage(handler) { messageHandlers.push(handler) },
     onVerifyFail(handler) { failHandlers.push(handler) },
   }
+}
+
+// ─────────────────── Stream signing over WebSocket ────────────────────────────
+
+/**
+ * createSignedWebSocketStream
+ *
+ * Attaches a SignedStreamWriter to a WebSocket:
+ *   - Each incoming WebSocket message is signed as a stream chunk and sent back.
+ *   - On connection close, the final signed frame is sent.
+ *
+ * Returns the underlying SignedStreamWriter so callers can also call writeChunk
+ * directly (e.g. when driving the stream from application code rather than
+ * forwarding received messages).
+ */
+export function createSignedWebSocketStream(
+  ws: WebSocketLike,
+  opts: StreamSignerOpts,
+): SignedStreamWriter {
+  const writer = new SignedStreamWriter(opts)
+
+  const messageListener = async (e: { data: string | Buffer }) => {
+    const data = typeof e.data === 'string' ? e.data : e.data.toString('utf8')
+    const chunk = await writer.writeChunk(data)
+    ws.send(encodeStreamChunk(chunk))
+  }
+
+  const closeListener = async () => {
+    ws.removeEventListener('message', messageListener as any)
+    ws.removeEventListener('close', closeListener as any)
+    const finalChunk = await writer.finalize()
+    ws.send(encodeStreamChunk(finalChunk))
+  }
+
+  ws.addEventListener('message', messageListener as any)
+  ws.addEventListener('close', closeListener as any)
+
+  return writer
+}
+
+/**
+ * receiveSignedWebSocketStream
+ *
+ * Listens for StreamChunk JSON frames on a WebSocket, accumulates them, and
+ * when the final frame (f=true) arrives calls verifyStream over the complete
+ * set of collected chunks.
+ *
+ * Resolves with StreamVerifyResult when the final frame is received.
+ * Rejects if a frame cannot be decoded.
+ */
+export function receiveSignedWebSocketStream(
+  ws: WebSocketLike,
+  opts: StreamVerifierOpts,
+): Promise<StreamVerifyResult> {
+  return new Promise<StreamVerifyResult>((resolve, reject) => {
+    const collected: StreamChunk[] = []
+
+    const messageListener = async (e: { data: string | Buffer }) => {
+      const raw = typeof e.data === 'string' ? e.data : e.data.toString('utf8')
+      let chunk: StreamChunk
+      try {
+        chunk = decodeStreamChunk(raw)
+      } catch (err) {
+        cleanup()
+        reject(err)
+        return
+      }
+      collected.push(chunk)
+      if (chunk.f) {
+        cleanup()
+        const result = await verifyStream(collected, opts)
+        resolve(result)
+      }
+    }
+
+    const closeListener = () => {
+      // Connection closed before receiving final frame
+      cleanup()
+      resolve({ ok: false, reason: 'connection closed before final frame' })
+    }
+
+    function cleanup() {
+      ws.removeEventListener('message', messageListener as any)
+      ws.removeEventListener('close', closeListener as any)
+    }
+
+    ws.addEventListener('message', messageListener as any)
+    ws.addEventListener('close', closeListener as any)
+  })
 }

@@ -6,6 +6,66 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.5.0
+
+### New features
+
+**Feature 1 — Distributed Redis replay cache**
+- RedisReplayStore: atomic SET NX PX prevents cross-instance replay attacks
+- ClusterRedisReplayStore: queries all Redis Cluster nodes
+- InMemoryReplayStore improvements
+- Go SDK: InMemoryReplayStore + RedisReplayStore (inject-your-client)
+- Python SDK: RedisReplayStore using redis-py
+
+**Feature 2 — End-to-end encryption (X25519 + ChaCha20-Poly1305)**
+- sealEnvelope / openEnvelope: encrypt body before signing, verify before decrypting
+- generateX25519KeyPair: ephemeral key pairs for forward secrecy
+- Zero new dependencies: Node.js built-in crypto.ecdh + crypto.createCipheriv('chacha20-poly1305')
+- Python SDK: X25519 + ChaCha20-Poly1305 via cryptography package
+- Go SDK: crypto/ecdh + golang.org/x/crypto/chacha20poly1305
+
+**Feature 3 — Capability tokens and delegation chains**
+- issueCapabilityToken: scoped, time-bounded, cryptographically signed credentials
+- delegateCapabilityToken: sub-delegate with equal or narrower scope
+- verifyCapabilityChain: verify full A→B→C delegation chain
+- Gateway integration: x-7h3-capability header accepted alongside signatures
+- tokenMatchesScope: glob path matching
+
+**Feature 4 — Streaming message signing**
+- SignedStreamWriter / SignedStreamReader: per-chunk HMAC + final Ed25519
+- signStream / verifyStream: convenience wrappers for arrays
+- WebSocket integration: createSignedWebSocketStream / receiveSignedWebSocketStream
+- Tampering detected mid-stream on the failing chunk
+
+**Feature 5 — Prometheus metrics + OpenTelemetry**
+- Protocol7h3Metrics: counters and histograms for all verification events
+- renderPrometheusText: zero-dep Prometheus exposition format
+- createMetricsMiddleware: serve /metrics endpoint
+- CLI: 7h3 gateway --metrics-port N
+- setOtelProvider / withVerificationSpan: optional OTel tracing
+
+**Feature 6 — Post-quantum signatures (ML-DSA) — @7h3/protocol-pq**
+- generatePqKeyPair: ML-DSA-65 and ML-DSA-87 keypairs
+- signEnvelopePq / verifyEnvelopePq: same envelope format, alg: 'ML-DSA-65'
+- Python SDK: Dilithium2/3/5 via dilithium-py
+- Separate package to keep @7h3/protocol at zero runtime deps
+
+**Feature 7 — CBOR binary wire format**
+- encodeCbor / decodeCbor: zero-dep deterministic CBOR (RFC 8949)
+- encodeEnvelopeCbor / decodeEnvelopeCbor: compact numeric-key encoding (~40% smaller)
+- HTTP binding: Content-Type: application/7h3-cbor support
+- Go SDK: EncodeEnvelopeCBOR / DecodeEnvelopeCBOR
+
+**Feature 8 — M-of-N threshold signatures (BLS12-381) — @7h3/protocol-threshold**
+- generateBlsKeyPair: BLS12-381 keypairs
+- signEnvelopeBls: partial signature from one participant
+- aggregateSignatures: combine M-of-N partial sigs into one
+- verifyThresholdEnvelope: single verify call on aggregated sig
+- splitPrivateKey / reconstructPrivateKey: Shamir Secret Sharing over BLS scalar field
+- Separate package (@7h3/protocol-threshold) using @noble/curves
+
+---
+
 ## [0.1.2] — 2026-06-05
 
 ### Added

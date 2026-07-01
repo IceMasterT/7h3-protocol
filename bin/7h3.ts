@@ -12,7 +12,7 @@ Usage:
   7h3 verify --public-key <key> --envelope <json>
   7h3 inspect --envelope <json>
   7h3 gateway --upstream <url> [--port <n>] [--public-key <key>] [--require ed25519|none]
-              [--sign-responses] [--private-key <key>] [--sender <id>]
+              [--sign-responses] [--private-key <key>] [--sender <id>] [--metrics-port <n>]
   7h3 keys serve [--public-key <key>] [--key-id <id>] [--port <n>]
   7h3 help
 
@@ -210,6 +210,7 @@ async function cmdGateway(argv: string[]): Promise<void> {
       'sign-responses': { type: 'boolean' },
       'private-key': { type: 'string' },
       sender: { type: 'string' },
+      'metrics-port': { type: 'string' },
     },
     strict: false,
   })
@@ -223,6 +224,8 @@ async function cmdGateway(argv: string[]): Promise<void> {
   const signResponses = !!(values['sign-responses'])
   const privateKey = values['private-key'] as string | undefined
   const sender = values['sender'] as string | undefined
+  const metricsPortRaw = values['metrics-port'] as string | undefined
+  const metricsPort = metricsPortRaw ? parseInt(metricsPortRaw, 10) : undefined
 
   const { createGateway } = await import('../src/gateway.js')
   const { createStaticKeyRegistry } = await import('../src/keyRegistry.js')
@@ -276,6 +279,24 @@ async function cmdGateway(argv: string[]): Promise<void> {
     process.stderr.write(`  sign-responses: ${signResponses && !!privateKey}\n`)
     if (sender) process.stderr.write(`  sender        : ${sender}\n`)
   })
+
+  // Optional: dedicated metrics server
+  if (metricsPort !== undefined) {
+    const { metrics: globalMetrics, renderPrometheusText } = await import('../src/telemetry.js')
+    const metricsServer = createServer((req, res) => {
+      if (req.url === '/metrics' && req.method === 'GET') {
+        const body = renderPrometheusText(globalMetrics)
+        res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8' })
+        res.end(body)
+      } else {
+        res.writeHead(404, { 'content-type': 'text/plain' })
+        res.end('Not Found')
+      }
+    })
+    metricsServer.listen(metricsPort, () => {
+      process.stderr.write(`7h3 metrics listening on :${metricsPort}/metrics\n`)
+    })
+  }
 }
 
 async function cmdKeysServe(argv: string[]): Promise<void> {

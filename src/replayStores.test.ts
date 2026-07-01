@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { InMemoryRedisLikeClient } from './redisClient'
-import { createRedisReplayStore } from './replayStores'
+import {
+  createRedisReplayStore,
+  RedisReplayStore,
+  ClusterRedisReplayStore,
+  createClusterReplayStore,
+  type ReplayStore,
+  type RedisClientLike,
+} from './replayStores'
 import { DistributedReplayCache } from './protocolReplay'
 import { createEnvelope } from './protocol'
 
@@ -137,5 +144,130 @@ describe('DistributedReplayCache batch delegation', () => {
     const results = await cache.consumeMany([e1, e2], 1000)
     expect(reserveManySpy).toHaveBeenCalledOnce()
     expect(results.map((r) => r.ok)).toEqual([true, true])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// New ReplayStore interface and class tests (check()-based API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a mock RedisClientLike whose SET NX behaviour can be scripted:
+ * first call returns 'OK' (fresh), subsequent calls return null (replay).
+ */
+function mockRedisClient(): RedisClientLike {
+  let callCount = 0
+  return {
+    set: vi.fn(async (_key: string, _value: string, _opts?: { nx?: boolean; px?: number }) => {
+      callCount++
+      return callCount === 1 ? 'OK' : null
+    }),
+    get: vi.fn(async (_key: string) => null),
+    del: vi.fn(async (_key: string) => 0),
+    quit: vi.fn(async () => undefined),
+  }
+}
+
+describe('RedisReplayStore (check() interface)', () => {
+  it('first call returns false (fresh) and second call returns true (replay)', async () => {
+    const client = mockRedisClient()
+    const store = new RedisReplayStore({ client })
+    const fresh = await store.check('nonce-abc', 30_000)
+    const replay = await store.check('nonce-abc', 30_000)
+    expect(fresh).toBe(false)
+    expect(replay).toBe(true)
+  })
+
+  it('satisfies the ReplayStore interface', () => {
+    const store: ReplayStore = new RedisReplayStore({ client: mockRedisClient() })
+    expect(typeof store.check).toBe('function')
+  })
+
+  it('uses default keyPrefix "7h3:nonce:"', async () => {
+    const client = mockRedisClient()
+    const store = new RedisReplayStore({ client })
+    await store.check('my-nonce', 5000)
+    expect(client.set).toHaveBeenCalledWith('7h3:nonce:my-nonce', '1', { nx: true, px: 5000 })
+  })
+
+  it('respects a custom keyPrefix', async () => {
+    const client = mockRedisClient()
+    const store = new RedisReplayStore({ client, keyPrefix: 'custom:' })
+    await store.check('n1', 1000)
+    expect(client.set).toHaveBeenCalledWith('custom:n1', '1', { nx: true, px: 1000 })
+  })
+
+  it('clamps TTL to at least 1ms', async () => {
+    const client = mockRedisClient()
+    const store = new RedisReplayStore({ client })
+    await store.check('n1', 0)
+    expect(client.set).toHaveBeenCalledWith('7h3:nonce:n1', '1', { nx: true, px: 1 })
+  })
+})
+
+describe('createRedisReplayStore opts-object overload', () => {
+  it('returns a RedisReplayStore with the correct keyPrefix', () => {
+    const store = createRedisReplayStore({ keyPrefix: '7h3:nonce:' })
+    expect(store).toBeInstanceOf(RedisReplayStore)
+  })
+
+  it('returns a RedisReplayStore with default keyPrefix when none specified', () => {
+    const store = createRedisReplayStore({ client: mockRedisClient() })
+    expect(store).toBeInstanceOf(RedisReplayStore)
+  })
+})
+
+describe('ClusterRedisReplayStore', () => {
+  it('check() returns false (fresh) when ALL nodes say fresh', async () => {
+    // Build two nodes each with a fresh client
+    const makeClient = () => {
+      const c = mockRedisClient()
+      return c
+    }
+    const node1 = new RedisReplayStore({ client: makeClient() })
+    const node2 = new RedisReplayStore({ client: makeClient() })
+    const cluster = new ClusterRedisReplayStore([node1, node2])
+    // First call: both nodes return OK → fresh
+    const result = await cluster.check('nonce-xyz', 10_000)
+    expect(result).toBe(false)
+  })
+
+  it('check() returns true (replay) when ANY node reports replay', async () => {
+    // node1: already seen (returns null immediately)
+    const replayClient: RedisClientLike = {
+      set: vi.fn(async () => null), // always null = always replay
+      get: vi.fn(async () => null),
+      del: vi.fn(async () => 0),
+      quit: vi.fn(async () => undefined),
+    }
+    // node2: fresh (returns OK)
+    const freshClient: RedisClientLike = {
+      set: vi.fn(async () => 'OK'),
+      get: vi.fn(async () => null),
+      del: vi.fn(async () => 0),
+      quit: vi.fn(async () => undefined),
+    }
+    const node1 = new RedisReplayStore({ client: replayClient })
+    const node2 = new RedisReplayStore({ client: freshClient })
+    const cluster = new ClusterRedisReplayStore([node1, node2])
+    const result = await cluster.check('nonce-xyz', 10_000)
+    expect(result).toBe(true)
+  })
+
+  it('queries all nodes in parallel via Promise.all', async () => {
+    const clients = [mockRedisClient(), mockRedisClient(), mockRedisClient()]
+    const nodes = clients.map((c) => new RedisReplayStore({ client: c }))
+    const cluster = new ClusterRedisReplayStore(nodes)
+    await cluster.check('nonce-parallel', 5000)
+    for (const c of clients) {
+      expect(c.set).toHaveBeenCalledOnce()
+    }
+  })
+})
+
+describe('createClusterReplayStore', () => {
+  it('returns a ClusterRedisReplayStore from an array of URLs', () => {
+    const cluster = createClusterReplayStore(['redis://node1:6379', 'redis://node2:6379'])
+    expect(cluster).toBeInstanceOf(ClusterRedisReplayStore)
   })
 })

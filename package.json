@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "7h3 Protocol: deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version 7h3/0.1.",
   "type": "module",
   "license": "MIT",
@@ -15,18 +15,60 @@
       "types": "./dist/protocol/index.d.ts",
       "import": "./dist/protocol/index.js"
     },
-    "./http": { "types": "./dist/protocol/httpBinding.d.ts", "import": "./dist/protocol/httpBinding.js" },
-    "./webhook": { "types": "./dist/protocol/webhookBinding.d.ts", "import": "./dist/protocol/webhookBinding.js" },
-    "./queue": { "types": "./dist/protocol/queueBinding.d.ts", "import": "./dist/protocol/queueBinding.js" },
-    "./ws": { "types": "./dist/protocol/wsBinding.d.ts", "import": "./dist/protocol/wsBinding.js" },
-    "./grpc": { "types": "./dist/protocol/grpcBinding.d.ts", "import": "./dist/protocol/grpcBinding.js" },
-    "./keys": { "types": "./dist/protocol/keyInfra.d.ts", "import": "./dist/protocol/keyInfra.js" },
-    "./key-registry": { "types": "./dist/protocol/keyRegistry.d.ts", "import": "./dist/protocol/keyRegistry.js" },
-    "./gateway": { "types": "./dist/protocol/gateway.d.ts", "import": "./dist/protocol/gateway.js" },
-    "./audit-log": { "types": "./dist/protocol/auditLog.d.ts", "import": "./dist/protocol/auditLog.js" },
-    "./signed-response": { "types": "./dist/protocol/signedResponse.d.ts", "import": "./dist/protocol/signedResponse.js" },
-    "./rate-limiter": { "types": "./dist/protocol/rateLimiter.d.ts", "import": "./dist/protocol/rateLimiter.js" },
-    "./route-policy": { "types": "./dist/protocol/routePolicy.d.ts", "import": "./dist/protocol/routePolicy.js" }
+    "./http": {
+      "types": "./dist/protocol/httpBinding.d.ts",
+      "import": "./dist/protocol/httpBinding.js"
+    },
+    "./webhook": {
+      "types": "./dist/protocol/webhookBinding.d.ts",
+      "import": "./dist/protocol/webhookBinding.js"
+    },
+    "./queue": {
+      "types": "./dist/protocol/queueBinding.d.ts",
+      "import": "./dist/protocol/queueBinding.js"
+    },
+    "./ws": {
+      "types": "./dist/protocol/wsBinding.d.ts",
+      "import": "./dist/protocol/wsBinding.js"
+    },
+    "./grpc": {
+      "types": "./dist/protocol/grpcBinding.d.ts",
+      "import": "./dist/protocol/grpcBinding.js"
+    },
+    "./keys": {
+      "types": "./dist/protocol/keyInfra.d.ts",
+      "import": "./dist/protocol/keyInfra.js"
+    },
+    "./key-registry": {
+      "types": "./dist/protocol/keyRegistry.d.ts",
+      "import": "./dist/protocol/keyRegistry.js"
+    },
+    "./gateway": {
+      "types": "./dist/protocol/gateway.d.ts",
+      "import": "./dist/protocol/gateway.js"
+    },
+    "./audit-log": {
+      "types": "./dist/protocol/auditLog.d.ts",
+      "import": "./dist/protocol/auditLog.js"
+    },
+    "./signed-response": {
+      "types": "./dist/protocol/signedResponse.d.ts",
+      "import": "./dist/protocol/signedResponse.js"
+    },
+    "./rate-limiter": {
+      "types": "./dist/protocol/rateLimiter.d.ts",
+      "import": "./dist/protocol/rateLimiter.js"
+    },
+    "./route-policy": {
+      "types": "./dist/protocol/routePolicy.d.ts",
+      "import": "./dist/protocol/routePolicy.js"
+    },
+    "./encryption": { "types": "./dist/protocol/encryption.d.ts", "import": "./dist/protocol/encryption.js" },
+    "./capability": { "types": "./dist/protocol/capability.d.ts", "import": "./dist/protocol/capability.js" },
+    "./stream": { "types": "./dist/protocol/stream.d.ts", "import": "./dist/protocol/stream.js" },
+    "./telemetry": { "types": "./dist/protocol/telemetry.d.ts", "import": "./dist/protocol/telemetry.js" },
+    "./cbor": { "types": "./dist/protocol/envelopeCbor.d.ts", "import": "./dist/protocol/envelopeCbor.js" },
+    "./replay": { "types": "./dist/protocol/replayStores.d.ts", "import": "./dist/protocol/replayStores.js" }
   },
   "repository": {
     "type": "git",

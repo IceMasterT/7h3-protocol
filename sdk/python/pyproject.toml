@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "7h3-protocol"
-version = "0.4.0"
+version = "0.5.0"
 description = "7h3 Protocol — Python SDK. Deterministic, signed, replay-safe AI-to-AI messaging. Wire version 7h3/0.1."
 readme = "README.md"
 license = { text = "MIT" }

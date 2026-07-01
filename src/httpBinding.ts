@@ -9,6 +9,9 @@ import {
   validateEnvelope,
 } from './protocol'
 import type { KeyRegistry } from './keyRegistry'
+import { encodeEnvelopeCbor, decodeEnvelopeCbor, CBOR_CONTENT_TYPE as _CBOR_CONTENT_TYPE } from './envelopeCbor'
+
+export { _CBOR_CONTENT_TYPE as CBOR_CONTENT_TYPE }
 
 export { type KeyRegistry }
 
@@ -32,21 +35,36 @@ export interface HttpBindingOptions {
   strictTtl?: boolean   // default true - reject expired TTL
 }
 
-// Verify the 7h3 envelope from an incoming HTTP request's headers
+// Verify the 7h3 envelope from an incoming HTTP request's headers or body
+// If content-type includes '7h3-cbor', decodes body as CBOR instead of JSON
 export async function verifyHttpEnvelope(
   headers: Record<string, string | string[] | undefined>,
-  opts: HttpBindingOptions
+  opts: HttpBindingOptions,
+  body?: Uint8Array
 ): Promise<VerifyHttpResult> {
   const headerName = opts.headerName ?? DEFAULT_HEADER
-  const raw = headers[headerName]
-  const rawStr = Array.isArray(raw) ? raw[0] : raw
-  if (!rawStr) return { ok: false, reason: 'missing-header' }
+  const contentType = (Array.isArray(headers['content-type']) ? headers['content-type'][0] : headers['content-type']) ?? ''
 
   let envelope: ProtocolEnvelope
-  try {
-    envelope = JSON.parse(rawStr) as ProtocolEnvelope
-  } catch {
-    return { ok: false, reason: 'malformed-envelope', detail: 'JSON parse failed' }
+
+  // CBOR mode: content-type contains '7h3-cbor' and body is provided
+  if (contentType.includes('7h3-cbor') && body instanceof Uint8Array) {
+    try {
+      envelope = decodeEnvelopeCbor(body)
+    } catch (e: unknown) {
+      return { ok: false, reason: 'malformed-envelope', detail: e instanceof Error ? e.message : 'CBOR decode failed' }
+    }
+  } else {
+    // JSON mode: read from header
+    const raw = headers[headerName]
+    const rawStr = Array.isArray(raw) ? raw[0] : raw
+    if (!rawStr) return { ok: false, reason: 'missing-header' }
+
+    try {
+      envelope = JSON.parse(rawStr) as ProtocolEnvelope
+    } catch {
+      return { ok: false, reason: 'malformed-envelope', detail: 'JSON parse failed' }
+    }
   }
 
   if (!envelope?.signature || !envelope?.header) {
@@ -83,12 +101,20 @@ export async function verifyHttpEnvelope(
 }
 
 // Sign an outgoing HTTP request — returns headers to merge in
+// When format is 'cbor', returns binary body + content-type header instead of JSON header
 export async function signHttpRequest(
   envelope: Omit<ProtocolEnvelope, 'signature'>,
   privateKey: string,
-  opts?: { headerName?: string }
-): Promise<{ headers: Record<string, string> }> {
+  opts?: { headerName?: string; format?: 'cbor' | 'json' }
+): Promise<{ headers: Record<string, string>; body?: Uint8Array }> {
   const signed = await signEnvelopeEd25519(envelope, privateKey)
+  if (opts?.format === 'cbor') {
+    const body = encodeEnvelopeCbor(signed)
+    return {
+      headers: { 'content-type': _CBOR_CONTENT_TYPE },
+      body,
+    }
+  }
   return {
     headers: { [opts?.headerName ?? DEFAULT_HEADER]: JSON.stringify(signed) },
   }
