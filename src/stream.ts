@@ -112,7 +112,7 @@ function getDerivedHmacKey(privateKeyBase64Url: string, nonce: string): Promise<
     // Import the raw PKCS8 bytes as HKDF input keying material
     const hkdfKey = await subtle.importKey(
       'raw',
-      pkcs8Bytes,
+      toArrayBuffer(pkcs8Bytes),
       'HKDF',
       false,
       ['deriveBits'],
@@ -188,7 +188,7 @@ function buildContentMessage(chunks: Array<{ i: number; d: string }>): Uint8Arra
 
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
   const subtle = requireCryptoSubtle()
-  const digest = await subtle.digest('SHA-256', data)
+  const digest = await subtle.digest('SHA-256', toArrayBuffer(data))
   return new Uint8Array(digest)
 }
 
@@ -242,7 +242,7 @@ export class SignedStreamWriter {
     const contentMsg = buildContentMessage(this.accum)
     const digest = await sha256(contentMsg)
     // Ed25519 signs the digest bytes directly (WebCrypto Ed25519 takes raw message)
-    const sigBytes = await subtle.sign('Ed25519', privKey, digest)
+    const sigBytes = await subtle.sign('Ed25519', privKey, toArrayBuffer(digest))
     const sig = toBase64Url(new Uint8Array(sigBytes))
 
     // Final frame HMAC is over the content hash (hex) so it binds the full stream
@@ -312,7 +312,7 @@ export class SignedStreamReader {
     const digest = await sha256(contentMsg)
 
     const sigBytes = fromBase64Url(finalChunk.sig)
-    const valid = await subtle.verify('Ed25519', pubKey, toArrayBuffer(sigBytes), digest)
+    const valid = await subtle.verify('Ed25519', pubKey, toArrayBuffer(sigBytes), toArrayBuffer(digest))
 
     if (!valid) {
       return { ok: false, reason: 'signature verification failed' }

@@ -6,7 +6,6 @@ import {
 import type { KeyRegistry } from './keyRegistry'
 import {
   SignedStreamWriter,
-  signStream,
   verifyStream,
   decodeStreamChunk,
   encodeStreamChunk,

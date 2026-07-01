@@ -7,6 +7,7 @@ export type IntentKind =
   | 'TASK'
   | 'RESULT'
   | 'ERROR'
+  | 'ENCRYPTED'
 
 export interface ProtocolHeader {
   version: ProtocolVersion
