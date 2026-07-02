@@ -1,0 +1,24 @@
+{
+  "name": "@7h3/protocol-cf",
+  "version": "0.5.0",
+  "private": true,
+  "description": "7h3 Protocol — Cloudflare Workers gateway and middleware",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "setup": "npx tsx scripts/cf-setup.ts",
+    "keys:load": "npx tsx scripts/kv-load-keys.ts",
+    "secrets:set": "wrangler secret put GATEWAY_PRIVATE_KEY"
+  },
+  "dependencies": {
+    "@7h3/protocol": "file:.."
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "@types/node": "^26.1.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.80.0"
+  }
+}

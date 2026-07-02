@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7h3 Protocol — Security Infographic</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1200px;
+    height: 1500px;
+    background: #0a0b1e;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #e2e8f0;
+    overflow: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(99,102,241,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .card {
+    position: relative;
+    padding: 48px 56px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .brand-badge {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -2px;
+    box-shadow: 0 0 32px rgba(99,102,241,0.5);
+  }
+
+  .brand-text h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .brand-text p {
+    font-size: 13px;
+    color: #818cf8;
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .version-pill {
+    background: rgba(99,102,241,0.15);
+    border: 1px solid rgba(99,102,241,0.4);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: #a5b4fc;
+    font-weight: 600;
+  }
+
+  /* ─── HERO TAGLINE ─── */
+  .tagline {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+
+  .tagline h2 {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #e2e8f0 0%, #a5b4fc 50%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .tagline p {
+    font-size: 16px;
+    color: #94a3b8;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* ─── ATTACK TABLE ─── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #6366f1;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(99,102,241,0.4), transparent);
+  }
+
+  .attacks-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .attack-card {
+    background: rgba(15,16,36,0.8);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 12px;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .attack-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #ef4444, #f97316);
+  }
+
+  .attack-card.defended::before {
+    background: linear-gradient(90deg, #22c55e, #10b981);
+  }
+
+  .attack-icon { font-size: 22px; margin-bottom: 6px; }
+
+  .attack-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+  }
+
+  .attack-defense {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .check {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: #22c55e;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 16px;
+    font-size: 9px;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+
+  /* ─── HOW IT WORKS FLOW ─── */
+  .flow-section {
+    margin-bottom: 28px;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .flow-node {
+    background: rgba(15,16,36,0.9);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 12px;
+    padding: 14px 18px;
+    text-align: center;
+    flex: 1;
+  }
+
+  .flow-node.highlight {
+    border-color: rgba(99,102,241,0.6);
+    background: rgba(99,102,241,0.1);
+    box-shadow: 0 0 20px rgba(99,102,241,0.15);
+  }
+
+  .flow-node .node-icon { font-size: 20px; margin-bottom: 4px; }
+  .flow-node .node-label { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+  .flow-node .node-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+  .flow-arrow {
+    width: 36px;
+    text-align: center;
+    color: #6366f1;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .envelope-box {
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.7;
+  }
+
+  .envelope-box .key { color: #818cf8; }
+  .envelope-box .val { color: #34d399; }
+  .envelope-box .sig-val { color: #f59e0b; }
+
+  /* ─── FEATURES GRID ─── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .feat {
+    background: rgba(15,16,36,0.8);
+    border: 1px solid rgba(99,102,241,0.18);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+  }
+
+  .feat-icon { font-size: 24px; margin-bottom: 8px; }
+  .feat-name { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+  .feat-desc { font-size: 11px; color: #64748b; line-height: 1.45; }
+
+  .feat-badge {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .new-badge { background: rgba(99,102,241,0.25); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); }
+  .pq-badge { background: rgba(139,92,246,0.25); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.4); }
+
+  /* ─── TRANSPORT PILLS ─── */
+  .transport-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+
+  .transport-pill {
+    background: rgba(15,16,36,0.8);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 8px;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .transport-pill .t-icon { font-size: 18px; }
+  .transport-pill .t-name { font-size: 13px; font-weight: 700; color: #e2e8f0; }
+  .transport-pill .t-header { font-size: 10px; color: #64748b; font-family: monospace; }
+
+  /* ─── SDK ROW ─── */
+  .sdk-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .sdk-pill {
+    background: rgba(15,16,36,0.8);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 8px;
+    padding: 10px 0;
+    text-align: center;
+    flex: 1;
+  }
+
+  .sdk-pill .s-icon { font-size: 20px; }
+  .sdk-pill .s-name { font-size: 11px; font-weight: 700; color: #a5b4fc; margin-top: 4px; }
+
+  /* ─── INSTALL STRIP ─── */
+  .install-strip {
+    background: rgba(15,16,36,0.9);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 24px;
+  }
+
+  .install-item { flex: 1; }
+  .install-item .lang { font-size: 10px; font-weight: 700; color: #6366f1; letter-spacing: 1px; margin-bottom: 4px; }
+  .install-item .cmd { font-family: monospace; font-size: 12px; color: #e2e8f0; }
+
+  /* ─── FOOTER ─── */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid rgba(99,102,241,0.15);
+  }
+
+  .footer-left { font-size: 12px; color: #475569; }
+  .footer-left strong { color: #6366f1; }
+
+  .stat-pills { display: flex; gap: 10px; }
+
+  .stat-pill {
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 11px;
+    color: #a5b4fc;
+    font-weight: 600;
+  }
+
+  .glow-dot {
+    width: 8px; height: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    box-shadow: 0 0 8px #22c55e;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-badge">7h3</div>
+      <div class="brand-text">
+        <h1>7h3 Protocol</h1>
+        <p>Cryptographic Agent Security Layer</p>
+      </div>
+    </div>
+    <div class="version-pill">v0.5.0 · Wire: 7h3/0.1</div>
+  </div>
+
+  <!-- TAGLINE -->
+  <div class="tagline">
+    <h2>Sign Every Message.<br>Reject Every Replay.<br>Encrypt End-to-End.</h2>
+    <p>One cryptographic envelope across every transport. Zero runtime dependencies.
+    Quantum-resistant. Multi-agent threshold signing. Built for AI agents.</p>
+  </div>
+
+  <!-- ATTACK SURFACE -->
+  <div class="section-label">Attack Surface Covered</div>
+  <div class="attacks-grid">
+    <div class="attack-card defended">
+      <div class="attack-icon">👤</div>
+      <div class="attack-name">Impersonation</div>
+      <div class="attack-defense"><span class="check">✓</span>Ed25519 — only private key holder can forge</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">🔁</div>
+      <div class="attack-name">Replay Attacks</div>
+      <div class="attack-defense"><span class="check">✓</span>Nonce dedup + TTL expiry (Redis-backed)</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">✂️</div>
+      <div class="attack-name">Tampering</div>
+      <div class="attack-defense"><span class="check">✓</span>Sig covers canonical full envelope body</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">🚪</div>
+      <div class="attack-name">Unauthorized Access</div>
+      <div class="attack-defense"><span class="check">✓</span>Per-route allowedSenders policy</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">📡</div>
+      <div class="attack-name">Eavesdropping</div>
+      <div class="attack-defense"><span class="check">✓</span>X25519 + ChaCha20-Poly1305 E2E encrypt</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">⚡</div>
+      <div class="attack-name">Rate Abuse</div>
+      <div class="attack-defense"><span class="check">✓</span>Sliding window by verified identity, not IP</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">🔮</div>
+      <div class="attack-name">Quantum Threats</div>
+      <div class="attack-defense"><span class="check">✓</span>ML-DSA-65/87 (NIST FIPS 204 Dilithium)</div>
+    </div>
+    <div class="attack-card defended">
+      <div class="attack-icon">📋</div>
+      <div class="attack-name">Audit Tampering</div>
+      <div class="attack-defense"><span class="check">✓</span>Ed25519-signed tamper-evident log chain</div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section-label">How a Message Gets Secured</div>
+  <div class="flow-section">
+    <div class="flow-row">
+      <div class="flow-node">
+        <div class="node-icon">🤖</div>
+        <div class="node-label">Agent</div>
+        <div class="node-sub">creates message</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">
+        <div class="node-icon">🔑</div>
+        <div class="node-label">Canonical JSON</div>
+        <div class="node-sub">sort keys · omit nulls</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">
+        <div class="node-icon">✍️</div>
+        <div class="node-label">Ed25519 Sign</div>
+        <div class="node-sub">private key · base64url</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="node-icon">📦</div>
+        <div class="node-label">Envelope</div>
+        <div class="node-sub">header + body + sig</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="node-icon">🌐</div>
+        <div class="node-label">Transport</div>
+        <div class="node-sub">HTTP / WS / gRPC…</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">
+        <div class="node-icon">🛡️</div>
+        <div class="node-label">Gateway Verify</div>
+        <div class="node-sub">TTL · nonce · sig · policy</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="node-icon">✅</div>
+        <div class="node-label">Upstream</div>
+        <div class="node-sub">x-7h3-sender injected</div>
+      </div>
+    </div>
+
+    <div class="envelope-box">
+      { <span class="key">"header"</span>: { <span class="key">"version"</span>: <span class="val">"7h3/0.1"</span>, <span class="key">"sender"</span>: <span class="val">"agent.alpha"</span>, <span class="key">"timestampMs"</span>: <span class="val">1712500000000</span>, <span class="key">"ttlMs"</span>: <span class="val">60000</span>, <span class="key">"nonce"</span>: <span class="val">"k9xR…"</span> },<br>
+      &nbsp;&nbsp;<span class="key">"body"</span>: { <span class="key">"intent"</span>: <span class="val">"TASK"</span>, <span class="key">"content"</span>: <span class="val">"process payment $99"</span> },<br>
+      &nbsp;&nbsp;<span class="key">"signature"</span>: { <span class="key">"alg"</span>: <span class="val">"ED25519"</span>, <span class="key">"keyId"</span>: <span class="val">"k1"</span>, <span class="key">"value"</span>: <span class="sig-val">"7xKQ…Nz4="</span> } }
+    </div>
+  </div>
+
+  <!-- V0.5 FEATURES -->
+  <div class="section-label">v0.5.0 New Capabilities</div>
+  <div class="features-grid">
+    <div class="feat">
+      <div class="feat-badge new-badge">NEW</div>
+      <div class="feat-icon">🔐</div>
+      <div class="feat-name">E2E Encryption</div>
+      <div class="feat-desc">X25519 key exchange + ChaCha20-Poly1305 AEAD. Forward secrecy per message. Zero new deps.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge new-badge">NEW</div>
+      <div class="feat-icon">🎟️</div>
+      <div class="feat-name">Capability Tokens</div>
+      <div class="feat-desc">Scoped, time-bounded delegation. Agent A grants B specific routes. B delegates narrower scope to C.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge new-badge">NEW</div>
+      <div class="feat-icon">🌊</div>
+      <div class="feat-name">Stream Signing</div>
+      <div class="feat-desc">Per-chunk HMAC + final Ed25519 over full content hash. Tamper detected mid-stream.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge new-badge">NEW</div>
+      <div class="feat-icon">🗄️</div>
+      <div class="feat-name">Redis Replay Cache</div>
+      <div class="feat-desc">Atomic SET NX PX across all instances. ClusterRedisReplayStore for Redis Cluster.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge new-badge">NEW</div>
+      <div class="feat-icon">📊</div>
+      <div class="feat-name">Prometheus + OTel</div>
+      <div class="feat-desc">Zero-dep metrics endpoint. 7 counters + histogram. Optional OpenTelemetry span injection.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge new-badge">NEW</div>
+      <div class="feat-icon">📦</div>
+      <div class="feat-name">CBOR Wire Format</div>
+      <div class="feat-desc">RFC 8949 deterministic encoding. ~40% smaller than JSON. Zero new deps.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge pq-badge">QUANTUM</div>
+      <div class="feat-icon">⚛️</div>
+      <div class="feat-name">ML-DSA Signatures</div>
+      <div class="feat-desc">NIST FIPS 204 Dilithium. ML-DSA-65 (Level 3) and ML-DSA-87 (Level 5). @7h3/protocol-pq</div>
+    </div>
+    <div class="feat">
+      <div class="feat-badge pq-badge">M-OF-N</div>
+      <div class="feat-icon">🏛️</div>
+      <div class="feat-name">Threshold Signatures</div>
+      <div class="feat-desc">BLS12-381 M-of-N aggregation. Shamir Secret Sharing. @7h3/protocol-threshold</div>
+    </div>
+  </div>
+
+  <!-- TRANSPORTS -->
+  <div class="section-label">Transport Coverage</div>
+  <div class="transport-row">
+    <div class="transport-pill">
+      <div class="t-icon">🌐</div>
+      <div>
+        <div class="t-name">HTTP / REST</div>
+        <div class="t-header">x-7h3-envelope</div>
+      </div>
+    </div>
+    <div class="transport-pill">
+      <div class="t-icon">⚡</div>
+      <div>
+        <div class="t-name">WebSocket</div>
+        <div class="t-header">per-frame + seq numbers</div>
+      </div>
+    </div>
+    <div class="transport-pill">
+      <div class="t-icon">🔌</div>
+      <div>
+        <div class="t-name">gRPC</div>
+        <div class="t-header">7h3-envelope-bin</div>
+      </div>
+    </div>
+    <div class="transport-pill">
+      <div class="t-icon">📬</div>
+      <div>
+        <div class="t-name">Message Queues</div>
+        <div class="t-header">{envelope, payload}</div>
+      </div>
+    </div>
+    <div class="transport-pill">
+      <div class="t-icon">🪝</div>
+      <div>
+        <div class="t-name">Webhooks</div>
+        <div class="t-header">x-7h3-sig + x-7h3-ts</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SDK ROW -->
+  <div class="section-label">SDK Coverage</div>
+  <div class="sdk-row">
+    <div class="sdk-pill">
+      <div class="s-icon">⬡</div>
+      <div class="s-name">TypeScript</div>
+    </div>
+    <div class="sdk-pill">
+      <div class="s-icon">🐍</div>
+      <div class="s-name">Python</div>
+    </div>
+    <div class="sdk-pill">
+      <div class="s-icon">🦀</div>
+      <div class="s-name">Rust</div>
+    </div>
+    <div class="sdk-pill">
+      <div class="s-icon">🐹</div>
+      <div class="s-name">Go</div>
+    </div>
+    <div class="sdk-pill">
+      <div class="s-icon">🌍</div>
+      <div class="s-name">Browser</div>
+    </div>
+    <div class="sdk-pill">
+      <div class="s-icon">⚛️</div>
+      <div class="s-name">PQ (ML-DSA)</div>
+    </div>
+    <div class="sdk-pill">
+      <div class="s-icon">🏛️</div>
+      <div class="s-name">Threshold (BLS)</div>
+    </div>
+  </div>
+
+  <!-- INSTALL -->
+  <div class="install-strip">
+    <div class="install-item">
+      <div class="lang">TypeScript</div>
+      <div class="cmd">npm i @7h3/protocol</div>
+    </div>
+    <div class="install-item">
+      <div class="lang">Python</div>
+      <div class="cmd">pip install 7h3-protocol</div>
+    </div>
+    <div class="install-item">
+      <div class="lang">Rust</div>
+      <div class="cmd">protocol-7h3 = "0.5"</div>
+    </div>
+    <div class="install-item">
+      <div class="lang">Go</div>
+      <div class="cmd">go get github.com/IceMasterT/7h3-protocol/sdk/go</div>
+    </div>
+    <div class="install-item">
+      <div class="lang">Post-Quantum</div>
+      <div class="cmd">npm i @7h3/protocol-pq</div>
+    </div>
+    <div class="install-item">
+      <div class="lang">Threshold</div>
+      <div class="cmd">npm i @7h3/protocol-threshold</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      <span class="glow-dot"></span>
+      <strong>github.com/IceMasterT/7h3-protocol</strong> · MIT License · Wire version 7h3/0.1 (immutable)
+    </div>
+    <div class="stat-pills">
+      <div class="stat-pill">428 tests ✓</div>
+      <div class="stat-pill">0 runtime deps</div>
+      <div class="stat-pill">5 transports</div>
+      <div class="stat-pill">7 SDKs</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

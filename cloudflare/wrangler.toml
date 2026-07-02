@@ -1,0 +1,62 @@
+name = "7h3-gateway"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# ---------------------------------------------------------------------------
+# Worker variables — override per environment below
+# ---------------------------------------------------------------------------
+[vars]
+# URL of the service this gateway proxies traffic to
+UPSTREAM_URL = "https://your-service.example.com"
+# This gateway's identity (must match a key in KEY_REGISTRY)
+GATEWAY_SENDER = "gateway@your-service.example.com"
+# 'deny' (production) or 'allow' (development/open APIs)
+DEFAULT_POLICY = "deny"
+
+# GATEWAY_PRIVATE_KEY is a secret — set with:
+#   wrangler secret put GATEWAY_PRIVATE_KEY
+# Generate a keypair first:
+#   cd .. && npx tsx bin/7h3.ts keygen
+
+# ---------------------------------------------------------------------------
+# KV namespaces — created with: wrangler kv:namespace create <name>
+# ---------------------------------------------------------------------------
+
+[[kv_namespaces]]
+binding = "KEY_REGISTRY"
+id = "REPLACE_WITH_KEY_REGISTRY_KV_ID"
+preview_id = "REPLACE_WITH_KEY_REGISTRY_KV_PREVIEW_ID"
+
+[[kv_namespaces]]
+binding = "REPLAY_STORE"
+id = "REPLACE_WITH_REPLAY_STORE_KV_ID"
+preview_id = "REPLACE_WITH_REPLAY_STORE_KV_PREVIEW_ID"
+
+# ---------------------------------------------------------------------------
+# Optional: Durable Object for fully atomic replay protection
+# Uncomment if you need zero-race-window nonce dedup (paid plans only)
+# ---------------------------------------------------------------------------
+# [[durable_objects.bindings]]
+# name = "REPLAY_DO"
+# class_name = "ReplayDurableObject"
+#
+# [[migrations]]
+# tag = "v1"
+# new_classes = ["ReplayDurableObject"]
+
+# ---------------------------------------------------------------------------
+# Environments — staging and production overrides
+# ---------------------------------------------------------------------------
+
+[env.staging]
+name = "7h3-gateway-staging"
+[env.staging.vars]
+UPSTREAM_URL = "https://staging.your-service.example.com"
+DEFAULT_POLICY = "allow"
+
+[env.production]
+name = "7h3-gateway"
+[env.production.vars]
+UPSTREAM_URL = "https://your-service.example.com"
+DEFAULT_POLICY = "deny"
