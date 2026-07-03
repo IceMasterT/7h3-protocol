@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "7h3-protocol": {
+      "command": "npx",
+      "args": ["-y", "@7h3/protocol-mcp"],
+      "description": "7h3 Protocol tools — keygen, sign, verify, scaffold, mcp-config"
+    }
+  }
+}

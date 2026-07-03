@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { writeFileSync } from 'node:fs'
 
 const USAGE = `
-7h3 — Aurelion Interaction Protocol CLI (wire version 7h3/0.1)
+7h3 — Protocol CLI (wire version 7h3/0.1)
 
 Usage:
   7h3 keygen [--output <file>]
@@ -14,15 +14,17 @@ Usage:
   7h3 gateway --upstream <url> [--port <n>] [--public-key <key>] [--require ed25519|none]
               [--sign-responses] [--private-key <key>] [--sender <id>] [--metrics-port <n>]
   7h3 keys serve [--public-key <key>] [--key-id <id>] [--port <n>]
+  7h3 add --framework <name> [--sender <id>] [--output <dir>]
   7h3 help
 
 Commands:
   keygen     Generate an Ed25519 keypair (PKCS8/SPKI, base64url-encoded)
-  sign       Create and sign an AIP envelope
-  verify     Verify an AIP envelope signature
-  inspect    Pretty-print an AIP envelope fields
+  sign       Create and sign a 7h3 envelope
+  verify     Verify a 7h3 envelope signature
+  inspect    Pretty-print a 7h3 envelope fields
   gateway    Run a verifying HTTP proxy gateway
   keys serve Serve a /.well-known/7h3-keys endpoint
+  add        Scaffold 7h3 integration into a project (see --framework options)
   help       Show this usage table
 `
 
@@ -351,6 +353,308 @@ async function cmdKeysServe(argv: string[]): Promise<void> {
   })
 }
 
+// ─── 7h3 add ───────────────────────────────────────────────────────────────────
+
+const ADD_FRAMEWORKS = ['cloudflare-worker', 'nextjs', 'express', 'hono', 'fastify', 'claude-code', 'opencode', 'codex', 'grok'] as const
+type Framework = typeof ADD_FRAMEWORKS[number]
+
+const FRAMEWORK_SNIPPETS: Record<Framework, (sender: string) => string> = {
+  'cloudflare-worker': (sender) => `// cloudflare/src/worker.ts — 7h3 Gateway Worker
+// Install: npm install @7h3/protocol
+// See: cloudflare/DEPLOY.md for full setup
+
+import { createGateway } from '@7h3/protocol/gateway'
+import { KvKeyRegistry } from './kv-key-registry'
+import { KvReplayStore } from './kv-replay-store'
+
+interface Env {
+  KEY_REGISTRY: KVNamespace
+  REPLAY_STORE: KVNamespace
+  UPSTREAM_URL: string
+  GATEWAY_PRIVATE_KEY?: string
+  GATEWAY_SENDER?: string
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const gateway = createGateway({
+      upstream: env.UPSTREAM_URL,
+      keyRegistry: new KvKeyRegistry(env.KEY_REGISTRY),
+      replayStore: new KvReplayStore(env.REPLAY_STORE),
+      defaultPolicy: 'deny',
+      privateKey: env.GATEWAY_PRIVATE_KEY,
+      sender: env.GATEWAY_SENDER ?? '${sender}',
+    })
+    const url = new URL(request.url)
+    const headers: Record<string, string> = {}
+    request.headers.forEach((v, k) => { headers[k] = v })
+    const result = await gateway.verify({ method: request.method, path: url.pathname, headers })
+    if (!result.ok) return new Response(result.reason, { status: result.status })
+    return fetch(env.UPSTREAM_URL + url.pathname + url.search, { method: request.method, headers })
+  }
+}
+`,
+
+  'nextjs': (sender) => `// middleware.ts — add to your Next.js project root
+// Install: npm install @7h3/protocol
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyHttpEnvelope } from '@7h3/protocol/http'
+import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
+
+// Load trusted peer public keys from env vars
+const PEER_KEYS = Object.fromEntries(
+  (process.env.P7H3_TRUSTED_KEYS ?? '').split(',').filter(Boolean)
+    .map(pair => pair.split('=') as [string, string])
+)
+
+const registry = createStaticKeyRegistry(PEER_KEYS)
+
+export async function middleware(req: NextRequest) {
+  const headers = Object.fromEntries(req.headers)
+  const result = await verifyHttpEnvelope(headers, { keyRegistry: registry })
+  if (!result.ok) {
+    return NextResponse.json({ error: result.reason }, { status: 401 })
+  }
+  const response = NextResponse.next()
+  response.headers.set('x-7h3-sender', (result as any).envelope?.header?.sender ?? '')
+  return response
+}
+
+export const config = { matcher: '/api/:path*' }
+
+// Usage: set env var P7H3_TRUSTED_KEYS="agent@example.com=<base64url-pubkey>,..."
+// Generate keypair: npx 7h3 keygen
+// Self-identity: ${sender}
+`,
+
+  'express': (sender) => `// middleware/7h3-auth.ts — add to your Express project
+// Install: npm install @7h3/protocol
+import type { Request, Response, NextFunction } from 'express'
+import { verifyHttpEnvelope } from '@7h3/protocol/http'
+import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
+
+const registry = createStaticKeyRegistry({
+  'peer-agent@example.com': process.env.PEER_PUBLIC_KEY ?? '',
+})
+
+export async function verify7h3(req: Request, res: Response, next: NextFunction) {
+  const result = await verifyHttpEnvelope(
+    req.headers as Record<string, string>,
+    { keyRegistry: registry },
+  )
+  if (!result.ok) return res.status(401).json({ error: result.reason })
+  ;(req as any).sender7h3 = (result as any).envelope?.header?.sender
+  next()
+}
+
+// Mount in app.ts:
+//   import { verify7h3 } from './middleware/7h3-auth'
+//   app.use('/api', verify7h3)
+//
+// Self-identity: ${sender}
+`,
+
+  'hono': (sender) => `// middleware/7h3-auth.ts — add to your Hono project
+// Install: npm install @7h3/protocol hono
+import { createMiddleware } from 'hono/factory'
+import { verifyHttpEnvelope } from '@7h3/protocol/http'
+import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
+
+const registry = createStaticKeyRegistry({
+  'peer-agent@example.com': process.env.PEER_PUBLIC_KEY ?? '',
+})
+
+export const auth7h3 = createMiddleware(async (c, next) => {
+  const headers = Object.fromEntries(c.req.raw.headers)
+  const result = await verifyHttpEnvelope(headers, { keyRegistry: registry })
+  if (!result.ok) return c.json({ error: result.reason }, 401)
+  c.set('sender7h3', (result as any).envelope?.header?.sender ?? '')
+  await next()
+})
+
+// Mount in your Hono app:
+//   import { auth7h3 } from './middleware/7h3-auth'
+//   app.use('/api/*', auth7h3)
+//
+// Self-identity: ${sender}
+`,
+
+  'fastify': (sender) => `// plugins/7h3-auth.ts — add to your Fastify project
+// Install: npm install @7h3/protocol fastify
+import fp from 'fastify-plugin'
+import { verifyHttpEnvelope } from '@7h3/protocol/http'
+import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
+
+const registry = createStaticKeyRegistry({
+  'peer-agent@example.com': process.env.PEER_PUBLIC_KEY ?? '',
+})
+
+export default fp(async (fastify) => {
+  fastify.addHook('preHandler', async (request, reply) => {
+    const result = await verifyHttpEnvelope(
+      request.headers as Record<string, string>,
+      { keyRegistry: registry },
+    )
+    if (!result.ok) {
+      return reply.code(401).send({ error: result.reason })
+    }
+    request.sender7h3 = (result as any).envelope?.header?.sender ?? ''
+  })
+})
+
+// In your main file: fastify.register(import('./plugins/7h3-auth'))
+// Self-identity: ${sender}
+`,
+
+  'claude-code': (_sender) => `# Install 7h3 Protocol MCP server in Claude Code
+
+## Option 1 — one command (recommended)
+
+\`\`\`bash
+claude mcp add 7h3-protocol -- npx -y @7h3/protocol-mcp
+\`\`\`
+
+## Option 2 — project .claude/settings.json
+
+Copy .claude/settings.example.json to .claude/settings.json:
+
+\`\`\`json
+{
+  "mcpServers": {
+    "7h3-protocol": {
+      "command": "npx",
+      "args": ["-y", "@7h3/protocol-mcp"]
+    }
+  }
+}
+\`\`\`
+
+## Available tools after install
+
+- 7h3_generate_keypair   — Ed25519 keypair
+- 7h3_generate_secret    — HMAC secret
+- 7h3_sign               — sign a test envelope
+- 7h3_verify             — verify an envelope
+- 7h3_scaffold           — generate framework integration code
+- 7h3_mcp_config         — get config for other editors
+- 7h3_wrap_mcp_server    — wrap an MCP handler with 7h3 signing
+`,
+
+  'opencode': (_sender) => `# Install 7h3 Protocol MCP server in Opencode
+
+Add to your opencode config (~/.config/opencode/config.json or opencode.json):
+
+\`\`\`json
+{
+  "mcp": {
+    "7h3-protocol": {
+      "command": "npx",
+      "args": ["-y", "@7h3/protocol-mcp"],
+      "type": "stdio"
+    }
+  }
+}
+\`\`\`
+
+Or one command:
+\`\`\`bash
+opencode mcp add 7h3-protocol npx -y @7h3/protocol-mcp
+\`\`\`
+
+After install, ask: "scaffold 7h3 for my hono project" and the AI will call 7h3_scaffold automatically.
+`,
+
+  'codex': (_sender) => `# 7h3 Protocol — GPT Codex integration
+
+Codex reads AGENTS.md automatically. This repo has AGENTS.md with:
+- Installation instructions for all SDKs
+- Framework integration snippets (CF Worker, Next.js, Express, Hono, Fastify)
+- All advanced feature examples
+- CLI reference
+
+No extra setup needed — just ensure AGENTS.md is in your repo root.
+
+## Add to your project's AGENTS.md
+
+\`\`\`markdown
+## Security — 7h3 Protocol
+
+All inter-agent HTTP calls must include a signed 7h3 envelope.
+
+Install: npm install @7h3/protocol
+Docs: see https://github.com/IceMasterT/7h3-protocol-aip
+
+Verify incoming requests with verifyHttpEnvelope() from @7h3/protocol/http.
+Sign outgoing requests with signEnvelopeEd25519() from @7h3/protocol.
+\`\`\`
+`,
+
+  'grok': (_sender) => `# 7h3 Protocol — Grok Builder integration
+
+Grok Builder reads AGENTS.md. This repo's AGENTS.md includes all integration patterns.
+
+## Add to your project's AGENTS.md
+
+\`\`\`markdown
+## Security — 7h3 Protocol signing
+
+All AI agent messages must use 7h3 Protocol (npm: @7h3/protocol).
+
+Key rules:
+- Outgoing: createEnvelope() + signEnvelopeEd25519() → x-7h3-envelope header
+- Incoming: verifyHttpEnvelope() from @7h3/protocol/http
+- Wire version is ALWAYS "7h3/0.1" — never change
+- Generate keys: npx 7h3 keygen
+\`\`\`
+
+## MCP config for Grok (if MCP supported)
+
+\`\`\`json
+{
+  "mcp": {
+    "7h3-protocol": {
+      "command": "npx",
+      "args": ["-y", "@7h3/protocol-mcp"]
+    }
+  }
+}
+\`\`\`
+`,
+}
+
+async function cmdAdd(argv: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      framework: { type: 'string', short: 'f' },
+      sender: { type: 'string', short: 's' },
+      output: { type: 'string', short: 'o' },
+    },
+    strict: false,
+  })
+
+  const framework = (values.framework as string | undefined) ?? ''
+  const sender = (values.sender as string | undefined) ?? 'agent@example.com'
+
+  if (!framework || !ADD_FRAMEWORKS.includes(framework as Framework)) {
+    process.stdout.write(`Available frameworks:\n`)
+    ADD_FRAMEWORKS.forEach(f => process.stdout.write(`  ${f}\n`))
+    process.stdout.write(`\nUsage: 7h3 add --framework <name> [--sender <id>]\n`)
+    return
+  }
+
+  const snippet = FRAMEWORK_SNIPPETS[framework as Framework](sender)
+  const out = values.output as string | undefined
+
+  if (out) {
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(out, snippet, 'utf8')
+    process.stdout.write(`Written to ${out}\n`)
+  } else {
+    process.stdout.write(snippet)
+  }
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
   const command = args[0] ?? 'help'
@@ -386,6 +690,10 @@ async function main(): Promise<void> {
       }
       break
     }
+
+    case 'add':
+      await cmdAdd(rest)
+      break
 
     case 'help':
     case '--help':

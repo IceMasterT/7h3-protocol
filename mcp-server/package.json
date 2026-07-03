@@ -1,10 +1,10 @@
 {
   "name": "@7h3/protocol-mcp",
-  "version": "0.1.1",
-  "description": "MCP server for @7h3/protocol — install into Claude to generate AIP secrets, keypairs, and server boilerplate",
+  "version": "0.5.0",
+  "description": "MCP server for @7h3/protocol — install into Claude to generate 7h3 secrets, keypairs, server boilerplate, and framework scaffolds",
   "type": "module",
   "bin": {
-    "aip-mcp": "./dist/index.js"
+    "7h3-mcp": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -16,11 +16,12 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@7h3/protocol": "^0.1.0",
+    "@7h3/protocol": "file:..",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.0",
     "typescript": "^6.0.3"
   },
   "engines": {
