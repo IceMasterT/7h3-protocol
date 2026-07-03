@@ -34,6 +34,8 @@
 - [Core API](#core-api)
 - [Transports](#transports)
 - [Gateway](#gateway)
+- [Cloudflare Workers](#cloudflare-workers)
+- [AI Coding Agents](#ai-coding-agents)
 - [MCP (Claude Tool Calls)](#mcp-claude-tool-calls)
 - [End-to-End Encryption](#end-to-end-encryption)
 - [Capability Tokens and Delegation](#capability-tokens-and-delegation)
@@ -671,6 +673,139 @@ policies:
     allowed_senders: [agent.alpha, agent.beta]
     rate_limit: { max_requests: 200, window_ms: 60000 }
 ```
+
+---
+
+## Cloudflare Workers
+
+`cloudflare/` contains a complete Cloudflare Workers deployment — a cryptographic reverse proxy that enforces 7h3 signing on all inbound traffic, using KV for distributed key registry and nonce replay protection across all Cloudflare PoPs.
+
+```
+Caller ──[x-7h3-envelope]──▶ 7h3 Gateway Worker ──[clean + x-7h3-sender]──▶ Upstream
+         Ed25519 signed         verify + strip                                 your Worker
+```
+
+### One-command setup
+
+```bash
+cd cloudflare
+npm install
+npm run setup     # generates keypair, creates KV namespaces, stores secret
+```
+
+Then set `UPSTREAM_URL` in `wrangler.toml` and deploy:
+
+```bash
+npm run deploy:staging
+npm run deploy:production
+```
+
+### Middleware for existing Workers
+
+Add 7h3 verification to any existing Worker without a full reverse-proxy setup:
+
+```ts
+import { create7h3Middleware } from './cloudflare/src/middleware'
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const mw = create7h3Middleware(env)
+    const check = await mw.verify(request)
+    if (!check.ok) return check.response   // 401 or 403
+
+    // check.sender holds the verified agent identity
+    return myHandler(request, env, ctx)
+  },
+}
+```
+
+### What's included
+
+| File | Purpose |
+|---|---|
+| `cloudflare/src/worker.ts` | Standalone gateway entry point |
+| `cloudflare/src/middleware.ts` | `create7h3Middleware()` for existing Workers |
+| `cloudflare/src/kv-replay-store.ts` | KV-backed nonce dedup (cross-instance) |
+| `cloudflare/src/kv-key-registry.ts` | KV-backed public key registry |
+| `cloudflare/src/durable-replay.ts` | Durable Object for fully atomic replay |
+| `cloudflare/wrangler.toml` | KV bindings, env vars, staging + production |
+| `cloudflare/scripts/cf-setup.ts` | First-time setup automation |
+| `cloudflare/DEPLOY.md` | Step-by-step deployment guide |
+
+### Replay protection tiers
+
+| Store | Consistency | Setup |
+|---|---|---|
+| `KvReplayStore` (default) | Strong within datacenter, ~60ms global lag | KV namespace (free plan) |
+| `DurableReplayStore` | Fully atomic, zero race window | Durable Objects (paid plan) |
+
+Register trusted agent public keys in KV:
+
+```bash
+wrangler kv:key put --namespace-id <ID> \
+  "7h3:pk:agent@example.com" "<base64url-ed25519-spki-pubkey>"
+```
+
+Key discovery is served automatically at `GET /.well-known/7h3-keys`.
+
+---
+
+## AI Coding Agents
+
+7h3 Protocol ships first-class support for AI coding environments. Each tool reads its config automatically — no plugin installation required.
+
+| Tool | Config file | What it gets |
+|---|---|---|
+| Claude Code | `CLAUDE.md` + MCP server | Live keygen/sign/verify/scaffold tools + full repo context |
+| GPT Codex | `AGENTS.md` | Full integration patterns, snippets, invariants |
+| Opencode | `AGENTS.md` | Same |
+| Grok Builder | `AGENTS.md` | Same |
+
+### Claude Code — MCP server
+
+Install the MCP server once to get live tools in every Claude Code session:
+
+```bash
+claude mcp add 7h3-protocol -- npx -y @7h3/protocol-mcp
+```
+
+Or copy `.claude/settings.example.json` → `.claude/settings.json` in your project.
+
+Available MCP tools:
+
+| Tool | Description |
+|---|---|
+| `7h3_generate_keypair` | Generate an Ed25519 keypair |
+| `7h3_generate_secret` | Generate a 32-byte HMAC secret |
+| `7h3_sign` | Sign a test envelope for debugging |
+| `7h3_verify` | Verify an envelope's signature, TTL, and shape |
+| `7h3_scaffold` | Generate integration code for a framework (see below) |
+| `7h3_mcp_config` | Get install config for Claude Code, Cursor, Opencode, Grok |
+| `7h3_wrap_mcp_server` | Generate boilerplate to wrap an MCP handler with 7h3 |
+
+### `7h3 add` — scaffold any project
+
+Generate ready-to-paste integration code from the CLI:
+
+```bash
+# Framework integrations
+npx 7h3 add --framework cloudflare-worker --sender agent@example.com
+npx 7h3 add --framework nextjs            --sender agent@example.com
+npx 7h3 add --framework express           --sender agent@example.com
+npx 7h3 add --framework hono              --sender agent@example.com
+npx 7h3 add --framework fastify           --sender agent@example.com
+
+# AI tool setup instructions
+npx 7h3 add --framework claude-code
+npx 7h3 add --framework opencode
+npx 7h3 add --framework codex
+npx 7h3 add --framework grok
+
+# Write to a file
+npx 7h3 add --framework hono --output middleware/7h3-auth.ts
+```
+
+When called from the MCP server, `7h3_scaffold` does the same — Claude Code can call it directly and paste the result into your file.
 
 ---
 
@@ -1399,6 +1534,30 @@ npm install -g @7h3/protocol
   --port 3010
 ```
 
+### `7h3 add` — scaffold integrations
+
+Generate ready-to-paste code for any framework or AI coding tool:
+
+```bash
+# Framework integrations
+npx 7h3 add --framework cloudflare-worker  --sender <sender-id>
+npx 7h3 add --framework nextjs             --sender <sender-id>
+npx 7h3 add --framework express            --sender <sender-id>
+npx 7h3 add --framework hono               --sender <sender-id>
+npx 7h3 add --framework fastify            --sender <sender-id>
+
+# AI coding tool setup instructions
+npx 7h3 add --framework claude-code   # prints MCP install + CLAUDE.md snippet
+npx 7h3 add --framework opencode      # prints AGENTS.md snippet
+npx 7h3 add --framework codex         # prints AGENTS.md snippet
+npx 7h3 add --framework grok          # prints AGENTS.md snippet
+
+# Write to a file instead of stdout
+npx 7h3 add --framework hono --sender agent@example.com --output middleware/7h3.ts
+```
+
+Supported `--framework` values: `cloudflare-worker`, `nextjs`, `express`, `hono`, `fastify`, `claude-code`, `opencode`, `codex`, `grok`
+
 ---
 
 ## Docker
@@ -1455,6 +1614,13 @@ go mod tidy
 ---
 
 ## Changelog
+
+### v0.5.1
+
+- **Cloudflare Workers gateway** — `cloudflare/` directory: standalone reverse-proxy Worker (`worker.ts`), drop-in middleware (`create7h3Middleware`), KV-backed key registry (`KvKeyRegistry`), KV nonce replay store (`KvReplayStore`), Durable Object atomic replay store (`DurableReplayStore`); one-command setup script (`cf-setup.ts`) with `execFileSync` shell-injection protection; staging + production environments in `wrangler.toml`; key discovery at `GET /.well-known/7h3-keys`
+- **AI coding agent integration** — `CLAUDE.md` (auto-loaded by Claude Code), `AGENTS.md` (auto-loaded by GPT Codex, Opencode, Grok Builder); MCP server v0.5.0 with 7 tools (`7h3_generate_keypair`, `7h3_generate_secret`, `7h3_sign`, `7h3_verify`, `7h3_scaffold`, `7h3_mcp_config`, `7h3_wrap_mcp_server`); one-line MCP install: `claude mcp add 7h3-protocol -- npx -y @7h3/protocol-mcp`
+- **`7h3 add` CLI** — `npx 7h3 add --framework <name>` generates ready-to-paste integration code for 9 targets: `cloudflare-worker`, `nextjs`, `express`, `hono`, `fastify`, `claude-code`, `opencode`, `codex`, `grok`; optional `--output <file>` flag
+- **MCP server renamed** — binary `aip-mcp` → `7h3-mcp`; env prefix `AIP_*` → `P7H3_*`; package `@7h3/protocol-mcp` v0.5.0
 
 ### v0.5.0
 
