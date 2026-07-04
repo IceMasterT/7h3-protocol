@@ -1,0 +1,14 @@
+# Default owner for everything in the repo.
+# Security-sensitive paths are listed explicitly so future co-maintainers
+# can be scoped without inheriting crypto-core review rights by default.
+
+* @IceMasterT
+
+# Protocol core — signing, canonicalization, replay protection
+/src/ @IceMasterT
+/sdk/ @IceMasterT
+/conformance/ @IceMasterT
+
+# Release and CI pipeline
+/.github/ @IceMasterT
+/scripts/release-gate.ts @IceMasterT

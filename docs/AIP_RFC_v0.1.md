@@ -12,13 +12,13 @@ This document defines the normative behavior for the GLUV AI communication proto
 An envelope has:
 
 - `header`
-  - `version` (MUST be `"aip/0.1"`)
+  - `version` (MUST be `"7h3/0.1"`)
   - `messageId` (MUST be non-empty)
   - `timestampMs` (Unix epoch milliseconds)
   - `ttlMs` (MUST be > 0)
   - `sender` (MUST be non-empty)
   - `recipient` (OPTIONAL)
-  - `nonce` (MUST be non-empty)
+  - `nonce` (MUST be non-empty; see §5 for entropy requirements)
 - `body`
   - `intent` (MUST be one of `PING`, `PONG`, `CAPS`, `TASK`, `RESULT`, `ERROR`)
   - `content` (MAY be empty but SHOULD be meaningful)
@@ -62,6 +62,18 @@ Receivers MUST verify signatures against this exact canonicalization behavior.
 - Receivers MUST enforce freshness: reject when `timestampMs + ttlMs < nowMs`.
 - Replay cache key MUST be `(sender, messageId, nonce)`.
 - Re-seeing an unexpired replay key MUST be rejected.
+
+### 5.1 Nonce Entropy (Normative)
+
+- Senders MUST generate `nonce` from a cryptographically secure random source
+  (CSPRNG): `crypto.getRandomValues`/`crypto.randomUUID` (JS),
+  `secrets`/`os.urandom` (Python), `getrandom` (Rust), or equivalent.
+- Nonces MUST carry at least 96 bits of entropy.
+- Timestamp-derived nonces and non-cryptographic PRNGs (e.g. `Math.random()`)
+  MUST NOT be used. Predictable nonces let an attacker pre-compute future
+  replay-cache keys; low-entropy nonces collide within the TTL window and
+  cause legitimate messages to be rejected as replays.
+- Receivers MAY reject envelopes whose nonce is shorter than 16 characters.
 
 ## 6. Transport Expectations
 
