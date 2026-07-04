@@ -4,3 +4,4 @@ sdk/rust/target/
 **/__pycache__/
 *.tsbuildinfo
 .DS_Store
+bench-results/

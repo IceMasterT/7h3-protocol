@@ -1,12 +1,12 @@
 [package]
 name = "protocol-7h3"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 description = "7h3 Protocol — Rust SDK. Deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python parity. Wire version 7h3/0.1."
 license = "MIT"
-repository = "https://github.com/IceMasterT/7h3-protocol-aip"
-homepage = "https://github.com/IceMasterT/7h3-protocol-aip"
-documentation = "https://docs.rs/7h3-protocol"
+repository = "https://github.com/IceMasterT/7h3-protocol"
+homepage = "https://github.com/IceMasterT/7h3-protocol"
+documentation = "https://docs.rs/protocol-7h3"
 keywords = ["7h3", "agent", "protocol", "ed25519", "mcp"]
 categories = ["cryptography", "network-programming", "web-programming::http-server"]
 readme = "README.md"
@@ -19,6 +19,7 @@ path = "src/lib.rs"
 [dependencies]
 base64 = "0.22"
 ed25519-dalek = { version = "2", features = ["pkcs8"] }
+getrandom = "0.2"
 hmac = "0.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

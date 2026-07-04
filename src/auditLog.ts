@@ -1,4 +1,5 @@
 import {
+  randomHex,
   signCanonicalPayloadEd25519,
   verifyCanonicalPayloadEd25519,
 } from './protocol'
@@ -61,7 +62,7 @@ class InMemoryAuditLog implements AuditLogger {
   }
 
   async log(event: Omit<AuditEntry, 'id' | 'timestampMs' | 'entrySignature'>): Promise<void> {
-    const id = `audit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const id = `audit-${Date.now()}-${randomHex(5)}`
     const timestampMs = Date.now()
 
     const partial: Omit<AuditEntry, 'entrySignature'> = { id, timestampMs, ...event }

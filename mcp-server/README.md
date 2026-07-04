@@ -1,6 +1,6 @@
 # @7h3/protocol-mcp
 
-MCP server for [@7h3/protocol](https://github.com/IceMasterT/7h3-protocol-aip) — install into Claude to generate AIP secrets, keypairs, and server boilerplate.
+MCP server for [@7h3/protocol](https://github.com/IceMasterT/7h3-protocol) — install into Claude to generate 7h3 secrets, keypairs, and server boilerplate.
 
 ## Install into Claude Code
 

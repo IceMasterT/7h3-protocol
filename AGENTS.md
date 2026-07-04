@@ -18,7 +18,7 @@ Wire version: `7h3/0.1` — **never change this string** (breaking for all peers
 npm install @7h3/protocol        # TypeScript / JavaScript
 pip install 7h3-protocol         # Python
 # Cargo.toml: protocol-7h3 = "0.5"
-# go.mod: github.com/IceMasterT/7h3-protocol-aip/sdk/go v0.5.0
+# go.mod: github.com/IceMasterT/7h3-protocol/sdk/go v0.5.0
 ```
 
 ### 2. Generate a keypair (one-time)

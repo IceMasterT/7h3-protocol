@@ -1,4 +1,4 @@
-import { generateEd25519KeypairBase64Url } from './protocol'
+import { generateEd25519KeypairBase64Url, randomHex } from './protocol'
 import type { KeyRegistry } from './keyRegistry'
 
 // ── Well-Known Document ──────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ export class KeyRotationManager {
     }
     const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
     const newKey: ManagedKeyPair = {
-      id: `key-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `key-${now}-${randomHex(4)}`,
       publicKey,
       privateKey,
       createdAt: now,

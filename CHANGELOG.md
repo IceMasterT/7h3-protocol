@@ -6,6 +6,43 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.5.2
+
+### Security
+
+- **Rust: constant-time HMAC verification** — `verify_canonical_payload_hmac` previously
+  compared base64 strings with `==`, leaking matching-prefix length as a timing oracle.
+  Now decodes the signature and uses `hmac::Mac::verify_slice` (constant-time). Brings
+  Rust in line with TypeScript (`subtle.verify`) and Python (`hmac.compare_digest`).
+- **Cryptographically secure nonces** — TypeScript `createEnvelope` used `Math.random()`
+  for nonce/messageId defaults; the Rust envelope helper used a timestamp-only nonce
+  (`n-<ms>`, zero entropy, collides within the same millisecond). Both now use CSPRNG
+  output: new exported `randomHex()` (Web Crypto) in TS and `random_nonce()`
+  (`getrandom`) in Rust. Capability token, key rotation, and audit log IDs also moved
+  off `Math.random()`.
+
+### Fixed
+
+- CI/publish workflows referenced nonexistent scripts (`build:aip`/`package:aip`) and
+  the old `dist/npm-aip` output path — corrected to `build:protocol`/`package:protocol`
+  and `dist/npm-protocol`.
+- `SECURITY.md`/`GOVERNANCE.md` still cited the pre-rebrand wire version `aip/0.1` and
+  the removed `src/aip/` path — corrected to `7h3/0.1` and current paths.
+- Repository URLs pointed at the old `7h3-protocol-aip` repo name across package
+  manifests and docs; Cargo `documentation` link fixed to `docs.rs/protocol-7h3`.
+
+### Added
+
+- `LICENSE` file (MIT) — previously declared in manifests but missing from the repo.
+
+### Removed
+
+- Stale compiled `src/protocol.js` (drift risk next to `protocol.ts`).
+- `bench-results/` JSON artifacts untracked and gitignored.
+
+Wire format unchanged: `7h3/0.1` envelopes signed by v0.5.1 verify under v0.5.2 and
+vice versa.
+
 ## v0.5.0
 
 ### New features
@@ -149,4 +186,4 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-[0.1.0]: https://github.com/IceMasterT/7h3-protocol-aip/releases/tag/v0.1.0
+[0.1.0]: https://github.com/IceMasterT/7h3-protocol/releases/tag/v0.1.0

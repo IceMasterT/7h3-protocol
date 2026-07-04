@@ -1,5 +1,6 @@
 import {
   generateEd25519KeypairBase64Url,
+  randomHex,
   signCanonicalPayloadEd25519,
   verifyCanonicalPayloadEd25519,
 } from './protocol'
@@ -97,7 +98,7 @@ export async function issueCapabilityToken(opts: {
   keyId?: string
 }): Promise<CapabilityToken> {
   const now = Date.now()
-  const id = `cap-${now}-${Math.random().toString(36).slice(2, 12)}`
+  const id = `cap-${now}-${randomHex(6)}`
   const keyId = opts.keyId ?? `${opts.issuerId}-key`
   const maxDelegations = opts.maxDelegations ?? 0
 
@@ -213,7 +214,7 @@ export async function delegateCapabilityToken(opts: {
     )
   }
 
-  const id = `cap-${now}-${Math.random().toString(36).slice(2, 12)}`
+  const id = `cap-${now}-${randomHex(6)}`
   const keyId = opts.keyId ?? `${delegatorId}-key`
 
   // Compute new maxDelegations: decrement from parent (undefined = unlimited stays unlimited)

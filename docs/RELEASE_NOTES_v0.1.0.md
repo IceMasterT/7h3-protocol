@@ -38,8 +38,8 @@ npm install @7h3/protocol
 ## Quick demo
 
 ```bash
-git clone https://github.com/IceMasterT/7h3-protocol-aip
-cd 7h3-protocol-aip && npm install
+git clone https://github.com/IceMasterT/7h3-protocol
+cd 7h3-protocol && npm install
 npm run aip:mcp:wrap   # proves tamper + replay rejection
 ```
 

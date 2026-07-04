@@ -132,6 +132,15 @@ pub fn canonicalize_envelope(envelope: &ProtocolEnvelope) -> String {
     )
 }
 
+/// Cryptographically secure random nonce (96 bits, hex-encoded).
+/// Nonces back replay protection, so they must come from the OS CSPRNG —
+/// never a timestamp or a non-cryptographic PRNG.
+pub fn random_nonce() -> String {
+    let mut buf = [0u8; 12];
+    getrandom::getrandom(&mut buf).expect("OS RNG should be available");
+    buf.iter().map(|b| format!("{b:02x}")).collect()
+}
+
 pub fn sign_canonical_payload_hmac(canonical_payload: &str, secret: &str) -> String {
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC key should be valid");
     mac.update(canonical_payload.as_bytes());
@@ -144,8 +153,14 @@ pub fn verify_canonical_payload_hmac(
     signature: &str,
     secret: &str,
 ) -> bool {
-    let expected = sign_canonical_payload_hmac(canonical_payload, secret);
-    expected == signature
+    let Ok(signature_bytes) = URL_SAFE_NO_PAD.decode(signature) else {
+        return false;
+    };
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC key should be valid");
+    mac.update(canonical_payload.as_bytes());
+    // verify_slice performs a constant-time comparison; a plain `==` on the
+    // encoded strings would leak matching-prefix length as a timing oracle.
+    mac.verify_slice(&signature_bytes).is_ok()
 }
 
 pub fn sign_canonical_payload_ed25519(
@@ -446,7 +461,7 @@ pub fn create_envelope(
             ttl_ms,
             sender: sender.to_string(),
             recipient: recipient.map(|value| value.to_string()),
-            nonce: format!("n-{}", now_ms),
+            nonce: random_nonce(),
         },
         body: ProtocolBody {
             intent: intent.to_string(),

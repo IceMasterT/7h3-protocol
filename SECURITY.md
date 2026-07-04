@@ -5,7 +5,7 @@
 Please do not open a GitHub Issue for security findings. Use coordinated disclosure instead.
 
 **Send private reports to:** tech@mysms.promo  
-**Subject line:** `[AIP Security] <brief description>`
+**Subject line:** `[7h3 Security] <brief description>`
 
 ### What to include
 
@@ -14,7 +14,7 @@ A useful report contains:
 - A clear description of the vulnerability and which component it affects
 - Steps to reproduce, ideally as a minimal test case or fixture
 - Your assessment of the impact (confidentiality, integrity, availability, scope)
-- The affected versions (check `package.json` version and the wire version `aip/0.1`)
+- The affected versions (check `package.json` version and the wire version `7h3/0.1`)
 - Any suggested fix or mitigation you have in mind (optional but appreciated)
 
 Reports that include a conformance vector demonstrating the issue are especially
@@ -38,7 +38,7 @@ an extended timeline or coordinated partial disclosure.
 
 The following are in scope:
 
-- Envelope signing and verification (`src/aip/`)
+- Envelope signing and verification (`src/`, `sdk/python/`, `sdk/rust/`)
 - Canonicalization logic and determinism guarantees
 - Replay-safety (nonce and timestamp validation)
 - Wire format parsing in all three runtimes (TypeScript, Python, Rust)

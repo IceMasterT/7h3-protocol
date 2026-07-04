@@ -201,6 +201,21 @@ function requireCryptoSubtle(): SubtleCrypto {
   return crypto.subtle
 }
 
+/**
+ * Cryptographically secure random hex string. Nonces are the replay-protection
+ * primitive, so they must come from a CSPRNG — never Math.random().
+ */
+export function randomHex(bytes = 12): string {
+  if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
+    throw new Error('Web Crypto API is not available in this runtime')
+  }
+  const buf = new Uint8Array(bytes)
+  crypto.getRandomValues(buf)
+  let out = ''
+  for (const b of buf) out += b.toString(16).padStart(2, '0')
+  return out
+}
+
 async function hmacSign(payload: string, secret: string): Promise<string> {
   const subtle = requireCryptoSubtle()
   const key = await getCachedHmacKey(secret)
@@ -397,12 +412,12 @@ export function createEnvelope(input: {
   return {
     header: {
       version: '7h3/0.1',
-      messageId: input.messageId ?? `msg-${nowMs}-${Math.random().toString(36).slice(2, 10)}`,
+      messageId: input.messageId ?? `msg-${nowMs}-${randomHex(6)}`,
       timestampMs: nowMs,
       ttlMs: input.ttlMs ?? 60_000,
       sender: input.sender,
       recipient: input.recipient,
-      nonce: input.nonce ?? Math.random().toString(36).slice(2, 12),
+      nonce: input.nonce ?? randomHex(12),
     },
     body: {
       intent: input.intent,

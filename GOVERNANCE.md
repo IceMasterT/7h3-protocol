@@ -24,9 +24,9 @@ require community input first.
 
 ## Versioning Policy
 
-The wire version `aip/0.1` is frozen. Interoperating implementations can rely
-on it not changing. A new wire version designation (e.g. `aip/0.2`) would be
-introduced in a new package major version and coexist with `aip/0.1` for a
+The wire version `7h3/0.1` is frozen. Interoperating implementations can rely
+on it not changing. A new wire version designation (e.g. `7h3/0.2`) would be
+introduced in a new package major version and coexist with `7h3/0.1` for a
 migration period.
 
 The TypeScript API is pre-1.0. Minor version bumps may include breaking API
