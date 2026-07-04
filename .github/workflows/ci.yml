@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
+      # Sub-package SDKs carry their own deps (@noble/post-quantum, @noble/curves)
+      # and their tests run under the root vitest suite
+      - run: npm ci --prefix sdk/pq
+      - run: npm ci --prefix sdk/threshold
       - run: npm run lint
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run test

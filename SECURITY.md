@@ -49,12 +49,23 @@ scripts, and documentation typos.
 
 ## Audit Status
 
-No independent third-party security audit has been performed on this codebase
-as of the current release. The protocol design has been reviewed by the
-maintainer against known attack classes for signed messaging systems, but that
-is not a substitute for a formal audit. Reproductions of conformance vectors
-that reveal edge-case signing or deserialization behavior are welcome and
-treated as high-value contributions.
+No independent third-party security audit has been performed on this codebase,
+and none is planned — this is an unfunded MIT project. Verification instead
+relies on what an open codebase can offer:
+
+- Cross-runtime conformance vectors (TypeScript / Python / Rust must agree
+  byte-for-byte on canonicalization and signatures)
+- Fuzz harnesses run in CI on every push (decode + tamper-detection)
+- The full implementation being small enough to read in an afternoon —
+  the signing core is a single file per runtime with zero runtime dependencies
+
+The protocol design has been reviewed by the maintainer against known attack
+classes for signed messaging systems (replay, malleability, timing oracles,
+cross-runtime canonicalization divergence). Independent review is welcome and
+will be credited below; reproductions of conformance vectors that reveal
+edge-case signing or deserialization behavior are treated as high-value
+contributions. If a security firm ever wants to audit an open protocol pro
+bono, the door is open: tech@mysms.promo.
 
 ## Hall of Thanks
 

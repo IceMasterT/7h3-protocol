@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     license: 'MIT',
     repository: {
       type: 'git',
-      url: 'https://github.com/IceMasterT/7h3-protocol-aip.git',
+      url: 'https://github.com/IceMasterT/7h3-protocol.git',
     },
   }
 
