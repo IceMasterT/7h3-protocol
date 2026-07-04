@@ -18,7 +18,7 @@ class NetRedisClient implements RedisLikeClient {
     return new Promise((resolve, reject) => {
       this.socket = net.createConnection({ host, port }, resolve)
       this.socket.on('error', reject)
-      this.socket.on('data', (chunk) => {
+      this.socket.on('data', (chunk: Buffer) => {
         this.buffer = Buffer.concat([this.buffer, chunk])
         this.drain()
       })

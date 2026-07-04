@@ -487,7 +487,7 @@ class HttpAdapter implements TransportAdapter {
       },
     })
 
-      this.server.on('stream', (stream, headers) => {
+      this.server.on('stream', (stream: http2.ServerHttp2Stream, headers: http2.IncomingHttpHeaders) => {
         stream.on('error', () => {
           // Ignore per-stream protocol errors under overload; client handles retries.
         })

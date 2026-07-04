@@ -59,13 +59,18 @@ async function measureSignVerify(
   iterations: number,
   material: { secret: string } | { privateKey: string; publicKey: string },
 ): Promise<Pick<ScenarioResult, 'signUsPerOp' | 'verifyUsPerOp' | 'signOpsPerSecond' | 'verifyOpsPerSecond'>> {
+  // Narrow the material union once up front; algorithm and material shape
+  // are correlated by the callers.
+  const secret = 'secret' in material ? material.secret : ''
+  const privateKey = 'privateKey' in material ? material.privateKey : ''
+  const publicKey = 'publicKey' in material ? material.publicKey : ''
   const signStart = performance.now()
   let lastSignature = ''
   for (let i = 0; i < iterations; i += 1) {
     if (algorithm === 'HS256') {
-      lastSignature = await signCanonicalPayloadHmac(canonical, material.secret)
+      lastSignature = await signCanonicalPayloadHmac(canonical, secret)
     } else {
-      lastSignature = await signCanonicalPayloadEd25519(canonical, material.privateKey)
+      lastSignature = await signCanonicalPayloadEd25519(canonical, privateKey)
     }
   }
   const signMs = performance.now() - signStart
@@ -75,8 +80,8 @@ async function measureSignVerify(
   for (let i = 0; i < iterations; i += 1) {
     const ok =
       algorithm === 'HS256'
-        ? await verifyCanonicalPayloadHmac(canonical, lastSignature, material.secret)
-        : await verifyCanonicalPayloadEd25519(canonical, lastSignature, material.publicKey)
+        ? await verifyCanonicalPayloadHmac(canonical, lastSignature, secret)
+        : await verifyCanonicalPayloadEd25519(canonical, lastSignature, publicKey)
     if (ok) verifiedCount += 1
   }
   const verifyMs = performance.now() - verifyStart

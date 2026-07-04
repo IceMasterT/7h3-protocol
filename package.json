@@ -63,12 +63,30 @@
       "types": "./dist/protocol/routePolicy.d.ts",
       "import": "./dist/protocol/routePolicy.js"
     },
-    "./encryption": { "types": "./dist/protocol/encryption.d.ts", "import": "./dist/protocol/encryption.js" },
-    "./capability": { "types": "./dist/protocol/capability.d.ts", "import": "./dist/protocol/capability.js" },
-    "./stream": { "types": "./dist/protocol/stream.d.ts", "import": "./dist/protocol/stream.js" },
-    "./telemetry": { "types": "./dist/protocol/telemetry.d.ts", "import": "./dist/protocol/telemetry.js" },
-    "./cbor": { "types": "./dist/protocol/envelopeCbor.d.ts", "import": "./dist/protocol/envelopeCbor.js" },
-    "./replay": { "types": "./dist/protocol/replayStores.d.ts", "import": "./dist/protocol/replayStores.js" }
+    "./encryption": {
+      "types": "./dist/protocol/encryption.d.ts",
+      "import": "./dist/protocol/encryption.js"
+    },
+    "./capability": {
+      "types": "./dist/protocol/capability.d.ts",
+      "import": "./dist/protocol/capability.js"
+    },
+    "./stream": {
+      "types": "./dist/protocol/stream.d.ts",
+      "import": "./dist/protocol/stream.js"
+    },
+    "./telemetry": {
+      "types": "./dist/protocol/telemetry.d.ts",
+      "import": "./dist/protocol/telemetry.js"
+    },
+    "./cbor": {
+      "types": "./dist/protocol/envelopeCbor.d.ts",
+      "import": "./dist/protocol/envelopeCbor.js"
+    },
+    "./replay": {
+      "types": "./dist/protocol/replayStores.d.ts",
+      "import": "./dist/protocol/replayStores.js"
+    }
   },
   "repository": {
     "type": "git",
@@ -119,6 +137,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.3",
+    "@types/ws": "^8.18.1",
     "eslint": "^10.5.0",
     "fast-check": "^4.8.0",
     "globals": "^17.6.0",

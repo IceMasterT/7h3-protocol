@@ -278,7 +278,7 @@ class HttpAdapter implements TransportAdapter {
         maxConcurrentStreams: 4096,
       },
     })
-    this.server.on('stream', (stream, headers) => {
+    this.server.on('stream', (stream: http2.ServerHttp2Stream, headers: http2.IncomingHttpHeaders) => {
       if (headers[':method'] !== 'POST') {
         stream.respond({ ':status': 405 })
         stream.end()

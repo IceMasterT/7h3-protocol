@@ -7,6 +7,7 @@ import {
   toLangChainMessage,
   toLlamaIndexMessage,
   type JsonRpcRequestLike,
+  type WireEnvelope,
 } from '../src'
 
 function printSection(title: string): void {
@@ -52,7 +53,7 @@ async function run(): Promise<void> {
     { recipient: 'agent.worker', capability: 'task.plan' },
   )
 
-  let lcRawResponse = ''
+  let lcRawResponse: WireEnvelope = ''
   await worker.handleRaw(lcRaw, async (rawResponse) => {
     lcRawResponse = rawResponse
   })
@@ -70,7 +71,7 @@ async function run(): Promise<void> {
     { recipient: 'agent.worker', capability: 'task.summarize' },
   )
 
-  let liRawResponse = ''
+  let liRawResponse: WireEnvelope = ''
   await worker.handleRaw(liRaw, async (rawResponse) => {
     liRawResponse = rawResponse
   })
@@ -91,7 +92,7 @@ async function run(): Promise<void> {
 
   const mcpRaw = await createRawTaskFromJsonRpc(orchestrator, request, { recipient: 'agent.worker' })
 
-  let mcpRawResponse = ''
+  let mcpRawResponse: WireEnvelope = ''
   await worker.handleRaw(mcpRaw, async (rawResponse) => {
     mcpRawResponse = rawResponse
   })
