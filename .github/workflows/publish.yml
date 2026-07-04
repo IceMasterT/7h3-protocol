@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -30,8 +30,6 @@ jobs:
       - name: Publish @7h3/protocol
         run: npm publish --provenance --access public
         working-directory: dist/npm-protocol
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-pypi:
     name: publish 7h3-protocol (PyPI, trusted publishing)
@@ -65,7 +63,7 @@ jobs:
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -79,5 +77,3 @@ jobs:
       - name: Publish @7h3/protocol-mcp
         run: npm publish --provenance --access public
         working-directory: mcp-server
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
