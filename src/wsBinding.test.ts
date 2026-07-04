@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { wrapWebSocket, generateEd25519KeypairBase64Url, type WebSocketLike } from './wsBinding'
 import { signEnvelopeEd25519, createEnvelope, type ProtocolEnvelope } from './protocol'
 import { createStaticKeyRegistry } from './keyRegistry'

@@ -88,7 +88,7 @@ describe('webhookBinding', () => {
     const data = { event: 'invoice.paid', amount: 9900, currency: 'usd' }
     const payload = JSON.stringify(data)
     const headers = await signWebhook(payload, { privateKey })
-    const result = await consumeWebhook<typeof data>(payload, headers as Record<string, string>, { publicKey })
+    const result = await consumeWebhook<typeof data>(payload, headers as unknown as Record<string, string>, { publicKey })
     expect(result).toEqual(data)
   })
 
@@ -99,7 +99,7 @@ describe('webhookBinding', () => {
     const payload = JSON.stringify({ event: 'invoice.paid' })
     const headers = await signWebhook(payload, { privateKey })
     await expect(
-      consumeWebhook(payload, headers as Record<string, string>, { publicKey: wrongPublicKey })
+      consumeWebhook(payload, headers as unknown as Record<string, string>, { publicKey: wrongPublicKey })
     ).rejects.toThrow('7h3: webhook signature verification failed')
   })
 

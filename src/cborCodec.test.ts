@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeCbor, decodeCbor, CborEncoder, CborDecoder } from './cborCodec'
+import { encodeCbor, decodeCbor, CborEncoder } from './cborCodec'
 import { encodeEnvelopeCbor, decodeEnvelopeCbor } from './envelopeCbor'
 import type { ProtocolEnvelope } from './protocol'
 

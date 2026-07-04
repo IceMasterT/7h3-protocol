@@ -246,7 +246,7 @@ export function toJsonRpcResponse(
     }
   }
 
-  let result: unknown = envelope.body.content
+  let result: unknown
   try {
     result = JSON.parse(envelope.body.content)
   } catch {

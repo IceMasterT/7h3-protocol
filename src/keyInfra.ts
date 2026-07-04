@@ -216,10 +216,9 @@ export class RevocationRegistry {
 
   // Returns a KeyRegistry wrapper that rejects revoked keys
   wrapRegistry(inner: KeyRegistry): KeyRegistry {
-    const self = this
     return {
-      async getPublicKey(senderId: string) {
-        if (self.isRevoked(senderId)) return null
+      getPublicKey: async (senderId: string) => {
+        if (this.isRevoked(senderId)) return null
         return inner.getPublicKey(senderId)
       },
       getSharedSecret: inner.getSharedSecret?.bind(inner),

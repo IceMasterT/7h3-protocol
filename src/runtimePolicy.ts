@@ -55,7 +55,7 @@ export function parseRuntimePolicyJson(jsonText: string): RuntimePolicy {
     parsed = JSON.parse(jsonText)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Invalid runtime policy JSON: ${message}`)
+    throw new Error(`Invalid runtime policy JSON: ${message}`, { cause: error })
   }
   return validateRuntimePolicy(parsed)
 }

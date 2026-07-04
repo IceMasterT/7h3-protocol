@@ -97,7 +97,7 @@ export function withGrpcVerification<TCall extends { metadata: Record<string, st
       const err = Object.assign(new Error(result.message), { code: result.code })
       throw err
     }
-    ;(call as any)['7h3Envelope'] = result.envelope
+    ;(call as Record<string, unknown>)['7h3Envelope'] = result.envelope
     return handler(call)
   }
 }

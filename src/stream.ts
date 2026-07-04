@@ -54,8 +54,18 @@ function requireCryptoSubtle(): SubtleCrypto {
   return crypto.subtle
 }
 
+/** Structural view of Node's Buffer constructor for base64 fast paths. */
+interface BufferCtorLike {
+  from(data: Uint8Array): { toString(encoding: 'base64'): string }
+  from(data: string, encoding: 'base64'): Uint8Array
+}
+
+function getBufferCtor(): BufferCtorLike | undefined {
+  return (globalThis as { Buffer?: BufferCtorLike }).Buffer
+}
+
 function toBase64Url(bytes: Uint8Array): string {
-  const bufferLike = (globalThis as any).Buffer
+  const bufferLike = getBufferCtor()
   const base64 = bufferLike
     ? bufferLike.from(bytes).toString('base64')
     : btoa(String.fromCharCode(...bytes))
@@ -67,7 +77,7 @@ function fromBase64Url(value: string): Uint8Array {
     .replace(/-/g, '+')
     .replace(/_/g, '/')
     .padEnd(Math.ceil(value.length / 4) * 4, '=')
-  const bufferLike = (globalThis as any).Buffer
+  const bufferLike = getBufferCtor()
   if (bufferLike) return new Uint8Array(bufferLike.from(padded, 'base64'))
   const binary = atob(padded)
   const bytes = new Uint8Array(binary.length)

@@ -16,8 +16,8 @@ import { InMemoryRedisLikeClient, type RedisLikeClient } from './redisClient'
 export interface RedisClientLike {
   set(key: string, value: string, opts?: { nx?: boolean; px?: number }): Promise<string | null>
   get(key: string): Promise<string | null>
-  del(key: string): Promise<number | any>
-  quit(): Promise<any>
+  del(key: string): Promise<number | unknown>
+  quit(): Promise<unknown>
 }
 
 /**
@@ -116,10 +116,10 @@ function isRedisLikeClient(val: unknown): val is RedisLikeClient {
   return (
     val !== null &&
     typeof val === 'object' &&
-    typeof (val as any).set === 'function' &&
+    typeof (val as Record<string, unknown>).set === 'function' &&
     // RedisLikeClient does NOT have a `quit` method — RedisClientLike does
     // Pipeline presence distinguishes internal RedisLikeClient
-    (typeof (val as any).pipeline === 'function' || !('quit' in val))
+    (typeof (val as Record<string, unknown>).pipeline === 'function' || !('quit' in val))
   )
 }
 

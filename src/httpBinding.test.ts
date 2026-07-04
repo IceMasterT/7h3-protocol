@@ -234,7 +234,7 @@ describe('createHttpMiddleware', () => {
   })
 
   it('returns 401 for invalid signature', async () => {
-    const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
+    const { publicKey } = await generateEd25519KeypairBase64Url()
     const { privateKey: otherPrivateKey } = await generateEd25519KeypairBase64Url()
     const sender = 'agent-bad-sig'
     const registry = createStaticKeyRegistry({ [sender]: publicKey })

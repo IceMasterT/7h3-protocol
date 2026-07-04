@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   SignedStreamWriter,
   SignedStreamReader,
-  createSignedStream,
-  createStreamVerifier,
   signStream,
   verifyStream,
   encodeStreamChunk,

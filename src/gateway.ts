@@ -89,7 +89,7 @@ class Protocol7h3Gateway {
           globalMetrics.verifications_total.increment({ result: 'fail', alg: 'none', transport: 'http' })
           globalMetrics.verification_duration_ms.observe(durationMs)
           return { ok: false, status: 401, reason: result.ok ? 'capability-scope-mismatch' : (result as { ok: false; reason: string }).reason }
-        } catch (e) {
+        } catch {
           const durationMs = performance.now() - startMs
           globalMetrics.verifications_total.increment({ result: 'fail', alg: 'none', transport: 'http' })
           globalMetrics.verification_duration_ms.observe(durationMs)

@@ -1253,7 +1253,6 @@ async function runAdaptiveScenario(profile: Profile, scenario: Scenario, adaptiv
   let doubling = 0
   while (isSustainable(highResult, adaptive) && doubling < adaptive.maxDoublings) {
     lowTarget = highTarget
-    lowResult = highResult
     highTarget = Math.floor(highTarget * 2)
     highResult = await runOpenLoopScenario(profile, scenario, highTarget, adaptive)
     if (isSustainable(highResult, adaptive)) {

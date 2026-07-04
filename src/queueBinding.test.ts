@@ -5,7 +5,6 @@ import { signQueueMessage, verifyQueueMessage, verifyQueueBatch } from './queueB
 let publicKey: string
 let privateKey: string
 let altPublicKey: string
-let altPrivateKey: string
 
 beforeAll(async () => {
   const kp = await generateEd25519KeypairBase64Url()
@@ -14,7 +13,6 @@ beforeAll(async () => {
 
   const alt = await generateEd25519KeypairBase64Url()
   altPublicKey = alt.publicKey
-  altPrivateKey = alt.privateKey
 })
 
 describe('signQueueMessage + verifyQueueMessage', () => {

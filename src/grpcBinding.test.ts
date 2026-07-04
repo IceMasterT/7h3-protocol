@@ -5,21 +5,13 @@ import {
   withGrpcVerification,
   GRPC_METADATA_KEY,
 } from './grpcBinding'
-import { createStaticKeyRegistry, type KeyRegistry } from './keyRegistry'
+import { createStaticKeyRegistry } from './keyRegistry'
 import {
   generateEd25519KeypairBase64Url,
   createEnvelope,
   signEnvelopeEd25519,
   type ProtocolEnvelope,
 } from './protocol'
-
-// Helper: build a KeyRegistry that holds HMAC shared secrets but no public keys
-function createHmacKeyRegistry(secrets: Record<string, string>): KeyRegistry {
-  return {
-    async getPublicKey() { return null },
-    async getSharedSecret(keyId) { return secrets[keyId] ?? null },
-  }
-}
 
 describe('signGrpcCall', () => {
   it('produces metadata with the correct key', async () => {

@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest'
 import { createGateway, type GatewayRequest } from './gateway'
 import { createStaticKeyRegistry } from './keyRegistry'
 import { generateEd25519KeypairBase64Url, createEnvelope, signEnvelopeEd25519, signEnvelopeHmac } from './protocol'
-import type { RoutePolicy } from './routePolicy'
 
 let senderKeys: { publicKey: string; privateKey: string }
 let gatewayKeys: { publicKey: string; privateKey: string }

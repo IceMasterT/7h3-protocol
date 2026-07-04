@@ -19,11 +19,14 @@ export { type KeyRegistry, generateEd25519KeypairBase64Url }
 export type { StreamSignerOpts, StreamVerifierOpts, StreamVerifyResult, StreamChunk }
 
 // Minimal WebSocket interface (works with browser WebSocket, ws library, etc.)
+export type WsMessageHandler = (e: { data: string | Buffer }) => void
+export type WsCloseHandler = () => void
+
 export interface WebSocketLike {
   send(data: string): void
-  addEventListener(event: 'message', handler: (e: { data: string | Buffer }) => void): void
-  addEventListener(event: 'close', handler: () => void): void
-  removeEventListener(event: string, handler: (...args: unknown[]) => void): void
+  addEventListener(event: 'message', handler: WsMessageHandler): void
+  addEventListener(event: 'close', handler: WsCloseHandler): void
+  removeEventListener(event: 'message' | 'close', handler: WsMessageHandler | WsCloseHandler): void
   readyState?: number
 }
 
@@ -62,7 +65,7 @@ export function wrapWebSocket(ws: WebSocketLike, opts: WsBindingOptions): Protec
     const raw = typeof e.data === 'string' ? e.data : e.data.toString('utf8')
     let envelope: ProtocolEnvelope
     try { envelope = JSON.parse(raw) as ProtocolEnvelope }
-    catch (err) { fireVerifyFail(new Error('malformed frame'), raw); return }
+    catch { fireVerifyFail(new Error('malformed frame'), raw); return }
 
     const sender = envelope?.header?.sender
     if (!sender) { fireVerifyFail(new Error('missing sender'), raw); return }
@@ -84,24 +87,24 @@ export function wrapWebSocket(ws: WebSocketLike, opts: WsBindingOptions): Protec
     for (const h of messageHandlers) h(payload, envelope)
   }
 
-  ws.addEventListener('message', messageListener as any)
+  ws.addEventListener('message', messageListener)
   ws.addEventListener('close', () => {
-    ws.removeEventListener('message', messageListener as any)
+    ws.removeEventListener('message', messageListener)
   })
 
   return {
     get seq() { return seq },
     async send(payload: unknown): Promise<void> {
       const content = typeof payload === 'string' ? payload : JSON.stringify(payload)
+      // embed sequence number in correlationId to help downstream ordering
       const envelope = createEnvelope({
         sender: opts.sender,
         recipient: opts.recipient,
         ttlMs: opts.ttlMs ?? 30_000,
         intent: 'TASK',
         content,
+        correlationId: String(++seq),
       })
-      // embed sequence number in correlationId to help downstream ordering
-      ;(envelope.body as any).correlationId = String(++seq)
       const signed = await signEnvelopeEd25519(envelope, opts.privateKey)
       ws.send(JSON.stringify(signed))
     },
@@ -136,14 +139,14 @@ export function createSignedWebSocketStream(
   }
 
   const closeListener = async () => {
-    ws.removeEventListener('message', messageListener as any)
-    ws.removeEventListener('close', closeListener as any)
+    ws.removeEventListener('message', messageListener)
+    ws.removeEventListener('close', closeListener)
     const finalChunk = await writer.finalize()
     ws.send(encodeStreamChunk(finalChunk))
   }
 
-  ws.addEventListener('message', messageListener as any)
-  ws.addEventListener('close', closeListener as any)
+  ws.addEventListener('message', messageListener)
+  ws.addEventListener('close', closeListener)
 
   return writer
 }
@@ -190,11 +193,11 @@ export function receiveSignedWebSocketStream(
     }
 
     function cleanup() {
-      ws.removeEventListener('message', messageListener as any)
-      ws.removeEventListener('close', closeListener as any)
+      ws.removeEventListener('message', messageListener)
+      ws.removeEventListener('close', closeListener)
     }
 
-    ws.addEventListener('message', messageListener as any)
-    ws.addEventListener('close', closeListener as any)
+    ws.addEventListener('message', messageListener)
+    ws.addEventListener('close', closeListener)
   })
 }

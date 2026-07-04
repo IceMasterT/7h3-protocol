@@ -11,5 +11,24 @@ export default tseslint.config(
       ecmaVersion: 2022,
       globals: { ...globals.node, ...globals.browser },
     },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+  {
+    // Test mocks and bench harnesses legitimately need `any` for partial
+    // doubles; production src/ keeps the strict rule.
+    files: ['**/*.test.ts', 'scripts/**', 'fuzz/**'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   },
 )

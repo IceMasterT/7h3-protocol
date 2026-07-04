@@ -94,7 +94,7 @@ export async function verifyHttpEnvelope(
     const valid = await verifyEnvelopeHmac(envelope, secret)
     if (!valid) return { ok: false, reason: 'invalid-signature' }
   } else {
-    return { ok: false, reason: 'malformed-envelope', detail: `unsupported alg: ${String((envelope.signature as any).alg)}` }
+    return { ok: false, reason: 'malformed-envelope', detail: `unsupported alg: ${String((envelope.signature as { alg?: unknown }).alg)}` }
   }
 
   return { ok: true, envelope }
@@ -149,7 +149,7 @@ export function createHttpMiddleware(opts: HttpBindingOptions) {
       })
       return
     }
-    ;(req as any)['7h3Envelope'] = result.envelope
+    ;(req as Record<string, unknown>)['7h3Envelope'] = result.envelope
     next()
   }
 }
