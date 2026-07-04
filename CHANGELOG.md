@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.5.3
+
+### Changed
+
+- Internal type-quality sweep: eliminated every `any` from production `src/`
+  (typed `WebSocketLike` listeners, structural `BufferCtorLike`, `unknown`
+  casts), zeroed out ESLint (62 → 0) and `tsc --noEmit` (40 → 0). No behavior
+  change; all 395 tests pass.
+- Supply-chain hardening: all GitHub Actions pinned to commit SHAs, gitleaks
+  secret-scan workflow, `tsc` + fuzz-smoke CI gates, CODEOWNERS,
+  CODE_OF_CONDUCT, branch protection on `main`.
+- Spec: RFC §5.1 now makes nonce entropy normative (CSPRNG, ≥96 bits;
+  timestamp / `Math.random()` nonces forbidden).
+
 ## v0.5.2
 
 ### Security
