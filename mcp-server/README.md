@@ -35,4 +35,6 @@ Add to your `claude_desktop_config.json`:
 
 ## License
 
-MIT
+Apache License 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
+
+`SPDX-License-Identifier: Apache-2.0`

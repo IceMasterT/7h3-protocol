@@ -50,7 +50,7 @@ scripts, and documentation typos.
 ## Audit Status
 
 No independent third-party security audit has been performed on this codebase,
-and none is planned — this is an unfunded MIT project. Verification instead
+and none is planned — this is an unfunded open-source project. Verification instead
 relies on what an open codebase can offer:
 
 - Cross-runtime conformance vectors (TypeScript / Python / Rust must agree
@@ -78,4 +78,4 @@ _No entries yet._
 
 Maintainer: [@IceMasterT](https://github.com/IceMasterT)  
 Package: `@7h3/protocol`  
-License: MIT
+License: Apache-2.0

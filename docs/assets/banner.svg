@@ -118,6 +118,6 @@
   <rect x="0" y="608" width="1280" height="32" fill="#04040c"/>
   <rect x="0" y="608" width="1280" height="1"  fill="#1e293b"/>
   <text x="62"   y="630" font-family="SF Mono,Consolas,monospace" font-size="12" fill="#334155">github.com/IceMasterT/7h3-protocol</text>
-  <text x="640"  y="630" font-family="SF Mono,Consolas,monospace" font-size="12" fill="#334155" text-anchor="middle">MIT License  ·  wire: 7h3/0.1  ·  Zero runtime deps</text>
+  <text x="640"  y="630" font-family="SF Mono,Consolas,monospace" font-size="12" fill="#334155" text-anchor="middle">Apache-2.0  ·  wire: 7h3/0.1  ·  Zero runtime deps</text>
   <text x="1218" y="630" font-family="SF Mono,Consolas,monospace" font-size="12" fill="#334155" text-anchor="end">v0.4.0</text>
 </svg>

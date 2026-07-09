@@ -7,13 +7,13 @@ name = "7h3-protocol"
 version = "0.5.1"
 description = "7h3 Protocol — Python SDK. Deterministic, signed, replay-safe AI-to-AI messaging. Wire version 7h3/0.1."
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
 keywords = ["7h3", "agent", "protocol", "ed25519", "mcp", "signing", "replay-protection"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
