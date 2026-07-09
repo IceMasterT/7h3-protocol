@@ -1690,5 +1690,5 @@ vendor a 7h3 Protocol SDK into a GPLv2-only codebase, pin `v0.5.3`.
 
 <div align="center">
   <sub>Wire version <code>7h3/0.1</code> is immutable — all v0.x releases are backwards-compatible at the wire level.</sub><br/>
-  <sub>Apache License 2.0 © 2024–2026 7h3 Agency - IceMasterT</sub>
+  <sub>Apache License 2.0 © 2024–2026 IceMasterT</sub>
 </div>

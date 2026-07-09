@@ -14,7 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   meant to be implemented independently. Apache-2.0 §3 supplies the express,
   irrevocable patent grant and the patent-retaliation clause that MIT lacks, and
   it is the license foundations hosting protocol work expect. Relicensing is
-  clean now: copyright is held solely by 7h3 Agency, the only non-maintainer
+  clean now: copyright is held solely by IceMasterT, the only non-maintainer
   commits are mechanical dependabot bumps, and no CLA or DCO is in effect.
 - All eight publishable artifacts now declare Apache-2.0 and carry the license
   text at their own package root: `@7h3/protocol`, `@7h3/protocol-mcp`,
@@ -40,7 +40,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 
 - `NOTICE` — attribution notice required to propagate under Apache-2.0 §4(d),
-  recording copyright in 7h3 Agency - IceMasterT.
+  recording copyright in IceMasterT.
 - `## License` section in `README.md`. There was previously only a badge.
 
 ### Downstream note
