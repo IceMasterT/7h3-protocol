@@ -67,4 +67,4 @@ _No entries yet._
 
 Maintainer: [@IceMasterT](https://github.com/IceMasterT)  
 Package: `@7h3/protocol`  
-License: MIT
+License: Apache-2.0

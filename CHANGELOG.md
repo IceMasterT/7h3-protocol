@@ -6,6 +6,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **License changed from MIT to Apache-2.0.** AIP is a wire protocol meant for independent implementation; Apache-2.0 §3 supplies the express patent grant and patent-retaliation clause that MIT lacks, and it is the license foundations hosting protocol work expect. Releases up to and including `0.1.2` remain available under MIT — that grant is irrevocable and is not being withdrawn. Apache-2.0 applies from `0.1.3` onward.
+- `scripts/prepare-aip-package.ts` — publishable manifest now declares `Apache-2.0`, and copies `LICENSE` and `NOTICE` into the tarball
+- `sdk/rust/Cargo.toml` — `license` now `Apache-2.0`; `include` extended with `LICENSE` and `NOTICE` so they reach crates.io
+- `mcp-server/package.json` — `license` now `Apache-2.0`; `NOTICE` added to `files`
+
+### Added
+- `LICENSE` — full Apache-2.0 text, verbatim. The repository previously declared MIT in package metadata and prose but shipped no license text at all, in any package.
+- `NOTICE` — attribution notice required to propagate under Apache-2.0 §4(d)
+- Per-package `LICENSE` and `NOTICE` copies in `sdk/rust/`, `sdk/python/`, and `mcp-server/`, each of which publishes as an independent artifact
+
+### Downstream note
+Apache-2.0 is incompatible with GPLv2-only code (GPLv3 is unaffected). Projects vendoring an AIP SDK into a GPLv2-only codebase should pin `0.1.2`.
+
+---
+
 ## [0.1.2] — 2026-06-05
 
 ### Added

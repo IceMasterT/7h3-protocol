@@ -314,4 +314,15 @@ See [`GOVERNANCE.md`](./GOVERNANCE.md) — single-maintainer stage, decision pro
 
 ## License
 
-MIT
+Apache License 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
+
+`SPDX-License-Identifier: Apache-2.0`
+
+Apache-2.0 is used rather than MIT because AIP is a wire protocol intended for
+independent implementation. Section 3 grants every user an express, irrevocable
+patent license from each contributor, and terminates that grant for anyone who
+initiates patent litigation over the work. MIT is silent on patents.
+
+Versions of `@7h3/protocol` up to and including `0.1.2` were published under the
+MIT license. That grant is irrevocable for those releases; Apache-2.0 applies
+from `0.1.3` onward.
