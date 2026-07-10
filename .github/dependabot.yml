@@ -31,17 +31,22 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+    ignore:
+      # Keep typescript on one major across every package -- see the root entry.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
-  # SDK sub-packages and the Cloudflare worker (npm). These hold the actual
-  # cryptography dependencies -- @noble/post-quantum (sdk/pq) and @noble/curves
-  # (sdk/threshold) -- and were previously unmonitored, so neither version
-  # updates nor security alerts reached them.
+  # Crypto SDK sub-packages (npm). These hold the cryptography dependencies --
+  # @noble/post-quantum (sdk/pq) and @noble/curves (sdk/threshold) -- and were
+  # previously unmonitored, so neither version updates nor security alerts
+  # reached them. Kept as their own group, separate from the Cloudflare worker
+  # below: a breaking @noble major bump must not hold hostage routine wrangler
+  # updates (and vice versa).
   # sdk/browser is omitted deliberately: it declares no dependencies.
   - package-ecosystem: "npm"
     directories:
       - "/sdk/pq"
       - "/sdk/threshold"
-      - "/cloudflare"
     schedule:
       interval: "weekly"
     target-branch: "main"
@@ -50,6 +55,27 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+    ignore:
+      # Keep typescript on one major across every package -- see the root entry.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+
+  # Cloudflare worker (npm): wrangler, @cloudflare/workers-types. Isolated from
+  # the crypto SDK group so its bumps land independently.
+  - package-ecosystem: "npm"
+    directory: "/cloudflare"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      npm-cloudflare-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    ignore:
+      # Keep typescript on one major across every package -- see the root entry.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # Rust SDK and its fuzz harness (cargo): ed25519-dalek, getrandom, sha2, hmac.
   - package-ecosystem: "cargo"
