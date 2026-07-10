@@ -11,6 +11,14 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+    ignore:
+      # typescript-eslint 8.x declares `peer typescript ">=4.8.4 <6.1.0"`, so
+      # bumping typescript to 7.x makes `npm install` fail with ERESOLVE and
+      # takes every downstream job with it. Scoped to version-update:* so
+      # security advisories for typescript are still raised. Remove once
+      # typescript-eslint ships stable TypeScript 7 support.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # mcp-server sub-package (npm)
   - package-ecosystem: "npm"
@@ -23,6 +31,54 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+
+  # SDK sub-packages and the Cloudflare worker (npm). These hold the actual
+  # cryptography dependencies -- @noble/post-quantum (sdk/pq) and @noble/curves
+  # (sdk/threshold) -- and were previously unmonitored, so neither version
+  # updates nor security alerts reached them.
+  # sdk/browser is omitted deliberately: it declares no dependencies.
+  - package-ecosystem: "npm"
+    directories:
+      - "/sdk/pq"
+      - "/sdk/threshold"
+      - "/cloudflare"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      npm-sdk-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  # Rust SDK and its fuzz harness (cargo): ed25519-dalek, getrandom, sha2, hmac.
+  - package-ecosystem: "cargo"
+    directories:
+      - "/sdk/rust"
+      - "/sdk/rust/fuzz"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      cargo-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  # Go SDK (gomod): golang.org/x/crypto.
+  - package-ecosystem: "gomod"
+    directory: "/sdk/go"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      gomod-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
+
+  # sdk/python is intentionally absent: pyproject.toml declares `dependencies = []`.
+  # Add a `pip` entry here if it ever gains runtime dependencies.
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
