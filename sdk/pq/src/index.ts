@@ -1,4 +1,4 @@
-import { ml_dsa65, ml_dsa87 } from '@noble/post-quantum/ml-dsa'
+import { ml_dsa65, ml_dsa87 } from '@noble/post-quantum/ml-dsa.js'
 
 // Re-export from @7h3/protocol
 export type { ProtocolEnvelope, ProtocolHeader, ProtocolBody } from '../../../src/protocol.js'
@@ -96,7 +96,8 @@ export async function signEnvelopePq(
   const canonical = canonicalizeEnvelope(envelope)
   const message = new TextEncoder().encode(canonical)
   const secretKey = fromBase64Url(privateKeyBase64Url)
-  const sigBytes = impl.sign(secretKey, message)
+  // @noble/post-quantum >=0.4 signature: sign(msg, secretKey, opts?)
+  const sigBytes = impl.sign(message, secretKey)
   // keyId derived from first 16 chars of the secretKey base64url
   const keyId = privateKeyBase64Url.slice(0, 16)
 
@@ -129,7 +130,8 @@ export async function verifyEnvelopePq(
   const sigBytes = fromBase64Url(envelope.signature.value)
 
   try {
-    return impl.verify(publicKey, message, sigBytes)
+    // @noble/post-quantum >=0.4 signature: verify(sig, msg, publicKey, opts?)
+    return impl.verify(sigBytes, message, publicKey)
   } catch {
     return false
   }

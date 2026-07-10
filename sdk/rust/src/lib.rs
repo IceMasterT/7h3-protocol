@@ -7,7 +7,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use ed25519_dalek::pkcs8::{DecodePrivateKey, DecodePublicKey};
 use ed25519_dalek::{Signature as Ed25519Signature, Signer, SigningKey, Verifier, VerifyingKey};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
@@ -137,7 +137,8 @@ pub fn canonicalize_envelope(envelope: &ProtocolEnvelope) -> String {
 /// never a timestamp or a non-cryptographic PRNG.
 pub fn random_nonce() -> String {
     let mut buf = [0u8; 12];
-    getrandom::getrandom(&mut buf).expect("OS RNG should be available");
+    // getrandom 0.3 renamed the free `getrandom()` fill function to `fill()`.
+    getrandom::fill(&mut buf).expect("OS RNG should be available");
     buf.iter().map(|b| format!("{b:02x}")).collect()
 }
 
