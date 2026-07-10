@@ -3,7 +3,7 @@
   "version": "0.5.3",
   "description": "7h3 Protocol: deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version 7h3/0.1.",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "./dist/protocol/index.js",
   "types": "./dist/protocol/index.d.ts",
   "exports": {

@@ -46,8 +46,8 @@ async function main(): Promise<void> {
         types: './index.d.ts',
       },
     },
-    files: ['index.js', '*.d.ts', 'README.md'],
-    license: 'MIT',
+    files: ['index.js', '*.d.ts', 'README.md', 'LICENSE', 'NOTICE'],
+    license: 'Apache-2.0',
     repository: {
       type: 'git',
       url: 'https://github.com/IceMasterT/7h3-protocol.git',
@@ -76,6 +76,12 @@ async function main(): Promise<void> {
 
   await writeFile(`${outDir}/package.json`, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8')
   await writeFile(`${outDir}/README.md`, readme, 'utf8')
+
+  // Apache-2.0 §4(a) and §4(d): the license text and the NOTICE must travel with
+  // every distributed copy. outDir is assembled from scratch, so they have to be
+  // copied in explicitly or the published tarball carries no license at all.
+  await copyFile('LICENSE', `${outDir}/LICENSE`)
+  await copyFile('NOTICE', `${outDir}/NOTICE`)
 
   console.log(`Prepared publishable package in ${outDir}`)
   console.log(`Version: ${version}`)

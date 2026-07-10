@@ -6,6 +6,54 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## Unreleased
+
+### Changed
+
+- **License changed from MIT to Apache-2.0.** 7h3 Protocol is a wire protocol
+  meant to be implemented independently. Apache-2.0 §3 supplies the express,
+  irrevocable patent grant and the patent-retaliation clause that MIT lacks, and
+  it is the license foundations hosting protocol work expect. Relicensing is
+  clean now: copyright is held solely by IceMasterT, the only non-maintainer
+  commits are mechanical dependabot bumps, and no CLA or DCO is in effect.
+- All eight publishable artifacts now declare Apache-2.0 and carry the license
+  text at their own package root: `@7h3/protocol`, `@7h3/protocol-mcp`,
+  `@7h3/protocol-pq`, `@7h3/protocol-threshold`, `@7h3/protocol-browser`,
+  `protocol-7h3` (crates.io), `7h3-protocol` (PyPI), and the Go module.
+- `cloudflare/package.json` declared no license at all; now `Apache-2.0`.
+
+### Fixed
+
+- `scripts/prepare-aip-package.ts` hardcoded `license: 'MIT'` independently of
+  `package.json` and never copied a license file into `dist/npm-protocol`. Every
+  published `@7h3/protocol` tarball to date has shipped with **no license text**,
+  including v0.5.3, despite the repo carrying a `LICENSE` since v0.5.2. The
+  script now declares Apache-2.0 and copies `LICENSE` and `NOTICE` into the
+  tarball.
+- `sdk/rust/Cargo.toml` `include` paths resolve against the package root
+  (`sdk/rust/`), so the repo-root `LICENSE` could never reach crates.io. Every
+  published `protocol-7h3` crate has shipped with no license text. `include` now
+  lists `LICENSE` and `NOTICE`.
+- `mcp-server/package.json` `files` allowlist omitted `NOTICE`. npm force-includes
+  `LICENSE` but not `NOTICE`, so the attribution notice would not have shipped.
+
+### Added
+
+- `NOTICE` — attribution notice required to propagate under Apache-2.0 §4(d),
+  recording copyright in IceMasterT.
+- `## License` section in `README.md`. There was previously only a badge.
+
+### Downstream note
+
+Releases up to and including `v0.5.3` were published under MIT. That grant is
+irrevocable and is not being withdrawn; anyone who obtained those versions keeps
+their MIT rights to them permanently. Apache-2.0 applies from `v0.5.4` onward.
+
+Apache-2.0 is incompatible with GPLv2-only code (GPLv3 is unaffected). Projects
+vendoring a 7h3 Protocol SDK into a GPLv2-only codebase should pin `v0.5.3`.
+
+Wire format unchanged: `7h3/0.1`.
+
 ## v0.5.3
 
 ### Changed

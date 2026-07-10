@@ -11,7 +11,7 @@
   [![Tests](https://img.shields.io/badge/tests-428%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
   [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
   [![Wire](https://img.shields.io/badge/wire-7h3%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
-  [![License](https://img.shields.io/badge/license-MIT-94a3b8?style=flat-square)](./LICENSE)
+  [![License](https://img.shields.io/badge/license-Apache--2.0-94a3b8?style=flat-square)](./LICENSE)
 
   <br/>
 
@@ -54,6 +54,7 @@
 - [Docker](#docker)
 - [Uninstall](#uninstall)
 - [Changelog](#changelog)
+- [License](#license)
 
 ---
 
@@ -1666,7 +1667,28 @@ go mod tidy
 
 ---
 
+## License
+
+Apache License 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
+
+`SPDX-License-Identifier: Apache-2.0`
+
+7h3 Protocol is a wire protocol meant to be implemented independently. Apache-2.0
+§3 grants every user an express, irrevocable patent license from each contributor,
+and terminates that grant for anyone who initiates patent litigation over the
+work. MIT, which this project used through v0.5.3, is silent on patents.
+
+Releases up to and including `v0.5.3` were published under the MIT license. That
+grant is irrevocable and is not being withdrawn — anyone who obtained those
+versions keeps their MIT rights to them permanently. Apache-2.0 applies from
+`v0.5.4` onward.
+
+Apache-2.0 is incompatible with GPLv2-only code (GPLv3 is unaffected). If you
+vendor a 7h3 Protocol SDK into a GPLv2-only codebase, pin `v0.5.3`.
+
+---
+
 <div align="center">
   <sub>Wire version <code>7h3/0.1</code> is immutable — all v0.x releases are backwards-compatible at the wire level.</sub><br/>
-  <sub>MIT License © 2024–2026 IceMasterT</sub>
+  <sub>Apache License 2.0 © 2024–2026 IceMasterT</sub>
 </div>
