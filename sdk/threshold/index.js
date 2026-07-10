@@ -1,4 +1,8 @@
-import { bls12_381 } from '@noble/curves/bls12-381';
+import { bls12_381 } from '@noble/curves/bls12-381.js';
+// @noble/curves v2 moved the signer helpers under `longSignatures`
+// (G1 public keys, 48 bytes; G2 signatures, 96 bytes), and sign/verify now
+// operate on message points, so messages must be hashed onto the curve first.
+const bls = bls12_381.longSignatures;
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function toBase64Url(bytes) {
     const base64 = Buffer.from(bytes).toString('base64');
@@ -47,8 +51,8 @@ export function canonicalizeEnvelopeForBls(envelope) {
 }
 // ─── Key Generation ──────────────────────────────────────────────────────────
 export function generateBlsKeyPair() {
-    const privateKeyBytes = bls12_381.utils.randomPrivateKey();
-    const publicKeyBytes = bls12_381.getPublicKey(privateKeyBytes);
+    const privateKeyBytes = bls12_381.utils.randomSecretKey();
+    const publicKeyBytes = bls.getPublicKey(privateKeyBytes).toBytes();
     return {
         publicKey: toBase64Url(publicKeyBytes),
         privateKey: toBase64Url(privateKeyBytes),
@@ -59,8 +63,9 @@ export async function signEnvelopeBls(envelope, privateKeyBase64Url, signerId) {
     const canonical = canonicalizeEnvelopeForBls(envelope);
     const msgHash = await sha256(canonical);
     const privateKeyBytes = fromBase64Url(privateKeyBase64Url);
-    // BLS sign: signature is a G2 point (96 bytes)
-    const sigBytes = bls12_381.sign(msgHash, privateKeyBytes);
+    // BLS sign: signature is a G2 point (96 bytes). Hash the digest onto the
+    // signature subgroup, then sign that point.
+    const sigBytes = bls.sign(bls.hash(msgHash), privateKeyBytes).toBytes();
     return {
         signerId,
         partialSig: toBase64Url(sigBytes),
@@ -83,8 +88,8 @@ envelope, config) {
             throw new Error(`Missing public key for signer: ${id}`);
         return fromBase64Url(pk);
     });
-    const aggregatedSig = bls12_381.aggregateSignatures(sigBytesArr);
-    const aggregatedPubKey = bls12_381.aggregatePublicKeys(pubKeyBytesArr);
+    const aggregatedSig = bls.aggregateSignatures(sigBytesArr).toBytes();
+    const aggregatedPubKey = bls.aggregatePublicKeys(pubKeyBytesArr).toBytes();
     // Fingerprint: first 16 bytes of aggregated pubkey as base64url
     const keyId = toBase64Url(aggregatedPubKey.slice(0, 16));
     return {
@@ -120,9 +125,9 @@ export async function verifyThresholdEnvelope(envelope, participantPublicKeys, c
                 throw new Error(`Missing public key for signer: ${id}`);
             return fromBase64Url(pk);
         });
-        const aggregatedPubKey = bls12_381.aggregatePublicKeys(pubKeyBytesArr);
+        const aggregatedPubKey = bls.aggregatePublicKeys(pubKeyBytesArr).toBytes();
         const sigBytes = fromBase64Url(thresholdSignature.value);
-        return bls12_381.verify(sigBytes, msgHash, aggregatedPubKey);
+        return bls.verify(sigBytes, bls.hash(msgHash), aggregatedPubKey);
     }
     catch {
         return false;
