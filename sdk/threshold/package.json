@@ -12,14 +12,14 @@
     }
   },
   "dependencies": {
-    "@noble/curves": "^1.4.0"
+    "@noble/curves": "^2.2.0"
   },
   "peerDependencies": {
     "@7h3/protocol": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "^4.1.8"
   },
   "scripts": {
