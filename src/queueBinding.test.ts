@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { generateEd25519KeypairBase64Url } from './protocol'
 import { signQueueMessage, verifyQueueMessage, verifyQueueBatch } from './queueBinding'
+import { InMemoryReplayCache } from './protocolReplay'
 
 let publicKey: string
 let privateKey: string
@@ -67,6 +68,42 @@ describe('signQueueMessage + verifyQueueMessage', () => {
     await expect(verifyQueueMessage(JSON.stringify({ payload: 'x' }), { publicKey })).rejects.toThrow(
       'missing envelope',
     )
+  })
+
+  it('rejects an expired message by default (strictTtl defaults to true)', async () => {
+    const msg = await signQueueMessage('expiring', { privateKey, sender: 'agent-a', ttlMs: 1_000 })
+    // Verify far enough past timestamp+ttl that it must be expired.
+    const parsed = JSON.parse(msg)
+    const nowMs = parsed.envelope.header.timestampMs + parsed.envelope.header.ttlMs + 60_000
+    await expect(verifyQueueMessage(msg, { publicKey, nowMs })).rejects.toThrow('failed validation')
+  })
+
+  it('accepts an expired message when strictTtl is explicitly disabled', async () => {
+    const msg = await signQueueMessage('expiring', { privateKey, sender: 'agent-a', ttlMs: 1_000 })
+    const parsed = JSON.parse(msg)
+    const nowMs = parsed.envelope.header.timestampMs + parsed.envelope.header.ttlMs + 60_000
+    const result = await verifyQueueMessage(msg, { publicKey, nowMs, strictTtl: false })
+    expect(result.payload).toBe('expiring')
+  })
+
+  it('rejects a replayed message when a shared replayCache is reused across calls', async () => {
+    // Regression test: a fresh replayCache constructed per call would provide
+    // zero protection. This proves persistence across independent verify calls.
+    const replayCache = new InMemoryReplayCache()
+    const msg = await signQueueMessage('once-only', { privateKey, sender: 'agent-a' })
+
+    const first = await verifyQueueMessage(msg, { publicKey, replayCache })
+    expect(first.payload).toBe('once-only')
+
+    await expect(verifyQueueMessage(msg, { publicKey, replayCache })).rejects.toThrow('Replay detected')
+  })
+
+  it('allows the same nonce twice when no replayCache is supplied (opt-in)', async () => {
+    const msg = await signQueueMessage('no-dedup', { privateKey, sender: 'agent-a' })
+    const first = await verifyQueueMessage(msg, { publicKey })
+    const second = await verifyQueueMessage(msg, { publicKey })
+    expect(first.payload).toBe('no-dedup')
+    expect(second.payload).toBe('no-dedup')
   })
 })
 

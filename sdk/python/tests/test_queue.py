@@ -9,6 +9,7 @@ from protocol_7h3.queue import (
     verify_queue_message,
     verify_queue_batch,
 )
+from protocol_7h3.replay import InMemoryReplayStore
 
 # Keys from conformance vectors (PKCS8/SPKI DER, base64url-encoded)
 PRIVATE_KEY = "MC4CAQAwBQYDK2VwBCIEICheZbQGuDVb6hezIlcs0QnCHGxz6IhiLkC9M0qr8OOZ"
@@ -75,6 +76,47 @@ class TestSignVerifyRoundTrip(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             verify_queue_message(msg, PUBLIC_KEY)
         self.assertIn("7h3: missing envelope", str(ctx.exception))
+
+    def test_verify_raises_on_expired_message(self):
+        """verify_queue_message rejects an expired envelope (TTL now actually enforced)."""
+        signed = sign_queue_message("expiring", PRIVATE_KEY, sender="test.sender", ttl_ms=1)
+        wrapper = json.loads(signed)
+        # Backdate the timestamp well past the 1ms TTL so it's unambiguously expired.
+        wrapper["envelope"]["header"]["timestampMs"] -= 60_000
+        expired = json.dumps(wrapper)
+        with self.assertRaises(ValueError) as ctx:
+            verify_queue_message(expired, PUBLIC_KEY)
+        self.assertIn("validation failed", str(ctx.exception))
+
+    def test_verify_raises_on_missing_nonce(self):
+        """verify_queue_message rejects an envelope with no nonce (replay protection requires it)."""
+        signed = sign_queue_message("no-nonce", PRIVATE_KEY, sender="test.sender")
+        wrapper = json.loads(signed)
+        del wrapper["envelope"]["header"]["nonce"]
+        malformed = json.dumps(wrapper)
+        with self.assertRaises(ValueError) as ctx:
+            verify_queue_message(malformed, PUBLIC_KEY)
+        self.assertIn("validation failed", str(ctx.exception))
+
+    def test_replay_rejected_when_replay_store_reused_across_calls(self):
+        """A shared InMemoryReplayStore persists across calls and catches replays."""
+        replay_store = InMemoryReplayStore()
+        signed = _make_signed("once-only")
+
+        first = verify_queue_message(signed, PUBLIC_KEY, replay_store=replay_store)
+        self.assertEqual(first["payload"], "once-only")
+
+        with self.assertRaises(ValueError) as ctx:
+            verify_queue_message(signed, PUBLIC_KEY, replay_store=replay_store)
+        self.assertIn("replay detected", str(ctx.exception))
+
+    def test_no_replay_protection_when_replay_store_omitted(self):
+        """Replay protection is opt-in — same nonce twice is allowed with no replay_store."""
+        signed = _make_signed("no-dedup")
+        first = verify_queue_message(signed, PUBLIC_KEY)
+        second = verify_queue_message(signed, PUBLIC_KEY)
+        self.assertEqual(first["payload"], "no-dedup")
+        self.assertEqual(second["payload"], "no-dedup")
 
 
 class TestVerifyQueueBatch(unittest.TestCase):
