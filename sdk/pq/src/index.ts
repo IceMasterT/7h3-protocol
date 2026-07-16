@@ -53,6 +53,11 @@ function toBase64Url(bytes: Uint8Array): string {
     .replace(/=+$/g, '')
 }
 
+async function deriveKeyId(publicKey: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', publicKey.slice())
+  return toBase64Url(new Uint8Array(digest)).slice(0, 16)
+}
+
 function fromBase64Url(value: string): Uint8Array {
   const padded = value
     .replace(/-/g, '+')
@@ -98,8 +103,10 @@ export async function signEnvelopePq(
   const secretKey = fromBase64Url(privateKeyBase64Url)
   // @noble/post-quantum >=0.4 signature: sign(msg, secretKey, opts?)
   const sigBytes = impl.sign(message, secretKey)
-  // keyId derived from first 16 chars of the secretKey base64url
-  const keyId = privateKeyBase64Url.slice(0, 16)
+  // keyId is a hash of the PUBLIC key, never the secret key — the secret key
+  // must never appear, even partially, in wire-transmitted envelope metadata.
+  const publicKey = impl.getPublicKey(secretKey)
+  const keyId = await deriveKeyId(publicKey)
 
   return {
     header: envelope.header,
