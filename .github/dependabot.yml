@@ -103,8 +103,19 @@ updates:
         patterns:
           - "*"
 
-  # sdk/python is intentionally absent: pyproject.toml declares `dependencies = []`.
-  # Add a `pip` entry here if it ever gains runtime dependencies.
+  # Python SDK CI deps (pip): the SDK itself declares `dependencies = []`,
+  # but the conformance suite pins `cryptography` in requirements-ci.txt —
+  # a crypto dependency that must receive security updates.
+  - package-ecosystem: "pip"
+    directory: "/sdk/python"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    groups:
+      pip-non-security:
+        applies-to: version-updates
+        patterns:
+          - "*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
