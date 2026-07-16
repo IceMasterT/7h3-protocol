@@ -4,8 +4,12 @@ import type { KeyRegistry } from '@7h3/protocol/key-registry'
  * Cloudflare KV-backed key registry.
  *
  * Keys are stored in KV under:
- *   7h3:pk:{senderId}   → Ed25519 SPKI public key (base64url)
- *   7h3:ss:{keyId}      → HMAC shared secret
+ *   7h3:pk:{senderId}          → Ed25519 SPKI public key (base64url)
+ *   7h3:ss:{senderId}:{keyId}  → HMAC shared secret
+ *
+ * HMAC secrets are keyed by (sender, keyId) — not keyId alone — so a
+ * principal holding one valid (keyId, secret) pair cannot present it while
+ * claiming to be a different sender.
  *
  * Load keys via:
  *   wrangler kv:key put --namespace-id <ID> "7h3:pk:agent@example.com" "<base64url-pubkey>"
@@ -29,8 +33,8 @@ export class KvKeyRegistry implements KeyRegistry {
     return this.kv.get(`${this.pkPrefix}${senderId}`)
   }
 
-  async getSharedSecret(keyId: string): Promise<string | null> {
-    return this.kv.get(`${this.ssPrefix}${keyId}`)
+  async getSharedSecret(keyId: string, sender: string): Promise<string | null> {
+    return this.kv.get(`${this.ssPrefix}${sender}:${keyId}`)
   }
 }
 
@@ -50,8 +54,8 @@ export function createKvKeyRegistry(
       const fromKv = await kvRegistry.getPublicKey(senderId)
       return fromKv ?? staticFallback[senderId] ?? null
     },
-    async getSharedSecret(keyId: string) {
-      return kvRegistry.getSharedSecret(keyId)
+    async getSharedSecret(keyId: string, sender: string) {
+      return kvRegistry.getSharedSecret(keyId, sender)
     },
   }
 }

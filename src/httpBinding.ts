@@ -89,7 +89,7 @@ export async function verifyHttpEnvelope(
     const valid = await verifyEnvelopeEd25519(envelope, publicKey)
     if (!valid) return { ok: false, reason: 'invalid-signature' }
   } else if (alg === 'HS256') {
-    const secret = await opts.keyRegistry.getSharedSecret?.(envelope.signature.keyId)
+    const secret = await opts.keyRegistry.getSharedSecret?.(envelope.signature.keyId, sender)
     if (!secret) return { ok: false, reason: 'unknown-sender', detail: envelope.signature.keyId }
     const valid = await verifyEnvelopeHmac(envelope, secret)
     if (!valid) return { ok: false, reason: 'invalid-signature' }

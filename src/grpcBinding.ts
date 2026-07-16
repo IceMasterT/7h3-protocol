@@ -74,7 +74,7 @@ export async function verifyGrpcCall(
     const valid = await verifyEnvelopeEd25519(envelope, publicKey)
     if (!valid) return { ok: false, code: 16, message: '7h3: invalid signature' }
   } else if (alg === 'HS256') {
-    const secret = await opts.keyRegistry.getSharedSecret?.(envelope.signature!.keyId)
+    const secret = await opts.keyRegistry.getSharedSecret?.(envelope.signature!.keyId, sender)
     if (!secret) return { ok: false, code: 16, message: '7h3: unknown key' }
     const valid = await verifyEnvelopeHmac(envelope, secret)
     if (!valid) return { ok: false, code: 16, message: '7h3: invalid signature' }
