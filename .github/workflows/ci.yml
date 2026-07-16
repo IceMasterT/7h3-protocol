@@ -53,6 +53,10 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '22'
+      # mcp-server's lockfile links @7h3/protocol to the repo root (file:..),
+      # so the root package must be installed and built first
+      - run: npm ci
+      - run: npm run build:protocol
       - run: npm ci --no-audit --no-fund --prefix mcp-server
       # build runs tsc, so this is both the typecheck and the packaging check
       - run: npm run build --prefix mcp-server
