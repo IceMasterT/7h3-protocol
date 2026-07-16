@@ -141,3 +141,29 @@ describe('algorithm-specific aliases', () => {
     expect(valid).toBe(false)
   })
 })
+
+describe('keyId does not leak private key material', () => {
+  it('keyId is not derived from (and does not appear in) the private key', async () => {
+    const kp = generatePqKeyPair('ML-DSA-65')
+    const signed = await signEnvelopePq(baseEnvelope, kp.privateKey, 'ML-DSA-65')
+    const keyId = signed.signature!.keyId
+    expect(keyId).not.toBe(kp.privateKey.slice(0, 16))
+    expect(kp.privateKey).not.toContain(keyId)
+  })
+
+  it('keyId is deterministic and derived from the public key', async () => {
+    const kp = generatePqKeyPair('ML-DSA-65')
+    const signedA = await signEnvelopePq(baseEnvelope, kp.privateKey, 'ML-DSA-65')
+    const signedB = await signEnvelopePq(
+      { ...baseEnvelope, header: { ...baseEnvelope.header, messageId: 'test-msg-002' } },
+      kp.privateKey,
+      'ML-DSA-65',
+    )
+    // Same keypair -> same keyId across different messages/signatures.
+    expect(signedA.signature!.keyId).toBe(signedB.signature!.keyId)
+
+    const otherKp = generatePqKeyPair('ML-DSA-65')
+    const signedC = await signEnvelopePq(baseEnvelope, otherKp.privateKey, 'ML-DSA-65')
+    expect(signedC.signature!.keyId).not.toBe(signedA.signature!.keyId)
+  })
+})
