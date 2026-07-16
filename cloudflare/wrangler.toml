@@ -46,6 +46,21 @@ preview_id = "REPLACE_WITH_REPLAY_STORE_KV_PREVIEW_ID"
 # new_classes = ["ReplayDurableObject"]
 
 # ---------------------------------------------------------------------------
+# Optional: Durable Object for fully atomic rate limiting
+# By default rate limiting is backed by KvRateLimitStore (REPLAY_STORE KV,
+# small race window under concurrent bursts). Uncomment for zero-race-window
+# accuracy (paid plans only), then wire DurableRateLimitStore into
+# buildGateway() in src/worker.ts.
+# ---------------------------------------------------------------------------
+# [[durable_objects.bindings]]
+# name = "RATE_LIMIT_DO"
+# class_name = "RateLimitDurableObject"
+#
+# [[migrations]]
+# tag = "v2"
+# new_classes = ["RateLimitDurableObject"]
+
+# ---------------------------------------------------------------------------
 # Environments — staging and production overrides
 # ---------------------------------------------------------------------------
 

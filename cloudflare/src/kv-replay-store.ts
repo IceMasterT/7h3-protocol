@@ -26,8 +26,10 @@ export class KvReplayStore implements ReplayStore {
     const existing = await this.kv.get(kvKey)
     if (existing !== null) return true // replay
 
-    // KV doesn't have SET NX — mark as seen with TTL
-    const ttlSeconds = Math.max(1, Math.ceil(ttlMs / 1000))
+    // KV doesn't have SET NX — mark as seen with TTL.
+    // Cloudflare KV rejects expirationTtl below 60s, so short-TTL envelopes
+    // (routine for real-time agent messages) must be floored, not just ceil'd.
+    const ttlSeconds = Math.max(60, Math.ceil(ttlMs / 1000))
     await this.kv.put(kvKey, '1', { expirationTtl: ttlSeconds })
     return false // fresh
   }

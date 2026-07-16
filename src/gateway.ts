@@ -1,6 +1,6 @@
 import { type KeyRegistry } from './keyRegistry'
 import { type RoutePolicy, matchPolicy, isAllowedSender } from './routePolicy'
-import { SlidingWindowRateLimiter } from './rateLimiter'
+import { SlidingWindowRateLimiter, type RateLimitStore } from './rateLimiter'
 import { verifyHttpEnvelope } from './httpBinding'
 import { signResponse } from './signedResponse'
 import { metrics as globalMetrics } from './telemetry'
@@ -21,6 +21,14 @@ export interface GatewayConfig {
   metricsPath?: string
   /** Optional distributed replay store — prevents nonce reuse across gateway instances. */
   replayStore?: ReplayStore
+  /**
+   * Optional persistent rate-limit store — required for correct rate limiting
+   * whenever the gateway is rebuilt per-request (e.g. inside a Workers/Lambda
+   * fetch handler). Without it, rate limiting falls back to the in-memory
+   * SlidingWindowRateLimiter, which only works if this Gateway instance
+   * persists across the requests it's limiting.
+   */
+  rateLimitStore?: RateLimitStore
   /** Optional capability token registry for capability-based auth. */
   capabilityRegistry?: { getPublicKey(id: string): Promise<string | null> }
 }
@@ -160,7 +168,9 @@ class Protocol7h3Gateway {
 
     // Check rate limit
     if (policy?.rateLimit) {
-      const rl = this.rateLimiter.consume(sender, policy.rateLimit)
+      const rl = this.config.rateLimitStore
+        ? await this.config.rateLimitStore.consume(sender, policy.rateLimit)
+        : this.rateLimiter.consume(sender, policy.rateLimit)
       if (!rl.allowed) {
         const durationMs = performance.now() - startMs
         globalMetrics.verifications_total.increment({ result: 'fail', alg, transport: 'http' })
