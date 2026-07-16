@@ -187,3 +187,20 @@ fn test_revocation_registry_get_list() {
     assert!(key_b["revokedAt"].as_u64().unwrap() > 0);
     assert!(key_b.get("reason").is_none() || key_b["reason"].is_null());
 }
+
+// 8. ManagedKeyPair: Debug output must never contain private key material
+#[test]
+fn test_managed_keypair_debug_redacts_private_key() {
+    let pair = ManagedKeyPair {
+        id: "debug-key".to_string(),
+        public_key: "public-material".to_string(),
+        private_key: "SUPER-SECRET-PKCS8-MATERIAL".to_string(),
+        created: now_ms(),
+        expires_at: None,
+    };
+
+    let printed = format!("{:?}", pair);
+    assert!(!printed.contains("SUPER-SECRET-PKCS8-MATERIAL"), "Debug must not leak private key");
+    assert!(printed.contains("<redacted>"), "Debug should mark the private key as redacted");
+    assert!(printed.contains("public-material"), "public fields should still be printed");
+}

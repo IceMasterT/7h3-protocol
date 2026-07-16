@@ -10,7 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 
-[dependencies.aip7h3]
+[dependencies.protocol-7h3]
 path = ".."
 
 # Each fuzz target is a separate binary
