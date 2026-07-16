@@ -14,6 +14,10 @@ use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// Ceiling on ttlMs — a huge TTL keeps an envelope replayable (and its nonce
+/// pinned in every replay store) far beyond any legitimate messaging window.
+pub const MAX_TTL_MS: i64 = 86_400_000; // 24 hours
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProtocolHeader {
     pub version: String,
@@ -353,6 +357,12 @@ pub fn validate_envelope(
         diagnostics.push(ProtocolDiagnostic {
             level: "error".to_string(),
             message: "ttlMs must be greater than zero".to_string(),
+        });
+    }
+    if envelope.header.ttl_ms > MAX_TTL_MS {
+        diagnostics.push(ProtocolDiagnostic {
+            level: "error".to_string(),
+            message: format!("ttlMs exceeds maximum allowed {MAX_TTL_MS} ms"),
         });
     }
     if let Some(now) = now_ms {

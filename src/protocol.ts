@@ -358,6 +358,10 @@ export async function verifyCanonicalPayloadSignature(
   return verifyCanonicalPayloadEd25519(payload, signature.value, material.publicKey)
 }
 
+// Ceiling on ttlMs — a huge TTL keeps an envelope replayable (and its nonce
+// pinned in every replay store) far beyond any legitimate messaging window.
+export const MAX_TTL_MS = 86_400_000 // 24 hours
+
 export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now()): ProtocolDiagnostic[] {
   const diagnostics: ProtocolDiagnostic[] = []
   const header = (envelope as Partial<ProtocolEnvelope>).header ?? ({} as Partial<ProtocolHeader>)
@@ -385,6 +389,9 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
   }
   if (ttlMs <= 0) {
     diagnostics.push({ level: 'error', message: 'ttlMs must be greater than zero' })
+  }
+  if (ttlMs > MAX_TTL_MS) {
+    diagnostics.push({ level: 'error', message: `ttlMs exceeds maximum allowed ${MAX_TTL_MS} ms` })
   }
   if (timestampMs + ttlMs < nowMs) {
     diagnostics.push({ level: 'error', message: 'Message TTL expired' })

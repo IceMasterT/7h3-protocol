@@ -73,6 +73,21 @@ class ConformanceTests(unittest.TestCase):
         )
         self.assertTrue(any(d.message == "Message TTL expired" for d in expired))
 
+    def test_ttl_ceiling(self) -> None:
+        from protocol_7h3.protocol import MAX_TTL_MS
+
+        vector = self.payload["vectors"][0]
+        envelope = json.loads(json.dumps(vector["envelope"]))
+        envelope["header"]["ttlMs"] = MAX_TTL_MS + 1
+
+        diags = validate_envelope(envelope)
+        self.assertTrue(any("exceeds maximum" in d.message for d in diags))
+
+        # Exactly at the ceiling stays valid
+        envelope["header"]["ttlMs"] = MAX_TTL_MS
+        diags = validate_envelope(envelope)
+        self.assertFalse(any(d.level == "error" for d in diags))
+
     def test_ed25519_vectors_if_crypto_available(self) -> None:
         vectors = self.payload.get("ed25519Vectors", [])
         if not vectors:

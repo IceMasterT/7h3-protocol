@@ -195,6 +195,44 @@ func TestValidateEnvelopeExpired(t *testing.T) {
 	}
 }
 
+// Test 7b: ValidateEnvelope rejects ttlMs above the 24h ceiling.
+func TestValidateEnvelopeTTLCeiling(t *testing.T) {
+	env := ProtocolEnvelope{
+		Header: ProtocolHeader{
+			Version:     WireVersion,
+			MessageID:   "msg-huge-ttl",
+			Nonce:       "nonce-huge-ttl",
+			Sender:      "agent.a",
+			TimestampMs: time.Now().UnixMilli(),
+			TTLMs:       MaxTTLMs + 1,
+		},
+		Body: ProtocolBody{
+			Intent:  "PING",
+			Content: "long-lived",
+		},
+	}
+
+	diags := ValidateEnvelope(env)
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Message, "exceeds maximum") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected ttlMs ceiling diagnostic, got: %+v", diags)
+	}
+
+	// Exactly at the ceiling stays valid
+	env.Header.TTLMs = MaxTTLMs
+	for _, d := range ValidateEnvelope(env) {
+		if d.Level == "error" {
+			t.Errorf("ttlMs == MaxTTLMs should not error, got: %+v", d)
+		}
+	}
+}
+
 // Test 8: HTTP: VerifyHTTPEnvelope valid signed request.
 func TestHTTPVerifyValidSignedRequest(t *testing.T) {
 	pub, priv, err := GenerateKeypair()

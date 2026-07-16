@@ -7,6 +7,10 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, TypedDict
 
+# Ceiling on ttlMs — a huge TTL keeps an envelope replayable (and its nonce
+# pinned in every replay store) far beyond any legitimate messaging window.
+MAX_TTL_MS = 86_400_000  # 24 hours
+
 # ---------------------------------------------------------------------------
 # Optional native Ed25519 backend — try cryptography, then PyNaCl
 # ---------------------------------------------------------------------------
@@ -509,6 +513,13 @@ def validate_envelope(
     if int(header.get("ttlMs", 0)) <= 0:
         diagnostics.append(
             ProtocolDiagnostic(level="error", message="ttlMs must be greater than zero")
+        )
+    if int(header.get("ttlMs", 0)) > MAX_TTL_MS:
+        diagnostics.append(
+            ProtocolDiagnostic(
+                level="error",
+                message=f"ttlMs exceeds maximum allowed {MAX_TTL_MS} ms",
+            )
         )
 
     if now_ms is not None:

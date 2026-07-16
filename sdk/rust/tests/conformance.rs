@@ -146,3 +146,41 @@ fn ed25519_vectors_match_canonical_and_signatures() {
         );
     }
 }
+
+#[test]
+fn validate_envelope_rejects_ttl_above_ceiling() {
+    use protocol_7h3::{ProtocolBody, ProtocolHeader, MAX_TTL_MS};
+
+    let mut envelope = ProtocolEnvelope {
+        header: ProtocolHeader {
+            version: "7h3/0.1".to_string(),
+            message_id: "msg-huge-ttl".to_string(),
+            timestamp_ms: 1_000,
+            ttl_ms: MAX_TTL_MS + 1,
+            sender: "agent.a".to_string(),
+            recipient: None,
+            nonce: "nonce-huge-ttl".to_string(),
+        },
+        body: ProtocolBody {
+            intent: "PING".to_string(),
+            content: "long-lived".to_string(),
+            capability: None,
+            correlation_id: None,
+        },
+        signature: None,
+    };
+
+    let diags = validate_envelope(&envelope, None);
+    assert!(
+        diags.iter().any(|d| d.message.contains("exceeds maximum")),
+        "expected ttlMs ceiling diagnostic, got: {diags:?}"
+    );
+
+    // Exactly at the ceiling stays valid
+    envelope.header.ttl_ms = MAX_TTL_MS;
+    let diags = validate_envelope(&envelope, None);
+    assert!(
+        diags.iter().all(|d| d.level != "error"),
+        "ttlMs == MAX_TTL_MS should not error, got: {diags:?}"
+    );
+}

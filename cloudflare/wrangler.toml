@@ -13,6 +13,9 @@ UPSTREAM_URL = "https://your-service.example.com"
 GATEWAY_SENDER = "gateway@your-service.example.com"
 # 'deny' (production) or 'allow' (development/open APIs)
 DEFAULT_POLICY = "deny"
+# /metrics requires a valid 7h3 envelope by default. Set to "true" only if
+# your scraper cannot sign requests and the metrics are safe to expose.
+# METRICS_PUBLIC = "true"
 
 # GATEWAY_PRIVATE_KEY is a secret — set with:
 #   wrangler secret put GATEWAY_PRIVATE_KEY
