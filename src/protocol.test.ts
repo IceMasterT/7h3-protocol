@@ -8,6 +8,7 @@ import {
   signEnvelopeHmac,
   verifyCanonicalPayloadEd25519,
   validateEnvelope,
+  MAX_TTL_MS,
   verifyCanonicalPayloadHmac,
   verifyEnvelopeEd25519,
   verifyEnvelopeHmac,
@@ -151,5 +152,31 @@ describe('GLUV AIP protocol', () => {
     })
     const diagnostics = validateEnvelope({ ...unsigned }, 500)
     expect(diagnostics.some((d) => d.message === 'Message TTL expired')).toBe(true)
+  })
+
+  it('flags ttlMs above the 24h ceiling', () => {
+    const unsigned = createEnvelope({
+      sender: 'agent.alpha',
+      intent: 'TASK',
+      content: 'long-lived',
+      messageId: 'm4',
+      nonce: 'n4',
+      nowMs: 0,
+      ttlMs: MAX_TTL_MS + 1,
+    })
+    const diagnostics = validateEnvelope({ ...unsigned }, 0)
+    expect(diagnostics.some((d) => d.message.includes('exceeds maximum'))).toBe(true)
+
+    // Exactly at the ceiling is still valid
+    const atCeiling = createEnvelope({
+      sender: 'agent.alpha',
+      intent: 'TASK',
+      content: 'ok',
+      messageId: 'm5',
+      nonce: 'n5',
+      nowMs: 0,
+      ttlMs: MAX_TTL_MS,
+    })
+    expect(validateEnvelope({ ...atCeiling }, 0).filter((d) => d.level === 'error')).toEqual([])
   })
 })

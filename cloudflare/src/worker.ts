@@ -13,6 +13,7 @@
  *   GATEWAY_SENDER    string       — this gateway's identity (for signing responses)
  *   GATEWAY_PRIVATE_KEY string     — secret: Ed25519 PKCS8 base64url
  *   DEFAULT_POLICY    string       — 'allow' | 'deny'  (default: 'deny')
+ *   METRICS_PUBLIC    string       — 'true' to expose /metrics without an envelope (default: gated)
  *
  * IMPORTANT: this Worker's fetch() rebuilds the gateway on every request (a
  * fresh V8 isolate/invocation may not share JS heap state with the last one),
@@ -36,17 +37,20 @@ export interface Env {
   GATEWAY_SENDER?: string
   GATEWAY_PRIVATE_KEY?: string
   DEFAULT_POLICY?: string
+  // 'true' opens /metrics without a 7h3 envelope. Off by default — traffic
+  // metadata is worth protecting, so scrapers should present an envelope
+  // unless the operator explicitly opts out.
+  METRICS_PUBLIC?: string
   // Optional: Durable Object for atomic replay (upgrade from KV)
   REPLAY_DO?: DurableObjectNamespace
   // Optional: Durable Object for atomic rate limiting (upgrade from KV)
   RATE_LIMIT_DO?: DurableObjectNamespace
 }
 
-// Routes that bypass 7h3 verification (health + metrics endpoints)
+// Routes that bypass 7h3 verification (health + key discovery)
 const OPEN_ROUTES: RoutePolicy[] = [
   { path: '/health',               require: 'none' },
   { path: '/healthz',              require: 'none' },
-  { path: '/metrics',              require: 'none' },
   { path: '/.well-known/7h3-keys', require: 'none' },
 ]
 
@@ -57,6 +61,9 @@ function buildGateway(env: Env) {
   // request — an in-memory limiter here would never actually limit anything.
   const rateLimitStore = new KvRateLimitStore(env.REPLAY_STORE)
   const defaultPolicy = (env.DEFAULT_POLICY === 'allow' ? 'allow' : 'deny') as 'allow' | 'deny'
+  const policies: RoutePolicy[] = env.METRICS_PUBLIC === 'true'
+    ? [...OPEN_ROUTES, { path: '/metrics', require: 'none' }]
+    : OPEN_ROUTES
 
   return createGateway({
     upstream: env.UPSTREAM_URL,
@@ -64,7 +71,7 @@ function buildGateway(env: Env) {
     replayStore,
     rateLimitStore,
     defaultPolicy,
-    policies: OPEN_ROUTES,
+    policies,
     privateKey: env.GATEWAY_PRIVATE_KEY,
     sender: env.GATEWAY_SENDER,
     signResponses: !!env.GATEWAY_PRIVATE_KEY,

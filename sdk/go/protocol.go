@@ -19,6 +19,11 @@ import (
 // WireVersion is the protocol version string.
 const WireVersion = "7h3/0.1"
 
+// MaxTTLMs is the ceiling on ttlMs — a huge TTL keeps an envelope replayable
+// (and its nonce pinned in every replay store) far beyond any legitimate
+// messaging window.
+const MaxTTLMs int64 = 86_400_000 // 24 hours
+
 // ProtocolHeader contains routing and metadata for a message.
 type ProtocolHeader struct {
 	Version     string `json:"version"`
@@ -192,6 +197,9 @@ func ValidateEnvelope(env ProtocolEnvelope) []Diagnostic {
 	}
 	if h.TTLMs <= 0 {
 		diags = append(diags, Diagnostic{Level: "error", Message: "ttlMs must be greater than zero"})
+	}
+	if h.TTLMs > MaxTTLMs {
+		diags = append(diags, Diagnostic{Level: "error", Message: fmt.Sprintf("ttlMs exceeds maximum allowed %d ms", MaxTTLMs)})
 	}
 	nowMs := time.Now().UnixMilli()
 	if h.TimestampMs+h.TTLMs < nowMs {
