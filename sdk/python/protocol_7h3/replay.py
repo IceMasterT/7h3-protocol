@@ -9,7 +9,42 @@ usable without installing Redis dependencies.
 
 from __future__ import annotations
 
-from typing import Optional, Any
+import time
+from typing import Optional, Any, Dict
+
+
+class InMemoryReplayStore:
+    """
+    Zero-dependency in-memory replay store — same ``check(key, ttl_ms) -> bool``
+    interface as :class:`RedisReplayStore`, so it's a drop-in default for a
+    single long-lived consumer process. For a horizontally-scaled consumer
+    group (multiple processes/machines), use :class:`RedisReplayStore` instead
+    so nonce state is actually shared.
+
+    Construct ONE instance per consumer process and reuse it across every
+    verify call — a fresh instance per call provides no protection at all,
+    since a replayed nonce would never be recognized as already-seen.
+    """
+
+    def __init__(self) -> None:
+        self._seen: Dict[str, float] = {}
+
+    def check(self, key: str, ttl_ms: int) -> bool:
+        """
+        Returns ``False`` if the key is fresh (first time seen), or ``True``
+        if it's a replay (already seen and not yet expired).
+        """
+        now = time.monotonic()
+        self._prune(now)
+        if key in self._seen:
+            return True  # replay
+        self._seen[key] = now + max(0.001, ttl_ms / 1000)
+        return False  # fresh
+
+    def _prune(self, now: float) -> None:
+        expired = [k for k, expires_at in self._seen.items() if expires_at <= now]
+        for k in expired:
+            del self._seen[k]
 
 
 class RedisReplayStore:

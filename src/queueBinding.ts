@@ -3,7 +3,9 @@ import {
   createEnvelope,
   signEnvelopeEd25519,
   verifyEnvelopeEd25519,
+  validateEnvelope,
 } from './protocol'
+import type { ReplayCache } from './protocolReplay'
 
 export interface QueueSignOptions {
   privateKey: string
@@ -15,6 +17,17 @@ export interface QueueSignOptions {
 
 export interface QueueVerifyOptions {
   publicKey: string
+  /** Reject expired or malformed envelopes (missing nonce, bad TTL, etc). Default true. */
+  strictTtl?: boolean
+  /**
+   * Optional replay/dedup cache (e.g. `new InMemoryReplayCache()` from
+   * `./protocolReplay`). Construct ONE instance per consumer process and pass
+   * the same instance to every verifyQueueMessage/verifyQueueBatch call — a
+   * fresh cache per call provides no protection at all, since a replayed
+   * message would never be recognized as already-seen.
+   */
+  replayCache?: ReplayCache
+  nowMs?: number
 }
 
 export type SignedEnvelope = ProtocolEnvelope
@@ -69,9 +82,26 @@ export async function verifyQueueMessage<T>(
     throw new Error('Queue message missing envelope')
   }
 
+  const nowMs = opts.nowMs ?? Date.now()
+  const strictTtl = opts.strictTtl ?? true
+  if (strictTtl) {
+    const diagnostics = validateEnvelope(parsed.envelope, nowMs)
+    const errors = diagnostics.filter((d) => d.level === 'error')
+    if (errors.length > 0) {
+      throw new Error(`Queue message failed validation: ${errors.map((e) => e.message).join('; ')}`)
+    }
+  }
+
   const valid = await verifyEnvelopeEd25519(parsed.envelope, opts.publicKey)
   if (!valid) {
     throw new Error('Queue message signature verification failed')
+  }
+
+  if (opts.replayCache) {
+    const replay = await opts.replayCache.consume(parsed.envelope, nowMs)
+    if (!replay.ok) {
+      throw new Error(replay.reason ?? 'Queue message replay detected')
+    }
   }
 
   return { payload: parsed.payload, envelope: parsed.envelope }

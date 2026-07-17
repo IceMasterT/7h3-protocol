@@ -64,11 +64,22 @@ def sign_queue_message(
     return json.dumps({"envelope": signed, "payload": payload}, separators=(",", ":"))
 
 
-def verify_queue_message(message: str, public_key: str) -> Dict[str, Any]:
+def verify_queue_message(
+    message: str,
+    public_key: str,
+    *,
+    replay_store: Optional[Any] = None,
+) -> Dict[str, Any]:
     """
     Verify and unwrap a queue message.
     Returns {"payload": Any, "envelope": dict}.
     Raises ValueError on failure.
+
+    replay_store: optional object exposing check(key: str, ttl_ms: int) -> bool
+        (e.g. InMemoryReplayStore or RedisReplayStore from .replay). Construct
+        ONE instance per consumer process and pass the same instance to every
+        call — a fresh instance per call provides no protection at all, since
+        a replayed nonce would never be recognized as already-seen.
     """
     from .protocol import verify_envelope_ed25519, validate_envelope
 
@@ -82,8 +93,11 @@ def verify_queue_message(message: str, public_key: str) -> Dict[str, Any]:
     if not envelope or not isinstance(envelope, dict):
         raise ValueError("7h3: missing envelope in queue message")
 
-    # validate_envelope returns list[ProtocolDiagnostic] (dataclass objects)
-    diags = validate_envelope(envelope)
+    # validate_envelope returns list[ProtocolDiagnostic] (dataclass objects).
+    # now_ms must be passed explicitly — validate_envelope silently skips its
+    # TTL-expiry check when now_ms is None.
+    now_ms = int(time.time() * 1000)
+    diags = validate_envelope(envelope, now_ms=now_ms)
     errors = [d for d in diags if d.level == "error"]
     if errors:
         raise ValueError(
@@ -94,12 +108,19 @@ def verify_queue_message(message: str, public_key: str) -> Dict[str, Any]:
     if not valid:
         raise ValueError("7h3: invalid signature on queue message")
 
+    if replay_store is not None:
+        header = envelope["header"]
+        if replay_store.check(header["nonce"], header["ttlMs"]):
+            raise ValueError("7h3: replay detected — nonce already seen")
+
     return {"payload": payload, "envelope": envelope}
 
 
 def verify_queue_batch(
     messages: List[str],
     public_key: str,
+    *,
+    replay_store: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
     """
     Verify a batch of queue messages without throwing.
@@ -109,7 +130,7 @@ def verify_queue_batch(
     results = []
     for msg in messages:
         try:
-            result = verify_queue_message(msg, public_key)
+            result = verify_queue_message(msg, public_key, replay_store=replay_store)
             results.append(
                 {"ok": True, "payload": result["payload"], "envelope": result["envelope"]}
             )
