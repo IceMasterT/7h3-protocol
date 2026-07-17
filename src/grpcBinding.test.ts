@@ -5,11 +5,12 @@ import {
   withGrpcVerification,
   GRPC_METADATA_KEY,
 } from './grpcBinding'
-import { createStaticKeyRegistry } from './keyRegistry'
+import { createStaticKeyRegistry, type KeyRegistry } from './keyRegistry'
 import {
   generateEd25519KeypairBase64Url,
   createEnvelope,
   signEnvelopeEd25519,
+  signEnvelopeHmac,
   type ProtocolEnvelope,
 } from './protocol'
 
@@ -129,6 +130,36 @@ describe('verifyGrpcCall', () => {
       expect(result.code).toBe(16)
       expect(result.message).toContain('unknown-grpc-agent')
     }
+  })
+
+  it('HMAC lookup is bound to the claimed sender', async () => {
+    const secret = 'grpc-shared-secret'
+    const keyId = 'grpc-hmac-key'
+    // Secret registered for agent-a only; lookup keyed by (sender, keyId)
+    const registry: KeyRegistry = {
+      async getPublicKey() { return null },
+      async getSharedSecret(id, sender) {
+        return sender === 'agent-a' && id === keyId ? secret : null
+      },
+    }
+
+    const legit = createEnvelope({ sender: 'agent-a', intent: 'TASK', content: 'ok', ttlMs: 60_000 })
+    const legitSigned = await signEnvelopeHmac(legit, secret, keyId)
+    const legitResult = await verifyGrpcCall(
+      { [GRPC_METADATA_KEY]: JSON.stringify(legitSigned) },
+      { keyRegistry: registry },
+    )
+    expect(legitResult.ok).toBe(true)
+
+    // Same valid (keyId, secret) pair claiming a different sender must fail
+    const forged = createEnvelope({ sender: 'agent-b', intent: 'TASK', content: 'forged', ttlMs: 60_000 })
+    const forgedSigned = await signEnvelopeHmac(forged, secret, keyId)
+    const forgedResult = await verifyGrpcCall(
+      { [GRPC_METADATA_KEY]: JSON.stringify(forgedSigned) },
+      { keyRegistry: registry },
+    )
+    expect(forgedResult.ok).toBe(false)
+    if (!forgedResult.ok) expect(forgedResult.code).toBe(16)
   })
 
   it('accepts Buffer values in metadata', async () => {
