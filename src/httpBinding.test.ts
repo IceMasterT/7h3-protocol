@@ -17,11 +17,12 @@ import {
   type ProtocolEnvelope,
 } from './protocol'
 
-// Helper: build a static KeyRegistry that also holds HMAC shared secrets
+// Helper: build a static KeyRegistry that also holds HMAC shared secrets,
+// keyed by `${sender}:${keyId}` so lookups are bound to the claimed sender
 function createHmacKeyRegistry(secrets: Record<string, string>): KeyRegistry {
   return {
     async getPublicKey() { return null },
-    async getSharedSecret(keyId) { return secrets[keyId] ?? null },
+    async getSharedSecret(keyId, sender) { return secrets[`${sender}:${keyId}`] ?? null },
   }
 }
 
@@ -295,7 +296,7 @@ describe('HMAC round trip', () => {
     const secret = 'super-secret-hmac-key'
     const keyId = 'hmac-key-1'
     const sender = 'agent-hmac'
-    const registry = createHmacKeyRegistry({ [keyId]: secret })
+    const registry = createHmacKeyRegistry({ [`${sender}:${keyId}`]: secret })
 
     const env = createEnvelope({ sender, intent: 'TASK', content: 'hmac task', ttlMs: 60_000 })
     const { headers } = await signHttpRequestHmac(env, secret, keyId)
@@ -312,7 +313,7 @@ describe('HMAC round trip', () => {
     const secret = 'super-secret-hmac-key'
     const keyId = 'hmac-key-2'
     const sender = 'agent-hmac-tamper'
-    const registry = createHmacKeyRegistry({ [keyId]: secret })
+    const registry = createHmacKeyRegistry({ [`${sender}:${keyId}`]: secret })
 
     const env = createEnvelope({ sender, intent: 'TASK', content: 'hmac task', ttlMs: 60_000 })
     const signed = await signEnvelopeHmac(env, secret, keyId)
@@ -344,6 +345,26 @@ describe('HMAC round trip', () => {
       expect(result.reason).toBe('unknown-sender')
       expect(result.detail).toBe(keyId)
     }
+  })
+
+  it('rejects a valid (keyId, secret) pair presented under a different sender', async () => {
+    const secret = 'shared-secret-for-agent-a'
+    const keyId = 'hmac-key-a'
+    // Secret is registered for agent-a only
+    const registry = createHmacKeyRegistry({ [`agent-a:${keyId}`]: secret })
+
+    // agent-a's own envelope verifies
+    const legit = createEnvelope({ sender: 'agent-a', intent: 'TASK', content: 'ok', ttlMs: 60_000 })
+    const { headers: legitHeaders } = await signHttpRequestHmac(legit, secret, keyId)
+    expect((await verifyHttpEnvelope(legitHeaders, { keyRegistry: registry })).ok).toBe(true)
+
+    // The same key material claiming to be agent-b must NOT verify —
+    // lookup is bound to the sender the envelope claims
+    const forged = createEnvelope({ sender: 'agent-b', intent: 'TASK', content: 'forged', ttlMs: 60_000 })
+    const { headers: forgedHeaders } = await signHttpRequestHmac(forged, secret, keyId)
+    const result = await verifyHttpEnvelope(forgedHeaders, { keyRegistry: registry })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('unknown-sender')
   })
 })
 

@@ -1,7 +1,11 @@
 // Core interface all bindings use to look up keys
 export interface KeyRegistry {
   getPublicKey(senderId: string): Promise<string | null>  // Ed25519 SPKI base64url
-  getSharedSecret?(keyId: string): Promise<string | null>  // HMAC secret (optional)
+  // HMAC secret (optional). `sender` MUST be checked by implementations that
+  // store secrets shared by multiple senders — without binding the lookup to
+  // the sender the envelope actually claims, any principal holding one valid
+  // (keyId, secret) pair can forge messages as a different sender.
+  getSharedSecret?(keyId: string, sender: string): Promise<string | null>
 }
 
 // Simple in-memory registry from a static map
@@ -21,10 +25,10 @@ export function createCompositeKeyRegistry(...registries: KeyRegistry[]): KeyReg
       }
       return null
     },
-    async getSharedSecret(keyId) {
+    async getSharedSecret(keyId, sender) {
       for (const r of registries) {
         if (!r.getSharedSecret) continue
-        const secret = await r.getSharedSecret(keyId)
+        const secret = await r.getSharedSecret(keyId, sender)
         if (secret !== null) return secret
       }
       return null
@@ -51,9 +55,11 @@ export function createCachingKeyRegistry(
     async getPublicKey(senderId) {
       return get(`pk:${senderId}`, () => inner.getPublicKey(senderId))
     },
-    async getSharedSecret(keyId) {
+    async getSharedSecret(keyId, sender) {
       if (!inner.getSharedSecret) return null
-      return get(`ss:${keyId}`, () => inner.getSharedSecret!(keyId))
+      // Cache key includes sender — a cached secret for (keyId, agent-a) must
+      // never be returned for a lookup claiming (keyId, agent-b).
+      return get(`ss:${sender}:${keyId}`, () => inner.getSharedSecret!(keyId, sender))
     },
   }
 }

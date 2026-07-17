@@ -11,6 +11,7 @@ use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
+use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -172,11 +173,14 @@ pub fn sign_canonical_payload_ed25519(
     canonical_payload: &str,
     private_key_pkcs8_base64url: &str,
 ) -> Result<String, String> {
-    let private_der = URL_SAFE_NO_PAD
+    let mut private_der = URL_SAFE_NO_PAD
         .decode(private_key_pkcs8_base64url)
         .map_err(|_| "Invalid ED25519 private key encoding".to_string())?;
-    let signing_key = SigningKey::from_pkcs8_der(&private_der)
-        .map_err(|_| "Invalid ED25519 private key".to_string())?;
+    // Wipe the decoded PKCS8 bytes before returning on either path — the
+    // SigningKey keeps its own copy and zeroizes it on drop.
+    let parsed = SigningKey::from_pkcs8_der(&private_der);
+    private_der.zeroize();
+    let signing_key = parsed.map_err(|_| "Invalid ED25519 private key".to_string())?;
     let signature = signing_key.sign(canonical_payload.as_bytes());
     Ok(URL_SAFE_NO_PAD.encode(signature.to_bytes()))
 }

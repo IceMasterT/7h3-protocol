@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -61,13 +62,32 @@ impl WellKnownKeysDocument {
 }
 
 /// Managed key pair for rotation.
-#[derive(Debug, Clone)]
+///
+/// The private key is wiped from memory on drop, and the `Debug` impl
+/// redacts it so key material can never reach logs via `{:?}`.
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct ManagedKeyPair {
+    #[zeroize(skip)]
     pub id: String,
+    #[zeroize(skip)]
     pub public_key: String,   // SPKI base64url
     pub private_key: String,  // PKCS8 base64url
+    #[zeroize(skip)]
     pub created: u64,
+    #[zeroize(skip)]
     pub expires_at: Option<u64>,
+}
+
+impl std::fmt::Debug for ManagedKeyPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ManagedKeyPair")
+            .field("id", &self.id)
+            .field("public_key", &self.public_key)
+            .field("private_key", &"<redacted>")
+            .field("created", &self.created)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
 }
 
 /// Manages key pairs with rotation policy.

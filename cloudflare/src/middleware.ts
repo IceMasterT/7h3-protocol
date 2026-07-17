@@ -2,6 +2,7 @@ import { createGateway, type GatewayConfig } from '@7h3/protocol/gateway'
 import type { KeyRegistry } from '@7h3/protocol/key-registry'
 import type { ReplayStore } from '@7h3/protocol/replay'
 import { KvReplayStore } from './kv-replay-store'
+import { KvRateLimitStore } from './kv-rate-limit-store'
 import { KvKeyRegistry } from './kv-key-registry'
 
 export interface MiddlewareEnv {
@@ -42,15 +43,22 @@ export interface DenyResult {
  *       return new Response('ok')
  *     }
  *   }
+ *
+ * Because this is called fresh on every request, rate limiting is backed by
+ * KvRateLimitStore (persisted in REPLAY_STORE) rather than the gateway's
+ * default in-memory limiter — an in-memory limiter reset every request would
+ * never actually enforce a limit.
  */
 export function create7h3Middleware(env: MiddlewareEnv, extra?: Partial<GatewayConfig>) {
   const keyRegistry: KeyRegistry = new KvKeyRegistry(env.KEY_REGISTRY)
   const replayStore: ReplayStore = new KvReplayStore(env.REPLAY_STORE)
+  const rateLimitStore = new KvRateLimitStore(env.REPLAY_STORE)
 
   const gatewayConfig: GatewayConfig = {
     upstream: '',
     keyRegistry,
     replayStore,
+    rateLimitStore,
     defaultPolicy: (env.DEFAULT_POLICY as 'allow' | 'deny') ?? 'deny',
     privateKey: env.GATEWAY_PRIVATE_KEY,
     sender: env.GATEWAY_SENDER,

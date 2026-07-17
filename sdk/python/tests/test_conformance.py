@@ -88,6 +88,22 @@ class ConformanceTests(unittest.TestCase):
         diags = validate_envelope(envelope)
         self.assertFalse(any(d.level == "error" for d in diags))
 
+    def test_nonce_required(self) -> None:
+        # Cross-language parity: the TS validateEnvelope has always required a
+        # nonce (replay protection depends on it); the Python port previously
+        # didn't check for one at all.
+        vector = self.payload["vectors"][0]
+        envelope = dict(vector["envelope"])
+        header = dict(envelope["header"])
+        envelope["header"] = header
+
+        present = validate_envelope(envelope)
+        self.assertFalse(any("nonce" in d.message.lower() for d in present))
+
+        del header["nonce"]
+        missing = validate_envelope(envelope)
+        self.assertTrue(any("nonce" in d.message.lower() for d in missing))
+
     def test_ed25519_vectors_if_crypto_available(self) -> None:
         vectors = self.payload.get("ed25519Vectors", [])
         if not vectors:

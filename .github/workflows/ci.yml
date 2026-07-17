@@ -15,7 +15,8 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '22'
-      - run: npm install
+      # npm ci: install exactly what the committed lockfile pins
+      - run: npm ci
       # Sub-package SDKs carry their own deps (@noble/post-quantum, @noble/curves)
       # and their tests run under the root vitest suite
       # npm install (not ci): these lockfiles pin the @7h3/protocol peer dep,
@@ -30,6 +31,20 @@ jobs:
         run: npm run fuzz:ts
         env:
           FUZZ_ROUNDS: '5000'
+  cloudflare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build:protocol
+      # npm install (not ci): cloudflare/package-lock.json pins the @7h3/protocol
+      # file: dep, which changes every release and would desync npm ci on each bump
+      - run: npm install --no-audit --no-fund --prefix cloudflare
+      - run: npm run typecheck --prefix cloudflare
+      - run: npm run test --prefix cloudflare
   conformance:
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +55,22 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
-      - run: pip install cryptography
-      - run: npm install
+      # Pinned so conformance runs are reproducible; dependabot bumps the pin
+      - run: pip install -r sdk/python/requirements-ci.txt
+      - run: npm ci
       - run: npm run conformance:python
       - run: npm run conformance:rust
+  mcp-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+      # mcp-server's lockfile links @7h3/protocol to the repo root (file:..),
+      # so the root package must be installed and built first
+      - run: npm ci
+      - run: npm run build:protocol
+      - run: npm ci --no-audit --no-fund --prefix mcp-server
+      # build runs tsc, so this is both the typecheck and the packaging check
+      - run: npm run build --prefix mcp-server

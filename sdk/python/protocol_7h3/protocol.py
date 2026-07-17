@@ -510,6 +510,13 @@ def validate_envelope(
         diagnostics.append(
             ProtocolDiagnostic(level="error", message="Missing sender identity")
         )
+    if not str(header.get("nonce", "")).strip():
+        diagnostics.append(
+            ProtocolDiagnostic(
+                level="error",
+                message="Missing nonce — replay protection requires a unique nonce per message",
+            )
+        )
     if int(header.get("ttlMs", 0)) <= 0:
         diagnostics.append(
             ProtocolDiagnostic(level="error", message="ttlMs must be greater than zero")

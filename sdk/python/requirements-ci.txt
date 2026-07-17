@@ -1,0 +1,5 @@
+# CI/test dependencies for the Python SDK conformance suite.
+# The SDK itself declares no runtime dependencies (see pyproject.toml);
+# cryptography is needed only to run the Ed25519 conformance tests.
+# Pinned exactly so CI is reproducible — dependabot tracks and bumps it.
+cryptography==49.0.0

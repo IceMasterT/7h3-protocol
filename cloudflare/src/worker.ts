@@ -7,20 +7,28 @@
  *
  * Environment bindings (wrangler.toml):
  *   KEY_REGISTRY      KVNamespace  — Ed25519 public keys by sender ID
- *   REPLAY_STORE      KVNamespace  — nonce dedup / replay protection
+ *   REPLAY_STORE      KVNamespace  — nonce dedup / replay protection, and
+ *                                    (shared, distinct key prefix) rate-limit windows
  *   UPSTREAM_URL      string       — where to forward verified requests
  *   GATEWAY_SENDER    string       — this gateway's identity (for signing responses)
  *   GATEWAY_PRIVATE_KEY string     — secret: Ed25519 PKCS8 base64url
  *   DEFAULT_POLICY    string       — 'allow' | 'deny'  (default: 'deny')
  *   METRICS_PUBLIC    string       — 'true' to expose /metrics without an envelope (default: gated)
+ *
+ * IMPORTANT: this Worker's fetch() rebuilds the gateway on every request (a
+ * fresh V8 isolate/invocation may not share JS heap state with the last one),
+ * so any per-policy rateLimit MUST be backed by a persistent store — never
+ * the gateway's default in-memory limiter — or it silently never triggers.
  */
 
 import { createGateway, type RoutePolicy } from '@7h3/protocol/gateway'
 import { KvKeyRegistry } from './kv-key-registry'
 import { KvReplayStore } from './kv-replay-store'
+import { KvRateLimitStore } from './kv-rate-limit-store'
 import { ReplayDurableObject } from './durable-replay'
+import { RateLimitDurableObject } from './durable-rate-limit'
 
-export { ReplayDurableObject }
+export { ReplayDurableObject, RateLimitDurableObject }
 
 export interface Env {
   KEY_REGISTRY: KVNamespace
@@ -35,6 +43,8 @@ export interface Env {
   METRICS_PUBLIC?: string
   // Optional: Durable Object for atomic replay (upgrade from KV)
   REPLAY_DO?: DurableObjectNamespace
+  // Optional: Durable Object for atomic rate limiting (upgrade from KV)
+  RATE_LIMIT_DO?: DurableObjectNamespace
 }
 
 // Routes that bypass 7h3 verification (health + key discovery)
@@ -47,6 +57,9 @@ const OPEN_ROUTES: RoutePolicy[] = [
 function buildGateway(env: Env) {
   const keyRegistry = new KvKeyRegistry(env.KEY_REGISTRY)
   const replayStore = new KvReplayStore(env.REPLAY_STORE)
+  // Rate-limit state must survive this function being called fresh on every
+  // request — an in-memory limiter here would never actually limit anything.
+  const rateLimitStore = new KvRateLimitStore(env.REPLAY_STORE)
   const defaultPolicy = (env.DEFAULT_POLICY === 'allow' ? 'allow' : 'deny') as 'allow' | 'deny'
   const policies: RoutePolicy[] = env.METRICS_PUBLIC === 'true'
     ? [...OPEN_ROUTES, { path: '/metrics', require: 'none' }]
@@ -56,6 +69,7 @@ function buildGateway(env: Env) {
     upstream: env.UPSTREAM_URL,
     keyRegistry,
     replayStore,
+    rateLimitStore,
     defaultPolicy,
     policies,
     privateKey: env.GATEWAY_PRIVATE_KEY,

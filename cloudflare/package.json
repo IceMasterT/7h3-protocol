@@ -11,7 +11,9 @@
     "deploy:production": "wrangler deploy --env production",
     "setup": "npx tsx scripts/cf-setup.ts",
     "keys:load": "npx tsx scripts/kv-load-keys.ts",
-    "secrets:set": "wrangler secret put GATEWAY_PRIVATE_KEY"
+    "secrets:set": "wrangler secret put GATEWAY_PRIVATE_KEY",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@7h3/protocol": "file:.."
@@ -20,6 +22,7 @@
     "@cloudflare/workers-types": "^5.20260710.1",
     "@types/node": "^26.1.0",
     "typescript": "^5.4.5",
+    "vitest": "^4.1.8",
     "wrangler": "^4.110.0"
   }
 }
