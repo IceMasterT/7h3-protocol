@@ -19,10 +19,10 @@
     "@7h3/protocol": "file:.."
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260710.1",
+    "@cloudflare/workers-types": "^5.20260717.1",
     "@types/node": "^26.1.0",
     "typescript": "^5.4.5",
     "vitest": "^4.1.8",
-    "wrangler": "^4.110.0"
+    "wrangler": "^4.112.0"
   }
 }
