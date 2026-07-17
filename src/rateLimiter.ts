@@ -1,6 +1,18 @@
 export type RateLimitPolicy = { requests: number; windowMs: number }
 export type RateLimitResult = { allowed: boolean; remaining: number; resetMs: number }
 
+/**
+ * Persistent rate-limit store — required for correct rate limiting in any
+ * environment where the gateway/limiter instance doesn't live for the
+ * lifetime of the traffic it's limiting (e.g. a serverless function that
+ * rebuilds its gateway on every invocation). Without one, SlidingWindowRateLimiter's
+ * in-memory Map resets whenever the process/instance does, silently
+ * defeating the limit.
+ */
+export interface RateLimitStore {
+  consume(key: string, policy: RateLimitPolicy, nowMs?: number): Promise<RateLimitResult>
+}
+
 class SlidingWindowRateLimiter {
   private windows: Map<string, number[]> = new Map()
 

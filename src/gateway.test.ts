@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest'
 import { createGateway, type GatewayRequest } from './gateway'
 import { createStaticKeyRegistry } from './keyRegistry'
 import { generateEd25519KeypairBase64Url, createEnvelope, signEnvelopeEd25519, signEnvelopeHmac } from './protocol'
+import { SlidingWindowRateLimiter, type RateLimitStore } from './rateLimiter'
 
 let senderKeys: { publicKey: string; privateKey: string }
 let gatewayKeys: { publicKey: string; privateKey: string }
@@ -161,6 +162,39 @@ describe('verify()', () => {
     const headers2 = await makeSignedHeader('agent-a', senderKeys.privateKey)
     const req2: GatewayRequest = { method: 'GET', path: '/api/data', headers: headers2 }
     const second = await gw.verify(req2)
+    expect(second.ok).toBe(false)
+    if (!second.ok) {
+      expect(second.status).toBe(429)
+    }
+  })
+
+  it('rate limit persists across gateway rebuilds when a shared rateLimitStore is used', async () => {
+    // Regression test for a critical bug: serverless/edge deployments (e.g. a
+    // Workers fetch handler) rebuild the gateway on every request, so an
+    // in-memory limiter resets every time and never actually limits. A
+    // persistent rateLimitStore must keep enforcing the limit regardless of
+    // how many separate Gateway instances are constructed.
+    const store = new SlidingWindowRateLimiter()
+    const rateLimitStore: RateLimitStore = {
+      consume: (key, policy) => Promise.resolve(store.consume(key, policy)),
+    }
+    const gatewayConfig = {
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({ 'agent-a': senderKeys.publicKey }),
+      policies: [{ path: '/api/**' as const, require: 'ed25519' as const, rateLimit: { requests: 1, windowMs: 10_000 } }],
+      rateLimitStore,
+    }
+
+    const gw1 = createGateway(gatewayConfig)
+    const headers1 = await makeSignedHeader('agent-a', senderKeys.privateKey)
+    const first = await gw1.verify({ method: 'GET', path: '/api/data', headers: headers1 })
+    expect(first.ok).toBe(true)
+
+    // A brand-new Gateway instance (own fresh in-memory limiter) sharing the
+    // same rateLimitStore must still see agent-a as rate-limited.
+    const gw2 = createGateway(gatewayConfig)
+    const headers2 = await makeSignedHeader('agent-a', senderKeys.privateKey)
+    const second = await gw2.verify({ method: 'GET', path: '/api/data', headers: headers2 })
     expect(second.ok).toBe(false)
     if (!second.ok) {
       expect(second.status).toBe(429)
