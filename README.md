@@ -135,25 +135,30 @@ Optional fields (`capability`, `correlationId`, `recipient`) are omitted when ab
 
 ```mermaid
 sequenceDiagram
-    participant S as Sender Agent
-    participant C as 7h3 SDK
-    participant T as Transport
-    participant G as Gateway / Receiver
-    participant U as Upstream
+    autonumber
 
-    S->>C: createEnvelope(sender, body, ttlMs)
-    C->>C: Deterministic JSON canonicalization
-    C->>C: Ed25519 sign(canonicalPayload, privateKey)
-    C-->>S: SignedEnvelope {header, body, signature}
-    S->>T: Transmit via HTTP / WS / gRPC / Queue / Webhook
-    T->>G: Request with envelope
-    G->>G: Check TTL not expired
-    G->>G: Check nonce not replayed (memory or Redis)
-    G->>G: Verify Ed25519 signature
-    G->>G: Match route policy + rate limit
-    G->>U: Forward + inject x-7h3-sender header
-    U-->>G: Response
-    G-->>S: Response (optionally signed)
+    participant Sender as Sender Agent
+    participant SDK as 7h3 SDK
+    participant Transport
+    participant Gateway as Gateway / Receiver
+    participant Upstream
+
+    Sender->>SDK: Create envelope with sender, body, and TTL
+    SDK->>SDK: Canonicalize JSON deterministically
+    SDK->>SDK: Sign payload using Ed25519
+    SDK-->>Sender: Return signed envelope
+
+    Sender->>Transport: Send via HTTP, WebSocket, gRPC, queue, or webhook
+    Transport->>Gateway: Deliver signed envelope
+
+    Gateway->>Gateway: Validate TTL
+    Gateway->>Gateway: Reject replayed nonce
+    Gateway->>Gateway: Verify Ed25519 signature
+    Gateway->>Gateway: Apply route policy and rate limit
+
+    Gateway->>Upstream: Forward request with x-7h3-sender header
+    Upstream-->>Gateway: Return response
+    Gateway-->>Sender: Return response, optionally signed
 ```
 
 ### TTL and Nonce
