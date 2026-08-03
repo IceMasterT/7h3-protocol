@@ -1,6 +1,6 @@
-# GLUV Operators Guide
+# 7h3 Protocol Operators Guide
 
-This guide is for SRE, platform, and performance teams operating GLUV-backed workloads in production.
+This guide is for SRE, platform, and performance teams operating 7h3 Protocol-backed workloads in production.
 
 ---
 

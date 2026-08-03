@@ -1,6 +1,6 @@
 # 7h3 Protocol AIP Rust SDK
 
-Reference `aip/0.1` SDK in Rust (crate `aip7h3`) with shared conformance fixtures.
+Reference `7h3/0.1` SDK in Rust (crate `protocol-7h3`) with shared conformance fixtures.
 
 ## Included
 
@@ -10,8 +10,8 @@ Reference `aip/0.1` SDK in Rust (crate `aip7h3`) with shared conformance fixture
 - compact wire encode/decode
 - envelope validation helpers (version, required fields, TTL)
 - JSON-RPC bridge helpers for TASK/RESULT mapping
-- line-based MCP-style gateway runtime over signed AIP envelopes
-- conformance tests using `conformance/aip_v0_1.json`
+- line-based MCP-style gateway runtime over signed 7h3 envelopes
+- conformance tests using `conformance/7h3_v0_1.json`
 
 ## Run tests
 

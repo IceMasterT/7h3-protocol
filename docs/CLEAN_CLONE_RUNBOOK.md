@@ -5,13 +5,19 @@ Use this to verify deterministic setup from a fresh checkout.
 ## TypeScript path
 
 ```bash
-git clone https://github.com/IceMasterT/GLUV-Protocol.git
-cd GLUV-Protocol
-npm install
+git clone https://github.com/IceMasterT/7h3-protocol.git
+cd 7h3-protocol
+npm run install:all
 npm run lint
 npm run test
-npm run build
+npm run build:protocol
 ```
+
+The `sdk/pq` and `sdk/threshold` optional SDKs have their own lockfiles and are
+not covered by a plain root `npm install` — `install:all` restores them too, or
+the root test suite will fail to resolve `@noble/post-quantum` and `@noble/curves`
+imports. (`install:all` runs `npm install` before restoring the subpackages, so
+there's no need to run `npm install` separately first.)
 
 ## Conformance path
 

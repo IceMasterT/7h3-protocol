@@ -1,7 +1,7 @@
 # 7h3 Protocol — Gateway Quick-Start
 
 The 7h3 gateway is a verifying HTTP reverse proxy.  It sits in front of your
-service, intercepts every request, checks that the AIP envelope header carries
+service, intercepts every request, checks that the 7h3 envelope header carries
 a valid Ed25519 (or HMAC) signature from a known sender, enforces per-route
 policies and rate limits, optionally signs upstream responses, then forwards
 clean HTTP to your application.
@@ -14,12 +14,50 @@ clean HTTP to your application.
 npm install @7h3/protocol
 ```
 
-`tsx` is required to run the CLI from source.  It is listed as a dev
-dependency and is also installed globally in the Docker image.
+The published package ships a compiled CLI (`bin/7h3.js`), so `npx 7h3` works
+with no extra setup. Running the CLI from a source checkout (`bin/7h3.ts`)
+instead requires `tsx`, which is listed as a dev dependency:
 
 ```bash
-npm install -g tsx          # if running outside Docker
+npm install -g tsx          # only needed to run bin/7h3.ts from source
 ```
+
+The Docker image (see §4) runs the compiled `bin/7h3.js` directly and does not
+need `tsx` at all.
+
+---
+
+## 1.5. Production Safety
+
+Two footguns to know before you deploy:
+
+- **`defaultPolicy` defaults to `'allow'`.** If you don't set it, requests to
+  any route that doesn't match one of your `policies` are forwarded upstream
+  **without signature verification**. Production configs must set
+  `defaultPolicy: 'deny'` explicitly.
+- **Replay protection requires a shared `replayStore`.** Without one, the
+  gateway still verifies signatures and TTL, but nonce reuse is only deduped
+  in an in-memory cache scoped to a single instance — it does not survive a
+  restart, and it does nothing at all across multiple instances (e.g. a
+  Workers isolate that rebuilds the gateway on every request, or more than
+  one replica behind a load balancer).
+
+Use `createProductionGateway()` instead of `createGateway()` to turn both of
+these into deploy-time errors instead of silent runtime gaps:
+
+```ts
+import { createProductionGateway } from '@7h3/protocol/gateway'
+
+const gateway = createProductionGateway({
+  upstream: 'http://internal-api:3000',
+  keyRegistry: registry,
+  defaultPolicy: 'deny',   // throws if omitted or set to 'allow'
+  replayStore,             // throws if omitted — use Redis/KV/Durable Object
+})
+```
+
+See `cloudflare/DEPLOY.md` for the KV replay-store race-window caveat and the
+Durable Object option for atomic replay checks.
 
 ---
 
@@ -32,6 +70,7 @@ three lines:
 import express from 'express'
 import { createGateway } from '@7h3/protocol/gateway'
 import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
+import { RedisReplayStore } from '@7h3/protocol/replay'
 
 const app = express()
 
@@ -43,6 +82,7 @@ const gateway = createGateway({
   upstream: 'http://internal-api:3000',
   keyRegistry: registry,
   defaultPolicy: 'deny',
+  replayStore: new RedisReplayStore(redisClient), // required in production — see section 1.5
 })
 
 // Verify every request before it reaches your routes
@@ -136,7 +176,7 @@ See `7h3.example.yaml` for a fully-annotated configuration file.
 | `port` | number | `8080` | Listening port |
 | `sender` | string | — | Gateway sender identity for signed responses |
 | `sign_responses` | boolean | `false` | Sign every proxied response |
-| `default_policy` | `allow` \| `deny` | `allow` | Behaviour when no route policy matches |
+| `default_policy` | `allow` \| `deny` | `allow` | Behaviour when no route policy matches — **set to `deny` in production**, see §1.5 |
 | `keys.private_key` | string | — | Gateway Ed25519 private key (base64url PKCS8) |
 | `keys.registry` | map | `{}` | `senderID → publicKey` (base64url SPKI) |
 | `policies[].path` | glob string | _(required)_ | Route glob (`**` crosses slashes) |
@@ -150,7 +190,7 @@ See `7h3.example.yaml` for a fully-annotated configuration file.
 
 ## 6. Client-Side Signing
 
-Agents calling a 7h3-protected gateway must attach a signed AIP envelope to
+Agents calling a 7h3-protected gateway must attach a signed 7h3 envelope to
 every request.  Use the TypeScript SDK:
 
 ```ts

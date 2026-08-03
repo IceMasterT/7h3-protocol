@@ -67,6 +67,21 @@ edge-case signing or deserialization behavior are treated as high-value
 contributions. If a security firm ever wants to audit an open protocol pro
 bono, the door is open: tech@mysms.promo.
 
+## Checklist for Security-Sensitive Changes
+
+Before merging any change to signing, canonicalization, replay handling, or
+wire parsing, confirm:
+
+- [ ] Conformance vectors updated (`conformance/7h3_v0_1.json` and, if the
+      binary codec is affected, `conformance/7h3_v0_1_binary.json`)
+- [ ] Fuzz harnesses run (`npm run fuzz:ts`, `npm run fuzz:ts:decode`,
+      `npm run fuzz:ts:verify`; `npm run fuzz:rust:decode` and
+      `npm run fuzz:rust:canonicalize` for wire-format or canonicalization changes)
+- [ ] Cross-SDK tests pass (`npm run conformance:python`, `npm run conformance:rust`,
+      plus the root `npm test`)
+- [ ] Dependency audit reviewed (`npm audit` in the root, `cloudflare/`,
+      `mcp-server/`, `sdk/pq/`, and `sdk/threshold/`)
+
 ## Hall of Thanks
 
 Researchers who report valid, confirmed vulnerabilities will be acknowledged

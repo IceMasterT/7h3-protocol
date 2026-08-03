@@ -34,7 +34,7 @@ All three test suites must pass before a PR is mergeable.
 
 ## The Wire Version is Frozen
 
-`aip/0.1` is the current wire version, and **it is frozen**. This means:
+`7h3/0.1` is the current wire version, and **it is frozen**. This means:
 
 - The envelope schema (field names, types, required fields) cannot change
 - The canonicalization algorithm cannot change
@@ -50,7 +50,8 @@ changelog when possible.
 
 ## Conformance Fixtures
 
-The canonical fixture set lives at `conformance/aip_v0_1.json`. If your PR adds
+The canonical fixture set lives at `conformance/7h3_v0_1.json` (with a
+companion `conformance/7h3_v0_1_binary.json` for the binary wire format). If your PR adds
 or changes any signing behavior, canonicalization detail, or replay-safety logic,
 you must update this fixture file with vectors that cover the new behavior.
 
@@ -62,7 +63,7 @@ changes signing logic without updating fixtures will be rejected.
 1. Fork the repo and create a branch with a descriptive name
    (`fix/nonce-validation`, `feat/ed448-profile`, etc.)
 2. Make your changes and ensure all three test suites pass
-3. Update `conformance/aip_v0_1.json` if signing behavior changed
+3. Update `conformance/7h3_v0_1.json` if signing behavior changed
 4. Open a PR against `main` with a clear description of:
    - What the change does
    - Why it is needed

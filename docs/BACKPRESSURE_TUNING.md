@@ -1,6 +1,6 @@
 # Backpressure and Saturation Tuning
 
-This guide documents practical tuning for GLUV transport behavior under contention.
+This guide documents practical tuning for 7h3 Protocol transport behavior under contention.
 
 ## Baseline methodology
 

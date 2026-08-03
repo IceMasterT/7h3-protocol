@@ -1,6 +1,6 @@
 # Clock Skew Policy
 
-GLUV transport enforces a configurable future timestamp tolerance.
+7h3 Protocol transport enforces a configurable future timestamp tolerance.
 
 ## Default
 

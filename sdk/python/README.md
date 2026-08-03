@@ -1,6 +1,6 @@
 # 7h3 Protocol AIP Python SDK (Skeleton)
 
-Minimal reference SDK for `aip/0.1` parity with the TypeScript implementation.
+Minimal reference SDK for `7h3/0.1` parity with the TypeScript implementation.
 
 ## Included
 
@@ -9,7 +9,7 @@ Minimal reference SDK for `aip/0.1` parity with the TypeScript implementation.
 - ED25519 signing and verification (requires `cryptography` package)
 - compact wire encode/decode
 - envelope validation helpers (version, required fields, TTL)
-- conformance tests using shared vectors from `conformance/aip_v0_1.json`
+- conformance tests using shared vectors from `conformance/7h3_v0_1.json`
 
 ## Run conformance tests
 

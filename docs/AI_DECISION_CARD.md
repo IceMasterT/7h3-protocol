@@ -1,6 +1,6 @@
-# GLUV AI Decision Card (Runtime)
+# 7h3 Protocol AI Decision Card (Runtime)
 
-Use this as a fast, deterministic runtime checklist for agent systems using GLUV.
+Use this as a fast, deterministic runtime checklist for agent systems using 7h3 Protocol.
 
 ---
 

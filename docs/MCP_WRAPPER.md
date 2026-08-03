@@ -1,10 +1,10 @@
 # MCP Hardening Wrapper
 
 MCP messages are plain JSON-RPC 2.0 with no signature and no replay protection.
-This wrapper puts a signed AIP envelope around every MCP message on the wire —
+This wrapper puts a signed 7h3 envelope around every MCP message on the wire —
 authenticating it, TTL-bounding it, and replay-checking it — **without changing
 your MCP handler**. Your handler still receives plain JSON-RPC `{ method, params }`
-and returns plain results; AIP lives entirely on the wire.
+and returns plain results; 7h3 Protocol lives entirely on the wire.
 
 Source: `src/mcpWrapper.ts`. Runnable demo: `npm run aip:mcp:wrap`.
 
@@ -27,7 +27,7 @@ Source: `src/mcpWrapper.ts`. Runnable demo: `npm run aip:mcp:wrap`.
 import { wrapMcpServer, signEnvelopeHmac } from '@7h3/protocol'
 import { DistributedReplayCache, createRedisReplayStore } from '@7h3/protocol'
 
-// Your existing MCP handler — unchanged, AIP-unaware.
+// Your existing MCP handler — unchanged, 7h3-unaware.
 async function myMcpServer(request) {
   if (request.method === 'tools/call') return { jsonrpc: '2.0', id: request.id, result: runTool(request.params) }
   return { jsonrpc: '2.0', id: request.id, error: { code: -32601, message: 'Method not found' } }
@@ -35,9 +35,9 @@ async function myMcpServer(request) {
 
 const secured = wrapMcpServer(myMcpServer, {
   selfAgentId: 'agent.mcp-server',
-  sign: (e) => signEnvelopeHmac(e, process.env.AIP_SECRET!, 'server-k1'),
+  sign: (e) => signEnvelopeHmac(e, process.env.P7H3_SECRET!, 'server-k1'),
   receive: {
-    secretResolver: async () => process.env.AIP_SECRET!,
+    secretResolver: async () => process.env.P7H3_SECRET!,
     replayCache: new DistributedReplayCache(createRedisReplayStore(redisLikeClient)), // fleet-wide replay
   },
 })
@@ -63,16 +63,16 @@ Ed25519 server example (replace the HMAC `sign`/`receive` block above):
 ```ts
 import { wrapMcpServer, signEnvelopeEd25519 } from '@7h3/protocol'
 
-// Generate keys once: npx @7h3/protocol-mcp → aip_generate_keypair
-// Set AIP_PRIVATE_KEY (server) and distribute AIP_CLIENT_PUBLIC_KEY (client's pubkey)
+// Generate keys once: npx @7h3/protocol-mcp → 7h3_generate_keypair
+// Set P7H3_PRIVATE_KEY (server) and distribute P7H3_CLIENT_PUBLIC_KEY (client's pubkey)
 
 const secured = wrapMcpServer(myMcpServer, {
   selfAgentId: 'agent.mcp-server',
-  sign: (e) => signEnvelopeEd25519(e, process.env.AIP_PRIVATE_KEY!, 'k1'),
+  sign: (e) => signEnvelopeEd25519(e, process.env.P7H3_PRIVATE_KEY!, 'k1'),
   receive: {
     signatureResolver: async (sig) =>
       sig.alg === 'ED25519'
-        ? { alg: 'ED25519' as const, publicKey: process.env.AIP_CLIENT_PUBLIC_KEY! }
+        ? { alg: 'ED25519' as const, publicKey: process.env.P7H3_CLIENT_PUBLIC_KEY! }
         : undefined,
   },
 })
@@ -86,8 +86,8 @@ import { wrapMcpClient, signEnvelopeHmac } from '@7h3/protocol'
 const call = wrapMcpClient(transport.send /* (raw) => Promise<raw> */, {
   selfAgentId: 'agent.mcp-client',
   peerAgentId: 'agent.mcp-server',
-  sign: (e) => signEnvelopeHmac(e, process.env.AIP_SECRET!, 'client-k1'),
-  receive: { secretResolver: async () => process.env.AIP_SECRET! },
+  sign: (e) => signEnvelopeHmac(e, process.env.P7H3_SECRET!, 'client-k1'),
+  receive: { secretResolver: async () => process.env.P7H3_SECRET! },
 })
 
 const result = await call({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'planner' } })
@@ -152,8 +152,8 @@ to use the `binary` wire format over HTTP.
 
 ## Notes
 
-- Both peers must be wrapped: the on-wire message is an AIP envelope, not plain
-  JSON-RPC. For interop with un-wrapped MCP peers, terminate AIP at a gateway.
+- Both peers must be wrapped: the on-wire message is a 7h3 envelope, not plain
+  JSON-RPC. For interop with un-wrapped MCP peers, terminate 7h3 Protocol at a gateway.
 - `wireFormat` defaults to `compact`; use `binary` for the highest-throughput lanes.
 - Verification failures and replays come back as signed JSON-RPC errors
   (`-32600`), so the client still gets an authenticated, well-formed response.

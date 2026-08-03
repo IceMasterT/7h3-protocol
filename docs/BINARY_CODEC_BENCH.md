@@ -1,6 +1,6 @@
 # Binary Codec Benchmark
 
-GLUV includes a binary wire codec prototype in `src/protocolBinary.ts`.
+7h3 Protocol includes a binary wire codec prototype in `src/protocolBinary.ts`.
 
 ## Run comparison
 
