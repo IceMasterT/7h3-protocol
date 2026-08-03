@@ -13,6 +13,7 @@ jobs:
   publish-protocol:
     name: publish @7h3/protocol
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -59,6 +60,7 @@ jobs:
     name: publish @7h3/protocol-mcp
     needs: publish-protocol
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -83,6 +85,7 @@ jobs:
     name: publish @7h3/protocol-pq
     needs: publish-protocol
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -112,6 +115,7 @@ jobs:
     name: publish @7h3/protocol-threshold
     needs: publish-protocol
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -140,6 +144,7 @@ jobs:
   publish-crate:
     name: publish protocol-7h3 (crates.io, trusted publishing)
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: read
       id-token: write # OIDC token exchanged for a short-lived crates.io token — no long-lived secret
