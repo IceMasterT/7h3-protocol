@@ -31,6 +31,8 @@ jobs:
       - name: Publish @7h3/protocol
         run: npm publish --provenance --access public
         working-directory: dist/npm-protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-pypi:
     name: publish 7h3-protocol (PyPI, trusted publishing)
@@ -80,6 +82,8 @@ jobs:
       - name: Publish @7h3/protocol-mcp
         run: npm publish --provenance --access public
         working-directory: mcp-server
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-pq:
     name: publish @7h3/protocol-pq
@@ -110,6 +114,8 @@ jobs:
       - name: Publish @7h3/protocol-pq
         run: npm publish --provenance --access public
         working-directory: sdk/pq
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-threshold:
     name: publish @7h3/protocol-threshold
@@ -140,14 +146,15 @@ jobs:
       - name: Publish @7h3/protocol-threshold
         run: npm publish --provenance --access public
         working-directory: sdk/threshold
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-crate:
-    name: publish protocol-7h3 (crates.io, trusted publishing)
+    name: publish protocol-7h3 (crates.io)
     runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: read
-      id-token: write # OIDC token exchanged for a short-lived crates.io token — no long-lived secret
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -157,17 +164,13 @@ jobs:
       - name: Test
         run: cargo test --manifest-path sdk/rust/Cargo.toml
 
-      # Requires a one-time Trusted Publisher configuration on crates.io for
-      # this crate (Settings -> Trusted Publishing on the protocol-7h3 crate
-      # page): repository IceMasterT/7h3-protocol, workflow publish.yml. This
-      # can only be configured after the crate has been published at least
-      # once — protocol-7h3 already has releases on crates.io, so this is a
-      # one-time manual step, not a blocker for every future release.
-      - name: Authenticate with crates.io
-        id: auth
-        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
-
+      # CARGO_REGISTRY_TOKEN is a classic crates.io API token stored as a repo
+      # secret. Once a Trusted Publisher is configured for this crate
+      # (crates.io -> protocol-7h3 -> Settings -> Trusted Publishing ->
+      # repository IceMasterT/7h3-protocol, workflow publish.yml), this can
+      # switch to rust-lang/crates-io-auth-action (OIDC, no stored token) —
+      # see git history for the prior version of this job.
       - name: Publish protocol-7h3
         run: cargo publish --manifest-path sdk/rust/Cargo.toml
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
