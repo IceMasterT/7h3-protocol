@@ -28,7 +28,25 @@ jobs:
       - name: Build dist/npm-protocol
         run: npm run package:protocol
 
+      # Makes this job (and the tag push that triggers it) safe to retry: a
+      # partial release failure elsewhere used to require re-running this
+      # job too, which then failed on "cannot publish over previously
+      # published version" and cascaded into every `needs: publish-protocol`
+      # job being skipped instead of retried.
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: dist/npm-protocol
+
       - name: Publish @7h3/protocol
+        if: steps.check.outputs.exists == 'false'
         run: npm publish --provenance --access public
         working-directory: dist/npm-protocol
         env:
@@ -57,6 +75,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           packages-dir: sdk/python/dist
+          skip-existing: true
 
   publish-mcp:
     name: publish @7h3/protocol-mcp
@@ -79,7 +98,20 @@ jobs:
         run: npm run build
         working-directory: mcp-server
 
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: mcp-server
+
       - name: Publish @7h3/protocol-mcp
+        if: steps.check.outputs.exists == 'false'
         run: npm publish --provenance --access public
         working-directory: mcp-server
         env:
@@ -111,7 +143,20 @@ jobs:
           npm test
         working-directory: sdk/pq
 
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: sdk/pq
+
       - name: Publish @7h3/protocol-pq
+        if: steps.check.outputs.exists == 'false'
         run: npm publish --provenance --access public
         working-directory: sdk/pq
         env:
@@ -143,7 +188,20 @@ jobs:
           npm test
         working-directory: sdk/threshold
 
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: sdk/threshold
+
       - name: Publish @7h3/protocol-threshold
+        if: steps.check.outputs.exists == 'false'
         run: npm publish --provenance --access public
         working-directory: sdk/threshold
         env:
@@ -164,6 +222,17 @@ jobs:
       - name: Test
         run: cargo test --manifest-path sdk/rust/Cargo.toml
 
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(grep '^name' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+          VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
+          if curl -sf "https://crates.io/api/v1/crates/$NAME/$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # CARGO_REGISTRY_TOKEN is a classic crates.io API token stored as a repo
       # secret. Once a Trusted Publisher is configured for this crate
       # (crates.io -> protocol-7h3 -> Settings -> Trusted Publishing ->
@@ -171,6 +240,7 @@ jobs:
       # switch to rust-lang/crates-io-auth-action (OIDC, no stored token) —
       # see git history for the prior version of this job.
       - name: Publish protocol-7h3
+        if: steps.check.outputs.exists == 'false'
         run: cargo publish --manifest-path sdk/rust/Cargo.toml
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
