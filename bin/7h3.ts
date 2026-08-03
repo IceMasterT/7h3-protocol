@@ -42,7 +42,7 @@ async function cmdKeygen(argv: string[]): Promise<void> {
     strict: false,
   })
 
-  const { generateEd25519KeypairBase64Url } = await import('../src/protocol.js')
+  const { generateEd25519KeypairBase64Url } = await import('@7h3/protocol')
   const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
 
   const result = {
@@ -86,7 +86,7 @@ async function cmdSign(argv: string[]): Promise<void> {
   if (!privateKey) die('--private-key is required')
   if (!sender) die('--sender is required')
 
-  const { createEnvelope, signEnvelopeEd25519 } = await import('../src/protocol.js')
+  const { createEnvelope, signEnvelopeEd25519 } = await import('@7h3/protocol')
 
   const envelope = createEnvelope({
     sender: sender!,
@@ -116,7 +116,7 @@ async function cmdVerify(argv: string[]): Promise<void> {
   if (!publicKey) die('--public-key is required')
   if (!envelopeJson) die('--envelope is required')
 
-  const { validateEnvelope, verifyEnvelopeEd25519 } = await import('../src/protocol.js')
+  const { validateEnvelope, verifyEnvelopeEd25519 } = await import('@7h3/protocol')
 
   let envelope: ReturnType<typeof JSON.parse>
   try {
@@ -229,8 +229,8 @@ async function cmdGateway(argv: string[]): Promise<void> {
   const metricsPortRaw = values['metrics-port'] as string | undefined
   const metricsPort = metricsPortRaw ? parseInt(metricsPortRaw, 10) : undefined
 
-  const { createGateway } = await import('../src/gateway.js')
-  const { createStaticKeyRegistry } = await import('../src/keyRegistry.js')
+  const { createGateway } = await import('@7h3/protocol/gateway')
+  const { createStaticKeyRegistry } = await import('@7h3/protocol/key-registry')
 
   const keys: Record<string, string> = {}
   if (publicKey && sender) keys[sender] = publicKey
@@ -284,7 +284,7 @@ async function cmdGateway(argv: string[]): Promise<void> {
 
   // Optional: dedicated metrics server
   if (metricsPort !== undefined) {
-    const { metrics: globalMetrics, renderPrometheusText } = await import('../src/telemetry.js')
+    const { metrics: globalMetrics, renderPrometheusText } = await import('@7h3/protocol/telemetry')
     const metricsServer = createServer((req, res) => {
       if (req.url === '/metrics' && req.method === 'GET') {
         const body = renderPrometheusText(globalMetrics)
@@ -316,7 +316,7 @@ async function cmdKeysServe(argv: string[]): Promise<void> {
   const keyId = (values['key-id'] as string | undefined) ?? 'default'
   const port = parseInt((values['port'] as string | undefined) ?? '8081', 10)
 
-  const { serveWellKnownKeys } = await import('../src/keyInfra.js')
+  const { serveWellKnownKeys } = await import('@7h3/protocol/keys')
 
   const doc = {
     version: '7h3/0.1' as const,

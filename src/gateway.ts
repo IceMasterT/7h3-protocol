@@ -58,6 +58,23 @@ class Protocol7h3Gateway {
   constructor(config: GatewayConfig) {
     this.config = config
     this.rateLimiter = new SlidingWindowRateLimiter()
+
+    // A gateway with at least one signature-requiring policy but no shared
+    // replayStore verifies signatures/TTL but never dedupes nonce reuse, and
+    // silently loses that protection entirely once more than one instance is
+    // running (e.g. a Workers isolate rebuilding the gateway per request).
+    // Warn once at construction rather than fail, since a single-instance
+    // in-memory-only deployment (e.g. local dev) is a legitimate use case.
+    if (
+      !config.replayStore &&
+      (config.policies ?? []).some((p) => p.require !== 'none')
+    ) {
+      console.warn(
+        '[7h3-protocol] createGateway(): no replayStore configured with signature-requiring policies. ' +
+          'Nonce/replay protection will not survive multiple gateway instances or restarts. ' +
+          'See docs/GATEWAY.md#production-safety.',
+      )
+    }
   }
 
   async verify(req: GatewayRequest): Promise<GatewayVerifyOutcome> {
@@ -250,6 +267,30 @@ class Protocol7h3Gateway {
 }
 
 export function createGateway(config: GatewayConfig): Protocol7h3Gateway {
+  return new Protocol7h3Gateway(config)
+}
+
+/**
+ * Hardened preset for production deployments: fails fast (rather than
+ * silently falling back to permissive defaults) if `defaultPolicy` isn't
+ * explicitly `'deny'` or `replayStore` isn't configured. Use this instead of
+ * `createGateway()` wherever a misconfiguration should be a deploy-time error,
+ * not a runtime security gap discovered later.
+ */
+export function createProductionGateway(config: GatewayConfig): Protocol7h3Gateway {
+  if (config.defaultPolicy !== 'deny') {
+    throw new Error(
+      "createProductionGateway(): defaultPolicy must be explicitly 'deny'. " +
+        "Unmatched routes must never be forwarded unverified in production.",
+    )
+  }
+  if (!config.replayStore) {
+    throw new Error(
+      'createProductionGateway(): replayStore is required. ' +
+        'Use a shared store (Redis/KV/Durable Object) so nonce replay protection ' +
+        'survives multiple instances and restarts.',
+    )
+  }
   return new Protocol7h3Gateway(config)
 }
 

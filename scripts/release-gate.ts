@@ -6,7 +6,7 @@ const commands: Array<[string, string[]]> = [
   ['npm', ['run', 'build:protocol']],
   ['npm', ['run', 'lint']],
   ['npm', ['run', 'bench:wire:quick']],
-  ['npm', ['run', 'bench:openloop:adaptive:ci']],
+  ['npm', ['run', 'bench:openloop:quick', '--', '--allow-unsafe-http']],
 ]
 
 for (const [command, args] of commands) {

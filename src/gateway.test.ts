@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest'
-import { createGateway, type GatewayRequest } from './gateway'
+import { createGateway, createProductionGateway, type GatewayRequest } from './gateway'
 import { createStaticKeyRegistry } from './keyRegistry'
 import { generateEd25519KeypairBase64Url, createEnvelope, signEnvelopeEd25519, signEnvelopeHmac } from './protocol'
 import { SlidingWindowRateLimiter, type RateLimitStore } from './rateLimiter'
+import type { ReplayStore } from './replayStores'
+
+const noopReplayStore: ReplayStore = { check: async () => false }
 
 let senderKeys: { publicKey: string; privateKey: string }
 let gatewayKeys: { publicKey: string; privateKey: string }
@@ -43,6 +46,67 @@ describe('createGateway', () => {
     })
     expect(typeof gw.getRateLimiter).toBe('function')
     expect(gw.getRateLimiter()).toBeDefined()
+  })
+
+  it('warns when a signature-requiring policy is configured with no replayStore', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      policies: [{ path: '/api/**', require: 'ed25519' }],
+    })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no replayStore configured'))
+    warnSpy.mockRestore()
+  })
+
+  it('does not warn when replayStore is configured', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      policies: [{ path: '/api/**', require: 'ed25519' }],
+      replayStore: noopReplayStore,
+    })
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('does not warn when every policy has require: none', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      policies: [{ path: '/health', require: 'none' }],
+    })
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+})
+
+describe('createProductionGateway', () => {
+  const baseConfig = {
+    upstream: 'http://upstream',
+    keyRegistry: createStaticKeyRegistry({}),
+  }
+
+  it('throws when defaultPolicy is not explicitly deny', () => {
+    expect(() => createProductionGateway({ ...baseConfig, replayStore: noopReplayStore })).toThrow(
+      /defaultPolicy must be explicitly 'deny'/,
+    )
+    expect(() =>
+      createProductionGateway({ ...baseConfig, defaultPolicy: 'allow', replayStore: noopReplayStore }),
+    ).toThrow(/defaultPolicy must be explicitly 'deny'/)
+  })
+
+  it('throws when replayStore is missing', () => {
+    expect(() => createProductionGateway({ ...baseConfig, defaultPolicy: 'deny' })).toThrow(
+      /replayStore is required/,
+    )
+  })
+
+  it('returns a gateway when defaultPolicy is deny and replayStore is set', () => {
+    const gw = createProductionGateway({ ...baseConfig, defaultPolicy: 'deny', replayStore: noopReplayStore })
+    expect(typeof gw.verify).toBe('function')
   })
 })
 

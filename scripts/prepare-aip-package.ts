@@ -1,8 +1,14 @@
-import { mkdir, readFile, writeFile, copyFile, readdir } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, copyFile, readdir, access } from 'node:fs/promises'
 import process from 'node:process'
+
+interface RootExportEntry {
+  types?: string
+  import?: string
+}
 
 interface RootPackageJson {
   version?: string
+  exports?: Record<string, RootExportEntry>
 }
 
 function parseVersionArg(argv: string[]): string | undefined {
@@ -11,14 +17,42 @@ function parseVersionArg(argv: string[]): string | undefined {
   return argv[idx + 1]
 }
 
-async function readRootVersion(): Promise<string> {
+async function readRootPackageJson(): Promise<RootPackageJson> {
   const raw = await readFile('package.json', 'utf8')
-  const parsed = JSON.parse(raw) as RootPackageJson
-  return parsed.version ?? '0.0.0'
+  return JSON.parse(raw) as RootPackageJson
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// The root package.json's "exports" map is the source of truth for which
+// subpaths (@7h3/protocol/gateway, /http, ...) are public API. Every one of
+// them resolves ("import" condition) to the single bundled dist/protocol/index.js
+// produced by vite.lib.config.ts — there is no per-module JS output — while
+// "types" keeps pointing at the per-module .d.ts file so editors/tsc still see
+// the narrower per-subpath type surface. The generated publish package must
+// mirror this shape exactly, or documented subpath imports 404 after publish.
+function buildExportsMap(rootExports: Record<string, RootExportEntry>): Record<string, RootExportEntry> {
+  const exportsMap: Record<string, RootExportEntry> = {}
+  for (const [subpath, entry] of Object.entries(rootExports)) {
+    const typesFile = entry.types ? entry.types.replace('./dist/protocol/', './') : undefined
+    exportsMap[subpath] = {
+      types: typesFile,
+      import: './index.js',
+    }
+  }
+  return exportsMap
 }
 
 async function main(): Promise<void> {
-  const version = parseVersionArg(process.argv) ?? (await readRootVersion())
+  const rootPackageJson = await readRootPackageJson()
+  const version = parseVersionArg(process.argv) ?? rootPackageJson.version ?? '0.0.0'
   const outDir = 'dist/npm-protocol'
 
   await mkdir(outDir, { recursive: true })
@@ -33,6 +67,22 @@ async function main(): Promise<void> {
     }
   }
 
+  const files = ['index.js', '*.d.ts', 'README.md', 'LICENSE', 'NOTICE']
+
+  // The CLI binary is optional: scripts/build-cli.ts must have run first
+  // (package:protocol wires it in via `npm run build:cli`). Ship it only if
+  // present rather than failing the whole package step when it's missing.
+  const cliBuilt = await fileExists('bin/7h3.js')
+  let bin: Record<string, string> | undefined
+  if (cliBuilt) {
+    await mkdir(`${outDir}/bin`, { recursive: true })
+    await copyFile('bin/7h3.js', `${outDir}/bin/7h3.js`)
+    files.push('bin/7h3.js')
+    bin = { '7h3': './bin/7h3.js' }
+  } else {
+    console.warn('bin/7h3.js not found — run `npm run build:cli` first. Publishing without the CLI binary.')
+  }
+
   const packageJson = {
     name: '@7h3/protocol',
     version,
@@ -40,13 +90,9 @@ async function main(): Promise<void> {
     type: 'module',
     main: './index.js',
     types: './index.d.ts',
-    exports: {
-      '.': {
-        import: './index.js',
-        types: './index.d.ts',
-      },
-    },
-    files: ['index.js', '*.d.ts', 'README.md', 'LICENSE', 'NOTICE'],
+    exports: buildExportsMap(rootPackageJson.exports ?? {}),
+    ...(bin ? { bin } : {}),
+    files,
     license: 'Apache-2.0',
     repository: {
       type: 'git',

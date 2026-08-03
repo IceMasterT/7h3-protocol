@@ -17,75 +17,75 @@
     },
     "./http": {
       "types": "./dist/protocol/httpBinding.d.ts",
-      "import": "./dist/protocol/httpBinding.js"
+      "import": "./dist/protocol/index.js"
     },
     "./webhook": {
       "types": "./dist/protocol/webhookBinding.d.ts",
-      "import": "./dist/protocol/webhookBinding.js"
+      "import": "./dist/protocol/index.js"
     },
     "./queue": {
       "types": "./dist/protocol/queueBinding.d.ts",
-      "import": "./dist/protocol/queueBinding.js"
+      "import": "./dist/protocol/index.js"
     },
     "./ws": {
       "types": "./dist/protocol/wsBinding.d.ts",
-      "import": "./dist/protocol/wsBinding.js"
+      "import": "./dist/protocol/index.js"
     },
     "./grpc": {
       "types": "./dist/protocol/grpcBinding.d.ts",
-      "import": "./dist/protocol/grpcBinding.js"
+      "import": "./dist/protocol/index.js"
     },
     "./keys": {
       "types": "./dist/protocol/keyInfra.d.ts",
-      "import": "./dist/protocol/keyInfra.js"
+      "import": "./dist/protocol/index.js"
     },
     "./key-registry": {
       "types": "./dist/protocol/keyRegistry.d.ts",
-      "import": "./dist/protocol/keyRegistry.js"
+      "import": "./dist/protocol/index.js"
     },
     "./gateway": {
       "types": "./dist/protocol/gateway.d.ts",
-      "import": "./dist/protocol/gateway.js"
+      "import": "./dist/protocol/index.js"
     },
     "./audit-log": {
       "types": "./dist/protocol/auditLog.d.ts",
-      "import": "./dist/protocol/auditLog.js"
+      "import": "./dist/protocol/index.js"
     },
     "./signed-response": {
       "types": "./dist/protocol/signedResponse.d.ts",
-      "import": "./dist/protocol/signedResponse.js"
+      "import": "./dist/protocol/index.js"
     },
     "./rate-limiter": {
       "types": "./dist/protocol/rateLimiter.d.ts",
-      "import": "./dist/protocol/rateLimiter.js"
+      "import": "./dist/protocol/index.js"
     },
     "./route-policy": {
       "types": "./dist/protocol/routePolicy.d.ts",
-      "import": "./dist/protocol/routePolicy.js"
+      "import": "./dist/protocol/index.js"
     },
     "./encryption": {
       "types": "./dist/protocol/encryption.d.ts",
-      "import": "./dist/protocol/encryption.js"
+      "import": "./dist/protocol/index.js"
     },
     "./capability": {
       "types": "./dist/protocol/capability.d.ts",
-      "import": "./dist/protocol/capability.js"
+      "import": "./dist/protocol/index.js"
     },
     "./stream": {
       "types": "./dist/protocol/stream.d.ts",
-      "import": "./dist/protocol/stream.js"
+      "import": "./dist/protocol/index.js"
     },
     "./telemetry": {
       "types": "./dist/protocol/telemetry.d.ts",
-      "import": "./dist/protocol/telemetry.js"
+      "import": "./dist/protocol/index.js"
     },
     "./cbor": {
       "types": "./dist/protocol/envelopeCbor.d.ts",
-      "import": "./dist/protocol/envelopeCbor.js"
+      "import": "./dist/protocol/index.js"
     },
     "./replay": {
       "types": "./dist/protocol/replayStores.d.ts",
-      "import": "./dist/protocol/replayStores.js"
+      "import": "./dist/protocol/index.js"
     }
   },
   "repository": {
@@ -96,12 +96,15 @@
     "7h3": "./bin/7h3.js"
   },
   "scripts": {
-    "cli:help": "tsx bin/7h3.ts help",
-    "cli:keygen": "tsx bin/7h3.ts keygen",
+    "install:all": "npm install && npm --prefix sdk/pq ci && npm --prefix sdk/threshold ci",
+    "cli:help": "npm run build:protocol && tsx bin/7h3.ts help",
+    "cli:keygen": "npm run build:protocol && tsx bin/7h3.ts keygen",
     "lint": "eslint .",
     "test": "vitest run",
     "build:protocol": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
-    "package:protocol": "npm run build:protocol && tsx scripts/prepare-aip-package.ts",
+    "build:cli": "tsx scripts/build-cli.ts",
+    "package:protocol": "npm run build:protocol && npm run build:cli && tsx scripts/prepare-aip-package.ts",
+    "package:protocol:smoke": "tsx scripts/smoke-test-package.ts",
     "bench:protocol": "vitest bench src/protocol.bench.ts",
     "bench:e2e:quick": "tsx scripts/bench-protocol-e2e.ts --profile quick",
     "bench:e2e:full": "tsx scripts/bench-protocol-e2e.ts --profile full",
@@ -121,7 +124,7 @@
     "bench:replay:full": "tsx scripts/bench-replay-cache.ts --profile full",
     "conformance:binary": "tsx scripts/build-binary-conformance.ts",
     "release:gate": "tsx scripts/release-gate.ts",
-    "policy:validate": "tsx scripts/validate-runtime-policy.ts",
+    "policy:validate": "tsx scripts/validate-runtime-policy.ts docs/AI_RUNTIME_POLICY.json",
     "canary:plan": "tsx scripts/canary-rollout.ts",
     "release:dashboard": "tsx scripts/build-release-dashboard.ts",
     "bench:diff": "tsx scripts/bench-diff.ts",

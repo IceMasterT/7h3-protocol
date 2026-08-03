@@ -1,7 +1,8 @@
 # ---------------------------------------------------------------------------
 # Stage 1 — builder
 # Install all dependencies (including devDeps for the build step) and
-# compile TypeScript sources.  The compiled output ends up in /app/dist.
+# compile TypeScript sources.  The compiled output ends up in /app/dist and
+# /app/bin/7h3.js.
 # ---------------------------------------------------------------------------
 FROM node:22-alpine AS builder
 
@@ -17,28 +18,22 @@ RUN npm ci --prefer-offline
 # Copy the full source tree
 COPY src/ src/
 COPY bin/ bin/
-COPY tsconfig.json tsconfig.lib.json ./
+COPY scripts/build-cli.ts ./scripts/build-cli.ts
+COPY tsconfig.json tsconfig.lib.json tsconfig.bin.json ./
 COPY vite.lib.config.ts ./
 
-# Run the build script if it exists; swallow the error gracefully so that
-# repositories that haven't wired up the build step yet still produce a
-# working image.  The runtime stage uses tsx to execute TypeScript directly,
-# so a missing dist/ is not fatal.
-RUN npm run build:protocol 2>/dev/null || true
+# Build must succeed — the runtime stage below ships the compiled CLI
+# (bin/7h3.js) and library bundle (dist/protocol/index.js), not TypeScript
+# source, so a broken build here must fail the image build, not silently
+# produce a runtime that fails on its first request instead.
+RUN npm run build:protocol && npm run build:cli
 
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime
-# Lean image with only production dependencies.
-# tsx executes TypeScript directly, so we don't strictly need dist/; the
-# builder stage is kept separate to avoid polluting the final image with
-# devDependencies and intermediate build artefacts.
+# Lean image with only production dependencies and compiled output — no
+# devDependencies, no TypeScript source, no tsx runtime required.
 # ---------------------------------------------------------------------------
 FROM node:22-alpine
-
-# Install tsx globally so the ENTRYPOINT can invoke TypeScript files.
-# Pinning via the package.json range is intentional — renovate will keep
-# this in sync with the devDependency version.
-RUN npm install -g tsx
 
 WORKDIR /app
 
@@ -48,13 +43,9 @@ COPY package.json package-lock.json ./
 # Production-only install; omits devDependencies such as vitest and vite
 RUN npm ci --omit=dev --prefer-offline
 
-# Copy the source files required at runtime
-COPY src/ src/
-COPY bin/ bin/
-
-# Copy compiled output from the builder stage (used when tsx is not
-# available or when --no-tsx mode is added in future).
+# Copy compiled output from the builder stage.
 COPY --from=builder /app/dist/ dist/
+COPY --from=builder /app/bin/7h3.js bin/7h3.js
 
 # The gateway listens on this port by default.
 EXPOSE 8080
@@ -65,8 +56,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:8080/health || exit 1
 
-# Run the gateway sub-command of the 7h3 CLI.
-ENTRYPOINT ["tsx", "bin/7h3.ts", "gateway"]
+# Run the gateway sub-command of the compiled 7h3 CLI.
+ENTRYPOINT ["node", "bin/7h3.js", "gateway"]
 
 # Default arguments — overridden at runtime via docker-compose environment
 # variables or explicit docker run arguments.

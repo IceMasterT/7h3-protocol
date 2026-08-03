@@ -1,6 +1,6 @@
 # 7h3 Protocol — Docker Compose development stack
 # Brings up:
-#   gateway — verifying AIP proxy (port 8080)
+#   gateway — verifying 7h3 Protocol proxy (port 8080)
 #   api     — minimal example upstream (port 3000, internal only)
 #
 # Quick start:
@@ -45,7 +45,7 @@ services:
   #
   # This is a self-contained inline Node.js server that demonstrates the
   # headers the gateway injects after successful envelope verification:
-  #   x-7h3-sender   — verified sender identity from the AIP envelope
+  #   x-7h3-sender   — verified sender identity from the 7h3 envelope
   #   x-7h3-verified — always "true" when the gateway passed the request
   #
   # Replace this service with your actual application in production.
