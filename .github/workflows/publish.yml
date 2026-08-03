@@ -227,7 +227,7 @@ jobs:
         run: |
           NAME=$(grep '^name' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
           VERSION=$(grep '^version' sdk/rust/Cargo.toml | head -1 | cut -d'"' -f2)
-          if curl -sf "https://crates.io/api/v1/crates/$NAME/$VERSION" >/dev/null 2>&1; then
+          if curl -sf -H "User-Agent: $NAME-publish-check (github-actions)" "https://crates.io/api/v1/crates/$NAME/$VERSION" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
