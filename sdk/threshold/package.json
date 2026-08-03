@@ -36,5 +36,9 @@
     "bls12-381",
     "m-of-n",
     "multisig"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IceMasterT/7h3-protocol.git"
+  }
 }
