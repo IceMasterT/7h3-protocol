@@ -5,10 +5,10 @@
     "moduleResolution": "bundler",
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "../../../",
+    "rootDir": "./src",
     "strict": true,
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/index.ts", "../../../src/protocol.ts"]
+  "include": ["src/index.ts"]
 }

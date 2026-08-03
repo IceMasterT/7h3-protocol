@@ -1,11 +1,11 @@
 import { ml_dsa65, ml_dsa87 } from '@noble/post-quantum/ml-dsa.js'
 
 // Re-export from @7h3/protocol
-export type { ProtocolEnvelope, ProtocolHeader, ProtocolBody } from '../../../src/protocol.js'
-export { canonicalizeEnvelope, createEnvelope } from '../../../src/protocol.js'
+export type { ProtocolEnvelope, ProtocolHeader, ProtocolBody } from '@7h3/protocol'
+export { canonicalizeEnvelope, createEnvelope } from '@7h3/protocol'
 
-import type { ProtocolEnvelope, ProtocolHeader, ProtocolBody } from '../../../src/protocol.js'
-import { canonicalizeEnvelope } from '../../../src/protocol.js'
+import type { ProtocolEnvelope, ProtocolHeader, ProtocolBody } from '@7h3/protocol'
+import { canonicalizeEnvelope } from '@7h3/protocol'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

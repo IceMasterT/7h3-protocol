@@ -1,14 +1,14 @@
 {
   "name": "@7h3/protocol-pq",
-  "version": "0.5.0",
+  "version": "0.5.4",
   "description": "7h3 Protocol — Post-quantum signatures (ML-DSA-65, ML-DSA-87) via @noble/post-quantum",
   "type": "module",
-  "main": "./index.js",
-  "types": "./index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "dependencies": {
@@ -32,7 +32,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run src/index.test.ts"
+    "test": "vitest run src/index.test.ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
