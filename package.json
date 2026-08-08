@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "7h3 Protocol: deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python/Rust parity. Wire version 7h3/0.1.",
   "type": "module",
   "license": "Apache-2.0",

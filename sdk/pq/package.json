@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol-pq",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "7h3 Protocol — Post-quantum signatures (ML-DSA-65, ML-DSA-87) via @noble/post-quantum",
   "type": "module",
   "main": "./dist/index.js",
