@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol-mcp",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "MCP server for @7h3/protocol — install into Claude to generate 7h3 secrets, keypairs, server boilerplate, and framework scaffolds",
   "type": "module",
   "main": "./dist/index.js",
