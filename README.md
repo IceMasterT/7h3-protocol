@@ -8,7 +8,7 @@
   [![npm threshold](https://img.shields.io/npm/v/@7h3/protocol-threshold?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-threshold)](https://www.npmjs.com/package/@7h3/protocol-threshold)
   [![PyPI](https://img.shields.io/pypi/v/7h3-protocol?style=flat-square&color=818cf8&logo=python&logoColor=white)](https://pypi.org/project/7h3-protocol/)
   [![Crates.io](https://img.shields.io/crates/v/protocol-7h3?style=flat-square&color=a5b4fc&logo=rust&logoColor=white)](https://crates.io/crates/protocol-7h3)
-  [![Tests](https://img.shields.io/badge/tests-428%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
+  [![Tests](https://img.shields.io/badge/tests-478%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
   [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
   [![Wire](https://img.shields.io/badge/wire-7h3%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
   [![License](https://img.shields.io/badge/license-Apache--2.0-94a3b8?style=flat-square)](./LICENSE)
@@ -76,7 +76,7 @@ The gap these protocols share is identical: they authenticate *agents* at the co
 
 7h3 Protocol wraps every message — regardless of transport — in a **signed envelope**. The envelope is compact, deterministic, and verifiable by any peer that holds the sender's public key.
 
-**v0.5.0 feature set:**
+**Feature set:**
 
 | Feature | Mechanism |
 |---|---|
@@ -196,7 +196,7 @@ pnpm add @7h3/protocol
 yarn add @7h3/protocol
 ```
 
-Requires Node.js ≥ 18. Zero runtime dependencies — uses Node.js built-in `crypto` throughout.
+Requires Node.js ≥ 20 (CI tests on Node 22). Zero runtime dependencies — uses Node.js built-in `crypto` throughout.
 
 ### Python
 
@@ -207,10 +207,13 @@ pip install 7h3-protocol
 Requires Python ≥ 3.9. Optional extras for advanced features:
 
 ```bash
-pip install 7h3-protocol[redis]    # RedisReplayStore (pip install redis)
-pip install 7h3-protocol[crypto]   # X25519 + ChaCha20 encryption (pip install cryptography)
-pip install 7h3-protocol[pq]       # ML-DSA post-quantum (pip install dilithium-py)
+pip install 7h3-protocol[crypto]   # X25519 + ChaCha20 encryption (cryptography)
+pip install 7h3-protocol[nacl]     # Alternative crypto backend (PyNaCl)
 ```
+
+`RedisReplayStore` and ML-DSA post-quantum support have no dedicated extra — install their
+backends directly (`pip install redis`, `pip install dilithium-py`); each module raises a clear
+`ImportError` telling you which package it needs if it's missing.
 
 ### Rust
 
@@ -267,18 +270,20 @@ const sender   = await generateEd25519KeypairBase64Url()
 const receiver = await generateEd25519KeypairBase64Url()
 
 // 2. Create and sign a message
-const envelope = createEnvelope('agent.alpha', {
+const envelope = createEnvelope({
+  sender:  'agent.alpha',
   intent:  'TASK',
   content: 'summarize https://example.com',
-}, { ttlMs: 60_000 })
+  ttlMs:   60_000,
+})
 
 const signed = await signEnvelopeEd25519(envelope, sender.privateKey, 'key-1')
 
 // 3. Transmit `signed` via any transport (HTTP header, WS frame, queue, etc.)
 
 // 4. Verify on the receiving end
-const result = await verifyEnvelopeEd25519(signed, sender.publicKey)
-if (!result.ok) throw new Error(result.error)
+const ok = await verifyEnvelopeEd25519(signed, sender.publicKey)
+if (!ok) throw new Error('signature verification failed')
 
 console.log('Verified sender:', signed.header.sender)  // 'agent.alpha'
 ```
@@ -301,19 +306,33 @@ const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
 
 **Python:**
 
-```python
-from protocol_7h3 import generate_keypair
+The Python SDK has no built-in keygen helper — generate directly with `cryptography`
+(PKCS8 private / SPKI public, base64url-encoded, matching every other SDK's key format):
 
-public_key, private_key = generate_keypair()
+```python
+import base64
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import serialization
+
+b64 = lambda b: base64.urlsafe_b64encode(b).decode('ascii').rstrip('=')
+
+priv = Ed25519PrivateKey.generate()
+private_key = b64(priv.private_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption(),
+))
+public_key = b64(priv.public_key().public_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+))
 ```
 
 **Rust:**
 
-```rust
-use protocol_7h3::generate_keypair;
-
-let (public_key, private_key) = generate_keypair().unwrap();
-```
+The Rust SDK only parses PKCS8/SPKI keys — it has no keygen helper either. Generate a
+keypair with the CLI (`npx 7h3 keygen`) or another SDK, then pass the resulting
+base64url strings into `sign_envelope_ed25519` / `verify_envelope_ed25519` (see below).
 
 **Go:**
 
@@ -336,20 +355,16 @@ const { publicKey, privateKey } = await generateKeypair()
 ```ts
 import { createEnvelope } from '@7h3/protocol'
 
-const envelope = createEnvelope(
-  'agent.alpha',              // sender ID
-  {
-    intent:        'TASK',
-    content:       'do something',
-    capability:    'task.plan',     // optional
-    correlationId: 'req-123',       // optional
-  },
-  {
-    ttlMs:     60_000,              // 1 minute (default: 60000)
-    recipient: 'agent.beta',        // optional
-    messageId: 'custom-uuid',       // optional — auto-generated if omitted
-  }
-)
+const envelope = createEnvelope({
+  sender:        'agent.alpha',
+  intent:        'TASK',
+  content:       'do something',
+  capability:    'task.plan',     // optional
+  correlationId: 'req-123',       // optional
+  ttlMs:         60_000,          // default: 60000 (1 minute)
+  recipient:     'agent.beta',    // optional
+  messageId:     'custom-uuid',   // optional — auto-generated if omitted
+})
 ```
 
 ### Signing
@@ -386,14 +401,15 @@ signed = sign_envelope_hmac(envelope, shared_secret, 'k1')
 ```rust
 use protocol_7h3::{sign_envelope_ed25519, sign_envelope_hmac};
 
-let signed = sign_envelope_ed25519(&envelope, &private_key, "k1")?;
-let signed = sign_envelope_hmac(&envelope, &shared_secret, "k1")?;
+let signed = sign_envelope_ed25519(&envelope, &private_key, "k1")?;   // Result<_, String>
+let signed = sign_envelope_hmac(&envelope, &shared_secret, "k1");     // infallible, no `?`
 ```
 
 **Go:**
 
 ```go
-signed, err := go7h3.SignEnvelopeEd25519(env, privateKey, "k1")
+// Ed25519: keyId is derived internally from the public key, not passed in
+signed, err := go7h3.SignEnvelopeEd25519(env, privateKey)
 signed, err := go7h3.SignEnvelopeHmac(env, sharedSecret, "k1")
 ```
 
@@ -404,20 +420,22 @@ signed, err := go7h3.SignEnvelopeHmac(env, sharedSecret, "k1")
 ```ts
 import { verifyEnvelopeEd25519, verifyEnvelopeHmac } from '@7h3/protocol'
 
-const result = await verifyEnvelopeEd25519(signed, publicKey)
-// { ok: true }  or  { ok: false, error: 'TTL expired' | 'signature verification failed' | ... }
+const ok = await verifyEnvelopeEd25519(signed, publicKey)  // Promise<boolean>
+if (!ok) throw new Error('signature verification failed')
 
-const result2 = await verifyEnvelopeHmac(signed, sharedSecret)
+const ok2 = await verifyEnvelopeHmac(signed, sharedSecret)
 ```
+
+Signature validity alone doesn't check TTL expiry or required fields — call
+`validateEnvelope(signed)` (returns `ProtocolDiagnostic[]`) alongside verification for full checks.
 
 **Python:**
 
 ```python
 from protocol_7h3 import verify_envelope_ed25519
 
-result = verify_envelope_ed25519(signed, public_key)
-if not result['ok']:
-    raise ValueError(result['error'])
+if not verify_envelope_ed25519(signed, public_key):  # returns bool
+    raise ValueError('signature verification failed')
 ```
 
 **Rust:**
@@ -447,17 +465,15 @@ The signed envelope travels as a JSON value in the `x-7h3-envelope` header.
 **Signing outbound requests:**
 
 ```ts
-import { signHttpRequest } from '@7h3/protocol'
+import { createEnvelope, signHttpRequest } from '@7h3/protocol'
 
-const headers = await signHttpRequest({
-  method:     'POST',
-  url:        'https://api.example.com/action',
-  body:       JSON.stringify(payload),
-  sender:     'agent.alpha',
-  privateKey: myPrivateKey,
-  keyId:      'k1',
-  intent:     'TASK',
+const envelope = createEnvelope({
+  sender:  'agent.alpha',
+  intent:  'TASK',
+  content: JSON.stringify(payload),
 })
+
+const { headers } = await signHttpRequest(envelope, myPrivateKey)
 
 await fetch('https://api.example.com/action', {
   method:  'POST',
@@ -469,14 +485,14 @@ await fetch('https://api.example.com/action', {
 **Verifying inbound requests (Express middleware):**
 
 ```ts
-import { verifyHttpEnvelope } from '@7h3/protocol'
+import { verifyHttpEnvelope, createStaticKeyRegistry } from '@7h3/protocol'
+
+const keyRegistry = createStaticKeyRegistry(keyStore)   // { [senderId]: publicKey }
 
 app.use(async (req, res, next) => {
-  const result = await verifyHttpEnvelope(req.headers, {
-    getPublicKey: async (senderId) => keyStore[senderId],
-  })
+  const result = await verifyHttpEnvelope(req.headers, { keyRegistry })
   if (!result.ok) return res.status(401).json({ error: result.reason })
-  req.sender = result.sender
+  req.sender = result.envelope.header.sender
   next()
 })
 ```
@@ -484,34 +500,36 @@ app.use(async (req, res, next) => {
 **Python:**
 
 ```python
-from protocol_7h3 import verify_http_envelope, sign_http_request
+from protocol_7h3 import build_signed_request_headers, verify_http_envelope, StaticKeyRegistry
 
-# Signing
-headers = sign_http_request(
-    method='POST', url='https://api.example.com/action',
-    body=json.dumps(payload), sender='agent.alpha',
-    private_key=my_private_key, key_id='k1', intent='TASK'
+# Signing — convenience wrapper builds the envelope and signs it in one call
+headers = build_signed_request_headers(
+    sender='agent.alpha', private_key=my_private_key,
+    content=json.dumps(payload),
 )
 
 # Verifying (FastAPI/Flask middleware)
-result = verify_http_envelope(request.headers, key_registry=key_store)
+registry = StaticKeyRegistry(key_store)   # { sender_id: public_key }
+ok, envelope, reason = verify_http_envelope(request.headers, registry)
+if not ok:
+    raise ValueError(reason)
 ```
 
 **Go:**
 
 ```go
-// Middleware
-func Middleware(keyRegistry go7h3.KeyRegistry) func(http.Handler) http.Handler {
-    return go7h3.Middleware(keyRegistry)
-}
+// go7h3.Middleware wraps an http.Handler directly — it verifies each
+// request's envelope before calling next.
+handler := go7h3.Middleware(keyRegistry, myHandler)
+http.ListenAndServe(":8080", handler)
 ```
 
 **CBOR encoding (smaller payloads):**
 
 ```ts
-const headers = await signHttpRequest({ ...opts, format: 'cbor' })
-// Content-Type: application/7h3-cbor
-// Payload ~40% smaller
+const { headers, body } = await signHttpRequest(envelope, myPrivateKey, { format: 'cbor' })
+// headers['content-type'] === 'application/7h3-cbor'
+// body: Uint8Array — send this as the request body instead of JSON
 ```
 
 ### WebSocket
@@ -519,45 +537,44 @@ const headers = await signHttpRequest({ ...opts, format: 'cbor' })
 Every frame is individually signed. Sequence numbers prevent reordering attacks.
 
 ```ts
-import { createWsBinding } from '@7h3/protocol'
+import { wrapWebSocket, createStaticKeyRegistry } from '@7h3/protocol'
 
 const ws = new WebSocket('wss://api.example.com')
 
 // Sender
-const binding = createWsBinding(ws, {
-  sender:     'agent.alpha',
-  privateKey: myPrivateKey,
-  keyId:      'k1',
+const binding = wrapWebSocket(ws, {
+  sender:      'agent.alpha',
+  privateKey:  myPrivateKey,
+  keyRegistry: createStaticKeyRegistry(keyStore),   // to verify incoming frames too
 })
-binding.send({ intent: 'TASK', content: 'do something' })
+await binding.send({ do: 'something' })   // payload is wrapped in a TASK envelope automatically
 
 // Receiver
-const serverBinding = createWsBinding(ws, {
-  getPublicKey: async (senderId) => keyStore[senderId],
-})
-serverBinding.onMessage((envelope) => {
+binding.onMessage((payload, envelope) => {
   console.log('Verified from:', envelope.header.sender)
+})
+binding.onVerifyFail((err, rawData) => {
+  console.warn('Rejected frame:', err.message)
 })
 ```
 
 ### gRPC
 
-Envelope in `7h3-envelope-bin` gRPC metadata (binary base64).
+Envelope in `7h3-envelope-bin` gRPC metadata (JSON, `-bin` suffix per gRPC convention).
 
 ```ts
-import { grpcSigningInterceptor, grpcVerifyingInterceptor } from '@7h3/protocol'
+import { signGrpcCall, withGrpcVerification, createStaticKeyRegistry } from '@7h3/protocol'
 
-// Client interceptor
-const client = new MyServiceClient(address, credentials, {
-  interceptors: [grpcSigningInterceptor({ sender: 'agent.alpha', privateKey, keyId: 'k1' })],
+// Client — build metadata to attach to the outbound call
+const metadata = await signGrpcCall({ sender: 'agent.alpha', privateKey, ttlMs: 60_000 })
+const call = client.myMethod(request, metadata)
+
+// Server — wrap any async handler with verify logic
+const verifiedHandler = withGrpcVerification(myHandler, {
+  keyRegistry: createStaticKeyRegistry(keyStore),
 })
-
-// Server interceptor
-const server = new grpc.Server()
-server.addService(MyService, grpcVerifyingInterceptor({
-  implementation: myHandler,
-  getPublicKey: async (senderId) => keyStore[senderId],
-}))
+// call.7h3Envelope holds the verified envelope inside myHandler; throws (with a gRPC
+// status `code`) on missing/invalid/expired envelopes
 ```
 
 ### Message Queues
@@ -567,40 +584,44 @@ Envelope wraps payload as `{ envelope, payload }`. Works with SQS, RabbitMQ, Kaf
 ```ts
 import { signQueueMessage, verifyQueueMessage } from '@7h3/protocol'
 
-// Producer
+// Producer — returns a ready-to-send JSON string: {"envelope": ..., "payload": ...}
 const message = await signQueueMessage(
   { taskId: '123', action: 'process' },
-  { sender: 'agent.alpha', privateKey, keyId: 'k1', intent: 'TASK' }
+  { sender: 'agent.alpha', privateKey, keyId: 'k1' }
 )
-await queue.send(JSON.stringify(message))
+await queue.send(message)
 
-// Consumer
-const result = await verifyQueueMessage(JSON.parse(rawMessage), {
-  getPublicKey: async (senderId) => keyStore[senderId],
-})
-if (result.ok) processTask(result.payload)
+// Consumer — takes the raw JSON string directly; throws on invalid/expired/tampered
+try {
+  const { payload, envelope } = await verifyQueueMessage(rawMessage, { publicKey })
+  processTask(payload)
+} catch (err) {
+  console.warn('Rejected queue message:', err)
+}
 ```
+
+Pass the same `replayCache` instance (e.g. `new InMemoryReplayCache()`) to every
+`verifyQueueMessage`/`verifyQueueBatch` call in a consumer process to dedupe replayed messages.
 
 ### Webhooks
 
 Compact `x-7h3-sig` header (HMAC or Ed25519) plus `x-7h3-ts` timestamp.
 
 ```ts
-import { signWebhook, verifyWebhook } from '@7h3/protocol'
+import { signWebhookHmac, verifyWebhookHmac, InMemoryWebhookReplayCache } from '@7h3/protocol'
 
-// Sender
-const headers = await signWebhook(body, sharedSecret)
+// Sender (HMAC shared-secret — use signWebhook/verifyWebhook for Ed25519 instead)
+const headers = await signWebhookHmac(body, { secret: sharedSecret, ttlMs: 300_000 })
 // Sets: x-7h3-sig, x-7h3-ts
 
-// Receiver
-const result = await verifyWebhook({
-  body,
-  signature: req.headers['x-7h3-sig'],
-  timestamp: req.headers['x-7h3-ts'],
-  secret:    webhookSecret,
+// Receiver — returns a plain boolean; pass a replayCache to reject re-delivery
+const replayCache = new InMemoryWebhookReplayCache()
+const ok = await verifyWebhookHmac(body, req.headers, {
+  secret:    sharedSecret,
   maxAgeMs:  300_000,
+  replayCache,
 })
-if (!result.ok) return res.status(401).end()
+if (!ok) return res.status(401).end()
 ```
 
 ---
@@ -609,34 +630,60 @@ if (!result.ok) return res.status(401).end()
 
 The `Protocol7h3Gateway` is a reverse proxy that verifies envelopes before forwarding to upstream. Drop it in front of any existing service.
 
+`createGateway()` returns a `verify()`/`handle()` object — it doesn't bind a port itself,
+so pair it with any HTTP server (Node's `http`, Express, a Workers `fetch` handler, etc.):
+
 ```ts
-import { createGateway } from '@7h3/protocol'
+import { createServer } from 'node:http'
+import { createGateway } from '@7h3/protocol/gateway'
+import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
 
 const gateway = createGateway({
   upstream:    'http://localhost:3001',
-  port:        3000,
-  keyRegistry: { getPublicKey: async (id) => keyStore[id] },
+  keyRegistry: createStaticKeyRegistry({
+    'agent.alpha': alphaPublicKey,
+    'agent.beta':  betaPublicKey,
+    'agent.admin': adminPublicKey,
+  }),
   policies: [
     {
-      pathGlob:       '/api/admin/**',
+      path:           '/api/admin/**',
+      require:        'ed25519',
       allowedSenders: ['agent.admin'],
-      rateLimit:      { maxRequests: 10, windowMs: 60_000 },
+      rateLimit:      { requests: 10, windowMs: 60_000 },
     },
     {
-      pathGlob:       '/api/**',
+      path:           '/api/**',
+      require:        'ed25519',
       allowedSenders: ['agent.alpha', 'agent.beta'],
-      rateLimit:      { maxRequests: 100, windowMs: 60_000 },
+      rateLimit:      { requests: 100, windowMs: 60_000 },
     },
   ],
-  defaultPolicy: { allowedSenders: [] },  // deny unmatched routes
+  defaultPolicy: 'deny',   // reject anything that doesn't match a policy above
   signResponses: true,
   privateKey:    gatewayPrivateKey,
   sender:        'gateway',
-  metricsPath:   '/metrics',
 })
 
-gateway.listen(3000)
+createServer(async (req, res) => {
+  const chunks: Buffer[] = []
+  for await (const chunk of req) chunks.push(chunk)
+  const result = await gateway.handle({
+    method:  req.method ?? 'GET',
+    path:    req.url ?? '/',
+    headers: Object.fromEntries(
+      Object.entries(req.headers).filter(([, v]) => v !== undefined),
+    ) as Record<string, string>,
+    body: chunks.length ? Buffer.concat(chunks).toString('utf8') : undefined,
+  })
+  res.writeHead(result.status, result.headers)
+  res.end(result.body)
+}).listen(3000)
 ```
+
+Use `createProductionGateway()` instead of `createGateway()` to fail fast at startup if
+`defaultPolicy` isn't `'deny'` or `replayStore` isn't configured — a misconfiguration you
+want caught at deploy time, not discovered later in production.
 
 **Gateway architecture:**
 
@@ -658,27 +705,17 @@ flowchart TB
     end
 ```
 
-**YAML config (for CLI):**
+**CLI gateway** — a flag-based, single-policy gateway for quick use without writing code
+(see [CLI Reference](#cli-reference) for the full flag list):
 
-```yaml
-# 7h3.example.yaml
-upstream: http://localhost:3001
-port: 3000
-sender: gateway
-metrics_path: /metrics
-
-key_registry:
-  agent.alpha: base64url-public-key-here
-  agent.beta:  base64url-public-key-here
-
-policies:
-  - path_glob: /api/admin/**
-    allowed_senders: [agent.admin]
-    rate_limit: { max_requests: 10, window_ms: 60000 }
-  - path_glob: /api/**
-    allowed_senders: [agent.alpha, agent.beta]
-    rate_limit: { max_requests: 200, window_ms: 60000 }
+```bash
+7h3 gateway --upstream http://localhost:3001 --port 3000 \
+  --public-key <base64url-key> --sender agent.alpha --require ed25519
 ```
+
+The CLI gateway supports one implicit sender/policy pair via flags — it does not read a
+YAML/JSON config file. For multi-policy setups (per-route `allowedSenders`, rate limits,
+mixed algorithms), use `createGateway()` directly as shown above.
 
 ---
 
@@ -785,7 +822,7 @@ Available MCP tools:
 | `7h3_generate_secret` | Generate a 32-byte HMAC secret |
 | `7h3_sign` | Sign a test envelope for debugging |
 | `7h3_verify` | Verify an envelope's signature, TTL, and shape |
-| `7h3_scaffold` | Generate integration code for a framework (see below) |
+| `7h3_scaffold` | Generate integration code for a framework — `cloudflare-worker`, `nextjs`, `express`, `hono`, `fastify`, `claude-code`, or `raw` (narrower than `7h3 add`'s list below) |
 | `7h3_mcp_config` | Get install config for Claude Code, Cursor, Opencode, Grok |
 | `7h3_wrap_mcp_server` | Generate boilerplate to wrap an MCP handler with 7h3 |
 
@@ -835,8 +872,9 @@ import { wrapMcpServer, signEnvelopeEd25519 } from '@7h3/protocol'
 const secureServer = wrapMcpServer(myMcpHandler, {
   selfAgentId: 'my-mcp-server',
   sign: (e) => signEnvelopeEd25519(e, serverPrivateKey, 'k1'),
-  keyRegistry: {
-    getPublicKey: async (senderId) => clientPublicKeys[senderId],
+  receive: {
+    signatureResolver: async (signature, senderId) =>
+      ({ alg: 'ED25519', publicKey: clientPublicKeys[senderId] }),
   },
 })
 ```
@@ -899,10 +937,10 @@ import {
 
 // Each agent needs an Ed25519 signing keypair + an X25519 encryption keypair
 const aliceSign = await generateEd25519KeypairBase64Url()
-const aliceEnc  = await generateX25519KeyPair()
+const aliceEnc  = generateX25519KeyPair()   // synchronous
 
 const bobSign = await generateEd25519KeypairBase64Url()
-const bobEnc  = await generateX25519KeyPair()
+const bobEnc  = generateX25519KeyPair()
 
 // Alice seals a message for Bob
 const envelope = createEnvelope('alice', { intent: 'TASK', content: 'secret payload' })
@@ -1098,7 +1136,7 @@ const result = await verifyStream(chunks, { publicKey })
 import { createSignedWebSocketStream, receiveSignedWebSocketStream } from '@7h3/protocol'
 
 // Server side
-const writer = await createSignedWebSocketStream(ws, { privateKey, sender: 'llm', keyId: 'k1' })
+const writer = createSignedWebSocketStream(ws, { privateKey, sender: 'llm', keyId: 'k1' })   // synchronous
 
 // Client side
 const result = await receiveSignedWebSocketStream(ws, { publicKey })
@@ -1236,7 +1274,7 @@ app.get('/metrics', (req, res) => {
 **CLI gateway:**
 
 ```bash
-7h3 gateway --config 7h3.example.yaml --metrics-port 9090
+7h3 gateway --upstream http://localhost:3001 --metrics-port 9090
 # http://localhost:9090/metrics
 ```
 
@@ -1276,11 +1314,11 @@ const signed   = await signEnvelopePq(envelope, privateKey, 'ML-DSA-65')
 const ok = await verifyEnvelopePq(signed, publicKey)
 ```
 
-| Algorithm | NIST Level | Public key | Signature size |
-|---|---|---|---|
-| `ML-DSA-44` | 2 (128-bit post-quantum) | 1,312 bytes | 2,420 bytes |
-| `ML-DSA-65` | 3 (192-bit post-quantum) | 1,952 bytes | 3,293 bytes |
-| `ML-DSA-87` | 5 (256-bit post-quantum) | 2,592 bytes | 4,595 bytes |
+| Algorithm | NIST Level | Public key | Signature size | SDKs |
+|---|---|---|---|---|
+| `ML-DSA-44` | 2 (128-bit post-quantum) | 1,312 bytes | 2,420 bytes | Python only |
+| `ML-DSA-65` | 3 (192-bit post-quantum) | 1,952 bytes | 3,293 bytes | TypeScript, Python |
+| `ML-DSA-87` | 5 (256-bit post-quantum) | 2,592 bytes | 4,595 bytes | TypeScript, Python |
 
 **Python:**
 
@@ -1366,38 +1404,30 @@ const recovered = reconstructPrivateKey([shares[0], shares[2], shares[4]], 3)
 
 ## Audit Log
 
-Every verification event is logged with an Ed25519-signed entry. Entries form a tamper-evident chain — altering any entry breaks all subsequent entries.
+Each event is logged as an independently Ed25519-signed entry — `log.verify()` proves a
+given entry wasn't altered after being written. This is not a Cloudflare-Worker-native
+gateway feature: the gateway does not write to it automatically, and entries aren't
+chained to each other (there's no cross-entry tamper detection) — call `log.log(...)`
+yourself wherever you want an entry recorded.
 
 ```ts
 import { createAuditLog } from '@7h3/protocol'
 
-const log = createAuditLog({ privateKey: auditPrivateKey, keyId: 'audit-k1' })
+const log = createAuditLog(auditPrivateKey, { maxEntries: 10_000 })
 
-// Gateway writes entries automatically.
-// You can also write manually:
-await log.write({
-  type:      'verify',
-  sender:    'agent.alpha',
-  messageId: 'msg-1',
-  result:    'ok',
-  transport: 'http',
+await log.log({
+  type:   'verify-ok',   // 'verify-ok' | 'verify-fail' | 'rate-limited' | 'sender-denied' | 'response-signed'
+  sender: 'agent.alpha',
+  path:   '/api/action',
+  envelopeId: 'msg-1',
 })
 
 // Read entries
-const entries = log.entries()
+const entries = await log.query({ sender: 'agent.alpha', limit: 100 })
 
-// Verify the full chain
-const valid = await log.verifyChain()
-// valid === true; false if any entry was tampered
-```
-
-**Chain structure:**
-
-```mermaid
-flowchart LR
-    E0["Entry 0\nhash: H0\nsig: S0"] --> E1["Entry 1\nprevHash: H0\nhash: H1\nsig: S1"]
-    E1 --> E2["Entry 2\nprevHash: H1\nhash: H2\nsig: S2"]
-    E2 --> En["Entry N ..."]
+// Verify a single entry's signature
+const valid = await log.verify(entries[0], auditPublicKey)
+// valid === true; false if that entry was tampered with
 ```
 
 ---
@@ -1409,11 +1439,16 @@ flowchart LR
 ```ts
 import { SlidingWindowRateLimiter } from '@7h3/protocol'
 
-const limiter = new SlidingWindowRateLimiter({ maxRequests: 100, windowMs: 60_000 })
+// { maxKeys? } bounds total tracked senders (LRU-evicted); the rate-limit
+// policy itself is passed per call, not at construction time.
+const limiter = new SlidingWindowRateLimiter({ maxKeys: 50_000 })
 
-const result = limiter.check('agent.alpha')
-// { allowed: true, remaining: 99, resetAt: 1712500060000 }
-// { allowed: false, remaining: 0, retryAfter: 45000 }
+const policy = { requests: 100, windowMs: 60_000 }
+
+const result = limiter.consume('agent.alpha', policy)
+// { allowed: true, remaining: 99, resetMs: 60000 }
+
+const check = limiter.check('agent.alpha', policy)   // read-only, doesn't record a hit
 ```
 
 ---
@@ -1426,12 +1461,12 @@ Glob-matched path policies enforce sender allowlists per route.
 import { matchPolicy, isAllowedSender } from '@7h3/protocol'
 
 const policies = [
-  { pathGlob: '/api/admin/**', allowedSenders: ['agent.admin'] },
-  { pathGlob: '/api/**',       allowedSenders: ['agent.alpha', 'agent.beta'] },
+  { path: '/api/admin/**', require: 'ed25519', allowedSenders: ['agent.admin'] },
+  { path: '/api/**',       require: 'ed25519', allowedSenders: ['agent.alpha', 'agent.beta'] },
 ]
 
-const matched = matchPolicy(req.path, policies)
-if (matched && !isAllowedSender(verifiedSender, matched)) {
+const matched = matchPolicy(policies, req.path)
+if (matched && !isAllowedSender(matched, verifiedSender)) {
   return res.status(403).json({ error: 'sender not authorized' })
 }
 ```
@@ -1461,30 +1496,44 @@ const registry = createStaticKeyRegistry({
 
 ### Caching Registry (remote keys with TTL)
 
-```ts
-import { createCachingKeyRegistry } from '@7h3/protocol'
+`createCachingKeyRegistry` wraps another `KeyRegistry` — it doesn't take a bare fetch
+function directly:
 
-const registry = createCachingKeyRegistry(
-  async (senderId) => {
+```ts
+import { createCachingKeyRegistry, type KeyRegistry } from '@7h3/protocol'
+
+const remoteRegistry: KeyRegistry = {
+  getPublicKey: async (senderId) => {
     const res = await fetch(`https://keys.example.com/${senderId}`)
     return (await res.json()).publicKey
   },
-  { ttlMs: 300_000 }
-)
+}
+
+const registry = createCachingKeyRegistry(remoteRegistry, { ttlMs: 300_000 })
 ```
 
 ### Key Rotation
 
-```ts
-import { createKeyRotator } from '@7h3/protocol'
+`KeyRotationManager` tracks a rolling set of keys with an overlap window, so a just-rotated
+key keeps verifying for a grace period while peers catch up on the new one:
 
-const rotator = createKeyRotator({
-  generateKey:           () => generateEd25519KeypairBase64Url(),
-  rotationIntervalMs:    86_400_000,   // daily
-  onNewKey: async (keypair, keyId) => {
-    await publishPublicKey(keyId, keypair.publicKey)
-  },
-})
+```ts
+import { KeyRotationManager, generateEd25519KeypairBase64Url } from '@7h3/protocol'
+
+const rotator = new KeyRotationManager({ maxAgeMs: 86_400_000, overlapMs: 3_600_000 })  // daily, 1h overlap
+
+const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
+rotator.addKey({ id: 'key-1', publicKey, privateKey, createdAt: Date.now() })
+
+// Call periodically (e.g. on a cron); returns the new key only when rotation happened
+const rotated = await rotator.rotateIfNeeded()
+if (rotated) await publishPublicKey(rotated.id, rotated.publicKey)
+
+// Serve /.well-known/7h3-keys directly from the manager
+const doc = rotator.getWellKnownDocument()
+
+// Or use it as a live KeyRegistry (falls back to null for unmanaged senders)
+const registry = rotator.toKeyRegistry()
 ```
 
 ---
@@ -1512,32 +1561,30 @@ npm install -g @7h3/protocol
 
 # Generate a keypair
 7h3 keygen
-# publicKey:  MCowBQ...
-# privateKey: MIGHAgE...
+# { "publicKey": "...", "privateKey": "...", ... }
 
-# Sign a message
+# Sign a message — prefer --private-key-file <path> or $P7H3_PRIVATE_KEY over
+# --private-key directly; a raw key on the command line lands in shell history
 7h3 sign \
-  --private-key <base64url-key> \
+  --private-key-file ./my-key.txt \
   --sender agent.alpha \
-  --content "hello world" \
-  --intent TASK
+  --payload "hello world"
 
-# Verify an envelope (reads from stdin)
-7h3 verify --public-key <base64url-key> < envelope.json
+# Verify an envelope
+7h3 verify --public-key <base64url-key> --envelope "$(cat envelope.json)"
 
 # Inspect an envelope without verifying
-7h3 inspect < envelope.json
+7h3 inspect --envelope "$(cat envelope.json)"
 
-# Run the gateway
-7h3 gateway --config 7h3.example.yaml
+# Run the gateway (refuses to start unverified unless --allow-unverified is passed)
+7h3 gateway --upstream http://localhost:3001 --public-key <base64url-key> --sender agent.alpha
 
 # Run the gateway with metrics
-7h3 gateway --config 7h3.example.yaml --metrics-port 9090
+7h3 gateway --upstream http://localhost:3001 --public-key <base64url-key> \
+  --sender agent.alpha --metrics-port 9090
 
-# Serve a key registry
-7h3 keys serve \
-  --keys "agent.alpha=<pubkey>,agent.beta=<pubkey>" \
-  --port 3010
+# Serve a key registry (one key/id pair)
+7h3 keys serve --public-key <base64url-key> --key-id agent.alpha --port 3010
 ```
 
 ### `7h3 add` — scaffold integrations
@@ -1568,34 +1615,38 @@ Supported `--framework` values: `cloudflare-worker`, `nextjs`, `express`, `hono`
 
 ## Docker
 
-```bash
-# Pull
-docker pull ghcr.io/icemastert/7h3-protocol:latest
+No image is published to a registry — build it locally from the included multi-stage `Dockerfile`.
+Its `ENTRYPOINT` already runs `7h3 gateway`, so `docker run` arguments are gateway flags directly:
 
-# Run gateway
-docker run -p 3000:3000 \
-  -v $(pwd)/7h3.example.yaml:/app/7h3.yaml \
-  ghcr.io/icemastert/7h3-protocol \
-  7h3 gateway --config /app/7h3.yaml
+```bash
+docker build -t 7h3-gateway .
+
+docker run -p 8080:8080 \
+  7h3-gateway --upstream http://host.docker.internal:3001 --public-key <base64url-key> --sender agent.alpha
 ```
 
-**`docker-compose.yaml` (included in repo):**
+**`docker-compose.yaml` (included in repo)** — brings up the gateway plus a minimal example
+upstream on an internal network:
 
 ```yaml
 services:
   gateway:
     build: .
     ports:
-      - "3000:3000"
-      - "9090:9090"
-    command: 7h3 gateway --config /app/7h3.yaml --metrics-port 9090
-    volumes:
-      - ./7h3.example.yaml:/app/7h3.yaml
+      - "8080:8080"
+    command: ["--port", "8080", "--upstream", "http://api:3000", "--require", "ed25519"]
+    depends_on:
+      api:
+        condition: service_started
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
+  api:                    # minimal example upstream — replace with your real service
+    image: node:22-alpine
+    expose:
+      - "3000"
+```
+
+```bash
+docker compose up --build
 ```
 
 ---
@@ -1620,6 +1671,52 @@ go mod tidy
 ---
 
 ## Changelog
+
+### v0.5.6
+
+- Fixed a CLI build regression from v0.5.5's release (`RedisReplayStore` was passed an
+  incompatible client type in `bin/7h3.ts`'s default gateway replay store) with a small
+  dedicated in-memory `ReplayStore` implementation
+
+### v0.5.5
+
+- **Gateway**: capability-token authentication now enforces `allowedSenders` and rate
+  limits — previously it bypassed both on a valid capability chain
+- **Path traversal fix**: gateway request paths are normalized once and reused for both
+  policy matching and upstream forwarding, closing a bypass via encoded `..` segments
+- Added optional replay-protection caches to `webhookBinding` and `wsBinding` (a captured
+  valid webhook/WebSocket frame could otherwise be replayed within its TTL window)
+- `SlidingWindowRateLimiter` now bounds tracked sender keys with LRU eviction
+- CLI: `--private-key-file` and `P7H3_PRIVATE_KEY`/`GATEWAY_PRIVATE_KEY` env vars as
+  alternatives to passing `--private-key` on the command line
+- Non-finite `timestampMs`/`ttlMs` values can no longer defeat TTL, clock-skew, or replay
+  checks; CBOR map decoding no longer allows `__proto__` prototype pollution
+- Closed `cryptography` (Python, GHSA-g6cj-pr64-35w5) and `nanoid` (GHSA-2v37-7h3g-55p8)
+  advisories across every workspace
+
+### v0.5.4
+
+- **Relicensed from MIT to Apache-2.0** (see [License](#license) for what this means for
+  releases up to `v0.5.3`)
+- **Critical**: gateway rate limiting now backed by persistent state (was resettable);
+  queue bindings gained TTL/replay protection; HMAC shared-secret lookups are now bound to
+  the claimed sender
+- Rust: private keys are zeroized on drop and redacted from `Debug` output
+- `/metrics` is gated by default; `ttlMs` is capped at 24h across all SDKs
+- Repaired broken subpath exports and shipped the compiled CLI in the published package
+- PyPI trusted publishing and crates.io publishing added to the release pipeline;
+  `@7h3/protocol-pq` and `@7h3/protocol-threshold` wired into `publish.yml`
+
+### v0.5.3
+
+- Lint and typecheck gates turned fully green in CI
+- Supply-chain hardening: SHA-pinned GitHub Actions, gitleaks scanning, CI gates, a
+  documented nonce-entropy spec
+
+### v0.5.2
+
+- Constant-time HMAC verification in the Rust SDK; CSPRNG-sourced nonces
+- LICENSE and post-rename branding fixes; CI corrections
 
 ### v0.5.1
 
