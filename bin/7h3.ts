@@ -301,14 +301,27 @@ async function cmdGateway(argv: string[]): Promise<void> {
   // No --replay-store flag exists (there's no CLI-friendly way to configure
   // a shared backing store), but shipping with no replay protection at all
   // when signatures ARE required silently drops one of the two guarantees
-  // this whole command exists to provide. An in-memory store is still only
-  // good for this single process — it won't survive a restart or a second
-  // instance — which is why this only applies to the local single-process
-  // CLI gateway, never the library default.
+  // this whole command exists to provide. A minimal in-memory ReplayStore is
+  // still only good for this single process — it won't survive a restart or
+  // a second instance — which is why this only applies to the local
+  // single-process CLI gateway, never the library default.
+  class InMemoryCliReplayStore {
+    private readonly seen = new Map<string, number>()
+    async check(key: string, ttlMs: number): Promise<boolean> {
+      const nowMs = Date.now()
+      for (const [k, expiresAt] of this.seen) {
+        if (expiresAt <= nowMs) this.seen.delete(k)
+      }
+      const existing = this.seen.get(key)
+      if (existing !== undefined && existing > nowMs) return true // replay
+      this.seen.set(key, nowMs + ttlMs)
+      return false
+    }
+  }
+
   let replayStore: import('@7h3/protocol/gateway').GatewayConfig['replayStore']
   if (requireMode !== 'none') {
-    const { RedisReplayStore, InMemoryRedisLikeClient } = await import('@7h3/protocol')
-    replayStore = new RedisReplayStore(new InMemoryRedisLikeClient())
+    replayStore = new InMemoryCliReplayStore()
     process.stderr.write(
       '[7h3] Replay protection is in-memory for this process only — it will not survive a ' +
         'restart or a second instance. For production, use the library directly with a shared replayStore.\n',
