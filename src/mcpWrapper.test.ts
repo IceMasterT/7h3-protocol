@@ -82,6 +82,34 @@ describe('tamper detection', () => {
   })
 })
 
+describe('requireSignature cannot be weakened via options.receive', () => {
+  it('still rejects an unsigned request even if receive.requireSignature is explicitly false', async () => {
+    const handler = vi.fn(echo)
+    // A caller might pass this through from a shared/misconfigured options
+    // object without intending to disable verification entirely.
+    const server = wrapMcpServer(
+      handler,
+      serverOptions({ receive: { secretResolver: async () => SECRET, requireSignature: false } }),
+    )
+    const codec = createMcpClientCodec(clientOptions())
+
+    const unsigned = createEnvelope({
+      sender: 'agent.client',
+      recipient: 'agent.server',
+      intent: 'TASK',
+      content: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {} }),
+      ttlMs: 60_000,
+    })
+    const raw = encodeEnvelope(unsigned, 'json')
+
+    const response = await codec.decodeResponse(await server(raw))
+
+    expect(handler).not.toHaveBeenCalled()
+    expect(response.error).toBeDefined()
+    expect(response.result).toBeUndefined()
+  })
+})
+
 describe('replay detection', () => {
   it('rejects the second delivery of an identical signed request', async () => {
     const replayCache = new InMemoryReplayCache()

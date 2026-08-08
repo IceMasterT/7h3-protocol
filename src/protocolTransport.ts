@@ -292,7 +292,7 @@ export async function receiveEnvelope(
     messageId: decoded.envelope.header.messageId,
   })
 
-  if (decoded.envelope.header.timestampMs > nowMs + maxClockSkewMs) {
+  if (!Number.isFinite(decoded.envelope.header.timestampMs) || decoded.envelope.header.timestampMs > nowMs + maxClockSkewMs) {
     const message = 'Message timestamp exceeds allowed clock skew'
     const diagnostics: ProtocolDiagnostic[] = [{ level: 'error', message }]
     await emitTelemetry({

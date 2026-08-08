@@ -15,6 +15,15 @@ export interface RateLimitStore {
 
 class SlidingWindowRateLimiter {
   private windows: Map<string, number[]> = new Map()
+  // A key seen once and never again (a one-off caller, a scanner, a typo'd
+  // sender id) would otherwise stay in `windows` for the lifetime of the
+  // process — unbounded growth under enough unique keys. Cap total tracked
+  // keys and evict least-recently-used on overflow.
+  private readonly maxKeys: number
+
+  constructor(opts: { maxKeys?: number } = {}) {
+    this.maxKeys = opts.maxKeys ?? 50_000
+  }
 
   // Check without recording — pure read
   check(key: string, policy: RateLimitPolicy, nowMs = Date.now()): RateLimitResult {
@@ -37,7 +46,22 @@ class SlidingWindowRateLimiter {
 
     if (allowed) {
       timestamps.push(nowMs)
+    }
+
+    if (timestamps.length > 0) {
+      // Map preserves insertion order; delete+set moves this key to the
+      // most-recently-used end so eviction below removes the true LRU key.
+      this.windows.delete(key)
       this.windows.set(key, timestamps)
+      while (this.windows.size > this.maxKeys) {
+        const oldestKey = this.windows.keys().next().value as string | undefined
+        if (oldestKey === undefined) break
+        this.windows.delete(oldestKey)
+      }
+    } else {
+      // Nothing left worth tracking for this key — drop it instead of
+      // storing an empty array forever.
+      this.windows.delete(key)
     }
 
     const remaining = Math.max(0, policy.requests - timestamps.length)

@@ -49,7 +49,55 @@ export interface GatewayResponse {
 
 export type GatewayVerifyOutcome =
   | { ok: true; sender: string; envelopeId?: string }
-  | { ok: false; status: 401 | 403 | 429; reason: string }
+  | { ok: false; status: 400 | 401 | 403 | 429; reason: string }
+
+/**
+ * Normalize a request path before it's used for both policy matching and
+ * upstream forwarding. Without this, a path like `/public/../admin/secret`
+ * matches a permissive `/public/**` policy (or no policy at all, under
+ * `defaultPolicy: 'allow'`) as a literal string, is forwarded unverified,
+ * and then gets collapsed by the URL parser inside `fetch()` on the way out
+ * — landing on `/admin/secret` at the upstream with zero verification ever
+ * having been performed against the path that's actually reached. Matching
+ * and forwarding must both operate on the same fully-normalized path so
+ * there's no gap between what was checked and what was sent.
+ *
+ * Returns null for anything that isn't a clean absolute path — including a
+ * `..` that would escape above the root, or percent-encoding that doesn't
+ * settle after a bounded number of decode passes (double-encoding is a
+ * classic way to smuggle a traversal past a single decode).
+ */
+export function normalizeGatewayPath(rawPath: string): string | null {
+  if (!rawPath.startsWith('/')) return null
+
+  let decoded = rawPath
+  for (let i = 0; i < 5; i++) {
+    let next: string
+    try {
+      next = decodeURIComponent(decoded)
+    } catch {
+      return null
+    }
+    if (next === decoded) break
+    decoded = next
+  }
+  if (/%[0-9a-fA-F]{2}/.test(decoded)) return null // still encoded after 5 passes
+  // eslint-disable-next-line no-control-regex -- intentional: reject control chars / null bytes
+  if (/[\x00-\x1f]/.test(decoded)) return null
+
+  const segments = decoded.split('/')
+  const normalized: string[] = []
+  for (const seg of segments) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') {
+      if (normalized.length === 0) return null // escapes above root
+      normalized.pop()
+      continue
+    }
+    normalized.push(seg)
+  }
+  return '/' + normalized.join('/')
+}
 
 class Protocol7h3Gateway {
   private config: GatewayConfig
@@ -77,9 +125,48 @@ class Protocol7h3Gateway {
     }
   }
 
+  // Shared by both auth paths (signature and capability-token) so neither one
+  // can bypass allowedSenders/rate-limit enforcement — the capability path
+  // used to return ok:true immediately on a valid chain, silently skipping
+  // both checks below for any policy that specified them.
+  private async checkSenderAndRateLimit(
+    policy: RoutePolicy | null,
+    sender: string,
+    alg: string,
+    req: GatewayRequest,
+    startMs: number,
+  ): Promise<GatewayVerifyOutcome | null> {
+    if (policy && !isAllowedSender(policy, sender)) {
+      const durationMs = performance.now() - startMs
+      globalMetrics.verifications_total.increment({ result: 'fail', alg, transport: 'http' })
+      globalMetrics.verification_duration_ms.observe(durationMs)
+      globalMetrics.sender_denials_total.increment({ sender, path: req.path })
+      return { ok: false, status: 403, reason: 'sender-denied' }
+    }
+
+    if (policy?.rateLimit) {
+      const rl = this.config.rateLimitStore
+        ? await this.config.rateLimitStore.consume(sender, policy.rateLimit)
+        : this.rateLimiter.consume(sender, policy.rateLimit)
+      if (!rl.allowed) {
+        const durationMs = performance.now() - startMs
+        globalMetrics.verifications_total.increment({ result: 'fail', alg, transport: 'http' })
+        globalMetrics.verification_duration_ms.observe(durationMs)
+        globalMetrics.rate_limit_hits_total.increment({ sender, path: req.path })
+        return { ok: false, status: 429, reason: 'rate-limited' }
+      }
+    }
+
+    return null
+  }
+
   async verify(req: GatewayRequest): Promise<GatewayVerifyOutcome> {
     const startMs = performance.now()
-    const policy = matchPolicy(this.config.policies ?? [], req.path)
+    const normalizedPath = normalizeGatewayPath(req.path)
+    if (normalizedPath === null) {
+      return { ok: false, status: 400, reason: 'invalid-path' }
+    }
+    const policy = matchPolicy(this.config.policies ?? [], normalizedPath)
 
     // Determine if we skip verification
     const skipVerify =
@@ -105,10 +192,13 @@ class Protocol7h3Gateway {
             requiredMethod: req.method,
           })
           if (result.ok && tokenMatchesScope(result.token, req.path, req.method)) {
+            const capSender = result.token.subject
+            const denied = await this.checkSenderAndRateLimit(policy, capSender, 'ED25519', req, startMs)
+            if (denied) return denied
             const durationMs = performance.now() - startMs
             globalMetrics.verifications_total.increment({ result: 'ok', alg: 'ED25519', transport: 'http' })
             globalMetrics.verification_duration_ms.observe(durationMs)
-            return { ok: true, sender: result.token.subject }
+            return { ok: true, sender: capSender }
           }
           const durationMs = performance.now() - startMs
           globalMetrics.verifications_total.increment({ result: 'fail', alg: 'none', transport: 'http' })
@@ -174,28 +264,9 @@ class Protocol7h3Gateway {
       }
     }
 
-    // Check allowedSenders
-    if (policy && !isAllowedSender(policy, sender)) {
-      const durationMs = performance.now() - startMs
-      globalMetrics.verifications_total.increment({ result: 'fail', alg, transport: 'http' })
-      globalMetrics.verification_duration_ms.observe(durationMs)
-      globalMetrics.sender_denials_total.increment({ sender, path: req.path })
-      return { ok: false, status: 403, reason: 'sender-denied' }
-    }
-
-    // Check rate limit
-    if (policy?.rateLimit) {
-      const rl = this.config.rateLimitStore
-        ? await this.config.rateLimitStore.consume(sender, policy.rateLimit)
-        : this.rateLimiter.consume(sender, policy.rateLimit)
-      if (!rl.allowed) {
-        const durationMs = performance.now() - startMs
-        globalMetrics.verifications_total.increment({ result: 'fail', alg, transport: 'http' })
-        globalMetrics.verification_duration_ms.observe(durationMs)
-        globalMetrics.rate_limit_hits_total.increment({ sender, path: req.path })
-        return { ok: false, status: 429, reason: 'rate-limited' }
-      }
-    }
+    // Check allowedSenders + rate limit (shared with the capability-token path)
+    const denied = await this.checkSenderAndRateLimit(policy, sender, alg, req, startMs)
+    if (denied) return denied
 
     const durationMs = performance.now() - startMs
     globalMetrics.verifications_total.increment({ result: 'ok', alg, transport: 'http' })
@@ -214,18 +285,28 @@ class Protocol7h3Gateway {
       }
     }
 
-    // Build upstream URL
-    const upstreamUrl = this.config.upstream.replace(/\/$/, '') + req.path
+    // Build upstream URL from the same normalized path verify() matched
+    // policies against — never the raw req.path. verify() already returned
+    // ok:true, so normalization is guaranteed to succeed here too (it's a
+    // pure function of req.path, which hasn't changed).
+    const normalizedPath = normalizeGatewayPath(req.path)!
+    const upstreamUrl = this.config.upstream.replace(/\/$/, '') + normalizedPath
 
     // Build forwarded headers, adding 7h3 metadata
     const forwardHeaders: Record<string, string> = {}
     for (const [k, v] of Object.entries(req.headers)) {
       forwardHeaders[k] = Array.isArray(v) ? v[0] : v
     }
+    // outcome.sender is only ever non-empty when a signature or capability
+    // token was actually checked (the skip-verify path returns sender: '').
+    // Setting x-7h3-verified: true unconditionally would tell the upstream
+    // "this request was cryptographically verified" even when it was simply
+    // allowed through unverified — actively misleading any upstream that
+    // trusts the header as proof of verification.
     if (outcome.sender) {
       forwardHeaders['x-7h3-sender'] = outcome.sender
+      forwardHeaders['x-7h3-verified'] = 'true'
     }
-    forwardHeaders['x-7h3-verified'] = 'true'
 
     // Fetch upstream
     const fetchResponse = await fetch(upstreamUrl, {

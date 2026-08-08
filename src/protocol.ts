@@ -371,8 +371,14 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
   const messageId = typeof header.messageId === 'string' ? header.messageId : ''
   const sender = typeof header.sender === 'string' ? header.sender : ''
   const nonce = typeof header.nonce === 'string' ? header.nonce : ''
-  const timestampMs = typeof header.timestampMs === 'number' ? header.timestampMs : 0
-  const ttlMs = typeof header.ttlMs === 'number' ? header.ttlMs : 0
+  // `typeof NaN === 'number'` is true, so a plain typeof check lets NaN (or
+  // ±Infinity) through as if it were a normal timestamp/ttl. Every comparison
+  // against NaN below (`<=`, `>`, `<`) evaluates to false, which silently
+  // defeats TTL-ceiling, TTL-expiry, AND (via the same field feeding into
+  // replay-store expiry math elsewhere) replay protection all at once —
+  // Number.isFinite() is required here, not just typeof.
+  const timestampMs = typeof header.timestampMs === 'number' && Number.isFinite(header.timestampMs) ? header.timestampMs : NaN
+  const ttlMs = typeof header.ttlMs === 'number' && Number.isFinite(header.ttlMs) ? header.ttlMs : NaN
   const content = typeof body.content === 'string' ? body.content : ''
 
   if (version !== '7h3/0.1') {
@@ -387,13 +393,20 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
   if (!nonce.trim()) {
     diagnostics.push({ level: 'error', message: 'Missing nonce — replay protection requires a unique nonce per message' })
   }
-  if (ttlMs <= 0) {
-    diagnostics.push({ level: 'error', message: 'ttlMs must be greater than zero' })
+  if (!Number.isFinite(timestampMs)) {
+    diagnostics.push({ level: 'error', message: 'timestampMs must be a finite number' })
   }
-  if (ttlMs > MAX_TTL_MS) {
-    diagnostics.push({ level: 'error', message: `ttlMs exceeds maximum allowed ${MAX_TTL_MS} ms` })
+  if (!Number.isFinite(ttlMs)) {
+    diagnostics.push({ level: 'error', message: 'ttlMs must be a finite number' })
+  } else {
+    if (ttlMs <= 0) {
+      diagnostics.push({ level: 'error', message: 'ttlMs must be greater than zero' })
+    }
+    if (ttlMs > MAX_TTL_MS) {
+      diagnostics.push({ level: 'error', message: `ttlMs exceeds maximum allowed ${MAX_TTL_MS} ms` })
+    }
   }
-  if (timestampMs + ttlMs < nowMs) {
+  if (Number.isFinite(timestampMs) && Number.isFinite(ttlMs) && timestampMs + ttlMs < nowMs) {
     diagnostics.push({ level: 'error', message: 'Message TTL expired' })
   }
   if (!content.trim()) {

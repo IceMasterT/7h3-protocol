@@ -261,3 +261,70 @@ describe('envelopeCbor - round-trip', () => {
     expect(decoded.signature).toBeUndefined()
   })
 })
+
+describe('CborCodec - map decoding does not enable prototype pollution', () => {
+  it('a "__proto__" key decodes as a plain own property, not a prototype swap', () => {
+    const map = new Map<string, unknown>()
+    map.set('__proto__', { polluted: true })
+    map.set('safe', 'value')
+
+    const decoded = decodeCbor(encodeCbor(map)) as Record<string, unknown>
+
+    expect(Object.getPrototypeOf(decoded)).toBe(null)
+    expect(Object.prototype.hasOwnProperty.call(decoded, '__proto__')).toBe(true)
+    expect(decoded['__proto__']).toEqual({ polluted: true })
+    expect(decoded.safe).toBe('value')
+    // Confirm the global Object.prototype was never actually touched.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+})
+
+describe('envelopeCbor - rejects wrong-typed and non-finite fields', () => {
+  // Field keys per the module doc comment: header 3=timestampMs, 4=ttlMs;
+  // body 1=intent, 2=content.
+  function encodeRawEnvelope(headerOverrides: Record<number, unknown>, bodyOverrides: Record<number, unknown> = {}): Uint8Array {
+    const header = new Map<number, unknown>([
+      [1, '7h3/0.1'],
+      [2, 'msg-1'],
+      [3, 1700000000000],
+      [4, 60000],
+      [5, 'agent:sender'],
+      [7, 'nonce123'],
+    ])
+    for (const [k, v] of Object.entries(headerOverrides)) header.set(Number(k), v)
+
+    const body = new Map<number, unknown>([
+      [1, 'TASK'],
+      [2, 'hello'],
+    ])
+    for (const [k, v] of Object.entries(bodyOverrides)) body.set(Number(k), v)
+
+    const top = new Map<number, unknown>([
+      [1, header],
+      [2, body],
+    ])
+    return encodeCbor(top)
+  }
+
+  it('rejects a non-finite ttlMs (NaN/Infinity float smuggled via CBOR)', () => {
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      const bytes = encodeRawEnvelope({ 4: bad })
+      expect(() => decodeEnvelopeCbor(bytes)).toThrow(/ttlMs must be a finite number/)
+    }
+  })
+
+  it('rejects a non-finite timestampMs', () => {
+    const bytes = encodeRawEnvelope({ 3: NaN })
+    expect(() => decodeEnvelopeCbor(bytes)).toThrow(/timestampMs must be a finite number/)
+  })
+
+  it('rejects a non-string content field (e.g. a nested map instead of a string)', () => {
+    const bytes = encodeRawEnvelope({}, { 2: new Map([['injected', true]]) })
+    expect(() => decodeEnvelopeCbor(bytes)).toThrow(/content must be a string/)
+  })
+
+  it('rejects a non-string sender field', () => {
+    const bytes = encodeRawEnvelope({ 5: 12345 })
+    expect(() => decodeEnvelopeCbor(bytes)).toThrow(/sender must be a string/)
+  })
+})

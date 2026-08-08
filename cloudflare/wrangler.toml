@@ -67,14 +67,44 @@ preview_id = "REPLACE_WITH_REPLAY_STORE_KV_PREVIEW_ID"
 # Environments — staging and production overrides
 # ---------------------------------------------------------------------------
 
+# `vars`, `kv_namespaces`, and `durable_objects` are NOT inherited from the
+# top-level config by named environments (Wrangler's documented behavior) —
+# each [env.*] block below must redeclare everything it needs, or `wrangler
+# deploy --env staging|production` ships a Worker with those bindings
+# undefined. That crashes on every request that reaches KV/DO access (and
+# GATEWAY_SENDER-dependent response signing/key discovery silently no-ops),
+# for both environments this config actually deploys.
+
 [env.staging]
 name = "7h3-gateway-staging"
 [env.staging.vars]
 UPSTREAM_URL = "https://staging.your-service.example.com"
+GATEWAY_SENDER = "gateway@your-service.example.com"
 DEFAULT_POLICY = "allow"
+
+[[env.staging.kv_namespaces]]
+binding = "KEY_REGISTRY"
+id = "REPLACE_WITH_STAGING_KEY_REGISTRY_KV_ID"
+preview_id = "REPLACE_WITH_STAGING_KEY_REGISTRY_KV_PREVIEW_ID"
+
+[[env.staging.kv_namespaces]]
+binding = "REPLAY_STORE"
+id = "REPLACE_WITH_STAGING_REPLAY_STORE_KV_ID"
+preview_id = "REPLACE_WITH_STAGING_REPLAY_STORE_KV_PREVIEW_ID"
 
 [env.production]
 name = "7h3-gateway"
 [env.production.vars]
 UPSTREAM_URL = "https://your-service.example.com"
+GATEWAY_SENDER = "gateway@your-service.example.com"
 DEFAULT_POLICY = "deny"
+
+[[env.production.kv_namespaces]]
+binding = "KEY_REGISTRY"
+id = "REPLACE_WITH_PRODUCTION_KEY_REGISTRY_KV_ID"
+preview_id = "REPLACE_WITH_PRODUCTION_KEY_REGISTRY_KV_PREVIEW_ID"
+
+[[env.production.kv_namespaces]]
+binding = "REPLAY_STORE"
+id = "REPLACE_WITH_PRODUCTION_REPLAY_STORE_KV_ID"
+preview_id = "REPLACE_WITH_PRODUCTION_REPLAY_STORE_KV_PREVIEW_ID"

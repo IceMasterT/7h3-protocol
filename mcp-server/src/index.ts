@@ -15,6 +15,18 @@ import { randomBytes } from 'node:crypto'
 
 const server = new McpServer({ name: '@7h3/protocol-mcp', version: '0.5.0' })
 
+// Agent identifiers get embedded into generated source code (buildScaffold,
+// buildBoilerplate) that this tool tells callers is "ready-to-paste" with
+// "zero changes." A value containing a quote, backtick, or newline could
+// break out of the string literal (or `//` comment) it's embedded in and
+// inject arbitrary code into a file the caller then runs — restricting the
+// charset up front means there's no injection-shaped value to embed in the
+// first place, on top of the JSON.stringify() escaping at each embed site.
+const agentIdSchema = z.string().min(1).max(256).regex(
+  /^[A-Za-z0-9._@:-]+$/,
+  'must contain only letters, digits, and . _ @ : -',
+)
+
 // ── 7h3_generate_secret ───────────────────────────────────────────────────────
 
 server.registerTool(
@@ -67,8 +79,8 @@ server.registerTool(
   {
     description: 'Generate ready-to-paste TypeScript boilerplate to wrap an existing MCP server handler with 7h3 Protocol signing and replay protection. Zero changes to your handler required.',
     inputSchema: {
-      serverAgentId: z.string().describe('Unique ID for this server agent, e.g. "my-tool-server"'),
-      clientAgentId: z.string().optional().describe('Expected client agent ID for sender binding. Omit to accept any signed client.'),
+      serverAgentId: agentIdSchema.describe('Unique ID for this server agent, e.g. "my-tool-server"'),
+      clientAgentId: agentIdSchema.optional().describe('Expected client agent ID for sender binding. Omit to accept any signed client.'),
       transport: z.enum(['stdio', 'http']).optional().describe('Transport type. Default: stdio'),
       signingMethod: z.enum(['hmac', 'ed25519']).optional().describe('Signing algorithm. hmac = shared secret (dev/trusted infra), ed25519 = keypair (recommended for production). Default: hmac'),
     },
@@ -176,8 +188,8 @@ server.registerTool(
       signingMethod: z.enum(['ed25519', 'hmac']).describe(
         'Signing algorithm. ed25519 = keypair (recommended for production), hmac = shared secret (dev/trusted infra).',
       ),
-      sender: z.string().describe('Agent identity of the sender, e.g. "my-agent@example.com".'),
-      upstream: z.string().optional().describe('Upstream URL to proxy to — used for cloudflare-worker gateway pattern.'),
+      sender: agentIdSchema.describe('Agent identity of the sender, e.g. "my-agent@example.com".'),
+      upstream: z.string().url().max(2048).optional().describe('Upstream URL to proxy to — used for cloudflare-worker gateway pattern.'),
     },
   },
   async ({ framework, signingMethod, sender, upstream }) => {
@@ -269,6 +281,15 @@ server.registerTool(
 
 // ── scaffold generator ────────────────────────────────────────────────────────
 
+// Safely embed a runtime string as a JS/TS string-literal expression inside
+// generated source. JSON.stringify escapes quotes, backslashes, and newlines
+// into their two-character escape sequences, so the value can never break out
+// of the literal it's embedded in (or, when embedded inside a `//` comment,
+// can never introduce an actual newline that would end the comment early).
+function jsStr(value: string): string {
+  return JSON.stringify(value)
+}
+
 function buildScaffold(
   framework: 'cloudflare-worker' | 'nextjs' | 'express' | 'hono' | 'fastify' | 'claude-code' | 'raw',
   signingMethod: 'ed25519' | 'hmac',
@@ -288,7 +309,7 @@ function buildScaffold(
       const upstreamUrl = upstream ?? 'https://your-upstream.example.com'
       return `// 7h3 Protocol Gateway — Cloudflare Worker
 // Install: npm install @7h3/protocol
-// Generated for sender: ${sender}
+// Generated for sender: ${jsStr(sender)}
 
 import { createGateway } from '@7h3/protocol/gateway'
 import { KvKeyRegistry, KvReplayStore } from './kv-replay-store'
@@ -304,7 +325,7 @@ export default {
     const replayStore = new KvReplayStore(env.P7H3_KV)
 
     const gateway = createGateway({
-      upstream: '${upstreamUrl}',
+      upstream: ${jsStr(upstreamUrl)},
       signingMethod: '${signingMethod}',
 ${signingMethod === 'hmac'
   ? '      secretResolver: async () => env.P7H3_SECRET,'
@@ -332,7 +353,7 @@ ${signingMethod === 'hmac'
       return `// 7h3 Protocol — Next.js Middleware
 // File: middleware.ts (project root)
 // Install: npm install @7h3/protocol
-// Generated for sender: ${sender}
+// Generated for sender: ${jsStr(sender)}
 
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyHttpEnvelope } from '@7h3/protocol'
@@ -372,7 +393,7 @@ export const config = {
     case 'express': {
       return `// 7h3 Protocol — Express Middleware
 // Install: npm install @7h3/protocol express
-// Generated for sender: ${sender}
+// Generated for sender: ${jsStr(sender)}
 
 import express, { Request, Response, NextFunction } from 'express'
 import { verifyHttpEnvelope } from '@7h3/protocol'
@@ -415,7 +436,7 @@ app.listen(3000, () => console.log('Server running on :3000'))
     case 'hono': {
       return `// 7h3 Protocol — Hono Middleware
 // Install: npm install @7h3/protocol hono
-// Generated for sender: ${sender}
+// Generated for sender: ${jsStr(sender)}
 
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
@@ -461,7 +482,7 @@ export default app
     case 'fastify': {
       return `// 7h3 Protocol — Fastify Hook
 // Install: npm install @7h3/protocol fastify
-// Generated for sender: ${sender}
+// Generated for sender: ${jsStr(sender)}
 
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify'
 import { verifyHttpEnvelope } from '@7h3/protocol'
@@ -524,7 +545,7 @@ fastify.listen({ port: 3000 }, (err) => {
 //   7h3_scaffold           — generate integration code for a framework
 //   7h3_mcp_config         — show install config for all editors
 //
-// Sender identity configured for this scaffold: ${sender}
+// Sender identity configured for this scaffold: ${jsStr(sender)}
 // Signing method: ${signingMethod}
 `
     }
@@ -532,7 +553,7 @@ fastify.listen({ port: 3000 }, (err) => {
     case 'raw': {
       return `// 7h3 Protocol — Minimal Node.js HTTP Server
 // Install: npm install @7h3/protocol
-// Generated for sender: ${sender}
+// Generated for sender: ${jsStr(sender)}
 
 import http from 'node:http'
 import { verifyHttpEnvelope } from '@7h3/protocol'
@@ -565,7 +586,7 @@ const server = http.createServer(async (req, res) => {
 
   // Request is verified — handle it
   res.writeHead(200, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify({ ok: true, sender: '${sender}' }))
+  res.end(JSON.stringify({ ok: true, sender: ${jsStr(sender)} }))
 })
 
 server.listen(3000, () => {

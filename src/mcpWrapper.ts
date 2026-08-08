@@ -79,9 +79,16 @@ function jsonRpcError(id: JsonRpcId, code: number, message: string): JsonRpcResp
   return { jsonrpc: '2.0', id, error: { code, message } }
 }
 
-/** Verification options with signature required and a replay cache guaranteed (secure defaults). */
+/**
+ * Verification options with signature required and a replay cache guaranteed
+ * (secure defaults). `requireSignature: true` and `replayCache` are both
+ * spread AFTER `...options.receive` so neither can be weakened by a caller's
+ * options — e.g. a shared "compat mode" config object that happens to set
+ * `requireSignature: false` would otherwise silently disable the one check
+ * this whole module exists to enforce.
+ */
 function hardenedReceive(options: McpSecurityOptions, replayCache: ReceiveEnvelopeOptions['replayCache']): ReceiveEnvelopeOptions {
-  return { requireSignature: true, ...options.receive, replayCache }
+  return { ...options.receive, requireSignature: true, replayCache }
 }
 
 /**

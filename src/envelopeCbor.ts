@@ -74,6 +74,34 @@ export function encodeEnvelopeCbor(env: ProtocolEnvelope): Uint8Array {
   return encodeCbor(topMap)
 }
 
+// `as` casts below are compile-time only — they have zero runtime effect, so
+// a malicious/malformed CBOR body could otherwise smuggle any decoded shape
+// (a map, array, or non-finite float) straight into fields the rest of the
+// protocol assumes are plain strings/finite numbers. That gap is exactly how
+// a NaN ttlMs/timestampMs (or a non-string content/capability/correlationId)
+// can defeat TTL and replay checks downstream, or diverge from what a
+// strictly-typed Python/Rust peer would accept for the same bytes. These
+// helpers make decoding fail loudly instead of producing a wrong-shaped
+// envelope that downstream code trusts implicitly.
+function expectString(value: unknown, field: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`decodeEnvelopeCbor: ${field} must be a string`)
+  }
+  return value
+}
+
+function expectOptionalString(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined
+  return expectString(value, field)
+}
+
+function expectFiniteNumber(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`decodeEnvelopeCbor: ${field} must be a finite number`)
+  }
+  return value
+}
+
 export function decodeEnvelopeCbor(data: Uint8Array): ProtocolEnvelope {
   const top = decodeCbor(data)
 
@@ -99,28 +127,27 @@ export function decodeEnvelopeCbor(data: Uint8Array): ProtocolEnvelope {
 
   const env: ProtocolEnvelope = {
     header: {
-      version: hr['1'] as ProtocolEnvelope['header']['version'],
-      messageId: hr['2'] as string,
-      timestampMs: hr['3'] as number,
-      ttlMs: hr['4'] as number,
-      sender: hr['5'] as string,
-      nonce: hr['7'] as string,
+      version: expectString(hr['1'], 'header.version') as ProtocolEnvelope['header']['version'],
+      messageId: expectString(hr['2'], 'header.messageId'),
+      timestampMs: expectFiniteNumber(hr['3'], 'header.timestampMs'),
+      ttlMs: expectFiniteNumber(hr['4'], 'header.ttlMs'),
+      sender: expectString(hr['5'], 'header.sender'),
+      nonce: expectString(hr['7'], 'header.nonce'),
     },
     body: {
-      intent: br['1'] as ProtocolEnvelope['body']['intent'],
-      content: br['2'] as string,
+      intent: expectString(br['1'], 'body.intent') as ProtocolEnvelope['body']['intent'],
+      content: expectString(br['2'], 'body.content'),
     },
   }
 
-  if (hr['6'] !== undefined) {
-    env.header.recipient = hr['6'] as string
-  }
-  if (br['3'] !== undefined) {
-    env.body.capability = br['3'] as string
-  }
-  if (br['4'] !== undefined) {
-    env.body.correlationId = br['4'] as string
-  }
+  const recipient = expectOptionalString(hr['6'], 'header.recipient')
+  if (recipient !== undefined) env.header.recipient = recipient
+
+  const capability = expectOptionalString(br['3'], 'body.capability')
+  if (capability !== undefined) env.body.capability = capability
+
+  const correlationId = expectOptionalString(br['4'], 'body.correlationId')
+  if (correlationId !== undefined) env.body.correlationId = correlationId
 
   // Signature
   const sigRaw = topRecord['3']
@@ -130,9 +157,9 @@ export function decodeEnvelopeCbor(data: Uint8Array): ProtocolEnvelope {
     }
     const sr = sigRaw as Record<string, unknown>
     env.signature = {
-      alg: sr['1'] as ProtocolSignature['alg'],
-      keyId: sr['2'] as string,
-      value: sr['3'] as string,
+      alg: expectString(sr['1'], 'signature.alg') as ProtocolSignature['alg'],
+      keyId: expectString(sr['2'], 'signature.keyId'),
+      value: expectString(sr['3'], 'signature.value'),
     }
   }
 

@@ -272,7 +272,14 @@ export class CborDecoder {
       }
       case MT_MAP: {
         const count = this._decodeUint(additionalInfo)
-        const result: Record<string, unknown> = {}
+        // Object.create(null), not {}: a plain object literal's "__proto__"
+        // key is a prototype-reassignment accessor, not a normal property —
+        // `result["__proto__"] = value` would swap result's prototype
+        // instead of storing a "__proto__" own property (unlike JSON.parse,
+        // which is spec-guaranteed to treat "__proto__" as an ordinary key).
+        // A null-prototype object has no such accessor, so every decoded key
+        // — including "__proto__" — becomes a plain own data property.
+        const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>
         for (let i = 0; i < count; i++) {
           const key = this._decode()
           const value = this._decode()

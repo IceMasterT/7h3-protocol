@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util'
 import { createServer } from 'node:http'
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
 
 const USAGE = `
 7h3 — Protocol CLI (wire version 7h3/0.1)
@@ -9,13 +9,21 @@ const USAGE = `
 Usage:
   7h3 keygen [--output <file>]
   7h3 sign   --private-key <key> --sender <id> [--recipient <id>] [--payload <str>] [--ttl <ms>]
+             (or --private-key-file <path>, or env P7H3_PRIVATE_KEY)
   7h3 verify --public-key <key> --envelope <json>
   7h3 inspect --envelope <json>
   7h3 gateway --upstream <url> [--port <n>] [--public-key <key>] [--require ed25519|none]
               [--sign-responses] [--private-key <key>] [--sender <id>] [--metrics-port <n>]
+              [--allow-unverified]
+              (private key: --private-key-file <path>, or env GATEWAY_PRIVATE_KEY)
   7h3 keys serve [--public-key <key>] [--key-id <id>] [--port <n>]
   7h3 add --framework <name> [--sender <id>] [--output <dir>]
   7h3 help
+
+Secrets:
+  --private-key on 'sign'/'gateway' is visible in shell history and process
+  listings. Prefer --private-key-file <path> or the P7H3_PRIVATE_KEY /
+  GATEWAY_PRIVATE_KEY environment variables.
 
 Commands:
   keygen     Generate an Ed25519 keypair (PKCS8/SPKI, base64url-encoded)
@@ -31,6 +39,35 @@ Commands:
 function die(msg: string): never {
   process.stderr.write(`Error: ${msg}\n`)
   process.exit(1)
+}
+
+// A private key passed as a bare CLI argument lands in shell history and is
+// visible to any other local user via `ps`/`/proc` for the life of the
+// process — resolveSecretArg() prefers a file (never touches argv or the
+// environment table other tools can dump) or an env var, and only falls
+// back to the raw flag with an explicit warning so the risk is visible
+// rather than silent.
+function resolveSecretArg(
+  flagName: string,
+  flagValue: string | undefined,
+  fileValue: string | undefined,
+  envVarName: string,
+): string | undefined {
+  if (fileValue) {
+    try {
+      return readFileSync(fileValue, 'utf8').trim()
+    } catch (err) {
+      die(`failed to read --${flagName}-file ${fileValue}: ${String(err)}`)
+    }
+  }
+  if (flagValue) {
+    process.stderr.write(
+      `[7h3] Warning: --${flagName} is visible in shell history and process listings. ` +
+        `Prefer --${flagName}-file <path> or the ${envVarName} environment variable.\n`,
+    )
+    return flagValue
+  }
+  return process.env[envVarName] || undefined
 }
 
 async function cmdKeygen(argv: string[]): Promise<void> {
@@ -72,6 +109,7 @@ async function cmdSign(argv: string[]): Promise<void> {
     args: argv,
     options: {
       'private-key': { type: 'string' },
+      'private-key-file': { type: 'string' },
       sender: { type: 'string' },
       recipient: { type: 'string' },
       payload: { type: 'string' },
@@ -80,10 +118,15 @@ async function cmdSign(argv: string[]): Promise<void> {
     strict: false,
   })
 
-  const privateKey = values['private-key'] as string | undefined
+  const privateKey = resolveSecretArg(
+    'private-key',
+    values['private-key'] as string | undefined,
+    values['private-key-file'] as string | undefined,
+    'P7H3_PRIVATE_KEY',
+  )
   const sender = values['sender'] as string | undefined
 
-  if (!privateKey) die('--private-key is required')
+  if (!privateKey) die('--private-key (or --private-key-file / P7H3_PRIVATE_KEY) is required')
   if (!sender) die('--sender is required')
 
   const { createEnvelope, signEnvelopeEd25519 } = await import('@7h3/protocol')
@@ -211,8 +254,10 @@ async function cmdGateway(argv: string[]): Promise<void> {
       require: { type: 'string' },
       'sign-responses': { type: 'boolean' },
       'private-key': { type: 'string' },
+      'private-key-file': { type: 'string' },
       sender: { type: 'string' },
       'metrics-port': { type: 'string' },
+      'allow-unverified': { type: 'boolean' },
     },
     strict: false,
   })
@@ -224,10 +269,27 @@ async function cmdGateway(argv: string[]): Promise<void> {
   const publicKey = values['public-key'] as string | undefined
   const requireMode = (values['require'] as string | undefined) ?? (publicKey ? 'ed25519' : 'none')
   const signResponses = !!(values['sign-responses'])
-  const privateKey = values['private-key'] as string | undefined
+  const privateKey = resolveSecretArg(
+    'private-key',
+    values['private-key'] as string | undefined,
+    values['private-key-file'] as string | undefined,
+    'GATEWAY_PRIVATE_KEY',
+  )
   const sender = values['sender'] as string | undefined
   const metricsPortRaw = values['metrics-port'] as string | undefined
   const metricsPort = metricsPortRaw ? parseInt(metricsPortRaw, 10) : undefined
+
+  // `7h3 gateway --upstream <url>` with no other flags used to silently start
+  // a fully unverified passthrough proxy — the exact opposite of what the
+  // command's own usage text ("a verifying HTTP proxy gateway") promises.
+  // Require an explicit, positive choice: either real verification material
+  // or an explicit acknowledgment that this instance is intentionally open.
+  if (requireMode === 'none' && !values['allow-unverified']) {
+    die(
+      'refusing to start an unverified passthrough gateway. Pass --public-key/--require to ' +
+        'verify requests, or --allow-unverified to explicitly run without verification.',
+    )
+  }
 
   const { createGateway } = await import('@7h3/protocol/gateway')
   const { createStaticKeyRegistry } = await import('@7h3/protocol/key-registry')
@@ -236,6 +298,23 @@ async function cmdGateway(argv: string[]): Promise<void> {
   if (publicKey && sender) keys[sender] = publicKey
   const keyRegistry = createStaticKeyRegistry(keys)
 
+  // No --replay-store flag exists (there's no CLI-friendly way to configure
+  // a shared backing store), but shipping with no replay protection at all
+  // when signatures ARE required silently drops one of the two guarantees
+  // this whole command exists to provide. An in-memory store is still only
+  // good for this single process — it won't survive a restart or a second
+  // instance — which is why this only applies to the local single-process
+  // CLI gateway, never the library default.
+  let replayStore: import('@7h3/protocol/gateway').GatewayConfig['replayStore']
+  if (requireMode !== 'none') {
+    const { RedisReplayStore, InMemoryRedisLikeClient } = await import('@7h3/protocol')
+    replayStore = new RedisReplayStore(new InMemoryRedisLikeClient())
+    process.stderr.write(
+      '[7h3] Replay protection is in-memory for this process only — it will not survive a ' +
+        'restart or a second instance. For production, use the library directly with a shared replayStore.\n',
+    )
+  }
+
   const gateway = createGateway({
     upstream: upstream!,
     keyRegistry,
@@ -243,6 +322,7 @@ async function cmdGateway(argv: string[]): Promise<void> {
     privateKey,
     sender,
     defaultPolicy: requireMode === 'none' ? 'allow' : 'deny',
+    replayStore,
   })
 
   const server = createServer(async (req, res) => {
@@ -274,6 +354,11 @@ async function cmdGateway(argv: string[]): Promise<void> {
     })
   })
 
+  // Without this, a plain EADDRINUSE (an easy real-world mistake — the port
+  // is already in use) throws as an uncaught exception: a raw Node stack
+  // trace instead of this CLI's own clean `Error: ...` convention.
+  server.on('error', (err) => die(`gateway server: ${String(err)}`))
+
   server.listen(port, () => {
     process.stderr.write(`7h3 gateway listening on port ${port}\n`)
     process.stderr.write(`  upstream      : ${upstream}\n`)
@@ -295,6 +380,7 @@ async function cmdGateway(argv: string[]): Promise<void> {
         res.end('Not Found')
       }
     })
+    metricsServer.on('error', (err) => die(`metrics server: ${String(err)}`))
     metricsServer.listen(metricsPort, () => {
       process.stderr.write(`7h3 metrics listening on :${metricsPort}/metrics\n`)
     })
@@ -345,6 +431,7 @@ async function cmdKeysServe(argv: string[]): Promise<void> {
     }
   })
 
+  server.on('error', (err) => die(`key server: ${String(err)}`))
   server.listen(port, () => {
     process.stderr.write(`7h3 key server listening on port ${port}\n`)
     process.stderr.write(`  GET /.well-known/7h3-keys\n`)

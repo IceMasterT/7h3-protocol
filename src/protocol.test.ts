@@ -179,4 +179,43 @@ describe('GLUV AIP protocol', () => {
     })
     expect(validateEnvelope({ ...atCeiling }, 0).filter((d) => d.level === 'error')).toEqual([])
   })
+
+  // NaN passes `typeof x === 'number'`, and every `<=`/`>`/`<` comparison
+  // against NaN is false — a naive typeof-only guard would let a NaN ttlMs
+  // or timestampMs silently skip the ttl-ceiling, ttl-positive, AND
+  // expiry checks all at once, and (via replayCache reservations keyed off
+  // the same fields) defeat replay protection too.
+  it('flags a non-finite ttlMs as an error instead of silently passing every ttl check', () => {
+    const unsigned = createEnvelope({
+      sender: 'agent.alpha',
+      intent: 'TASK',
+      content: 'x',
+      messageId: 'm6',
+      nonce: 'n6',
+      nowMs: 0,
+      ttlMs: 100,
+    })
+    for (const badTtl of [NaN, Infinity, -Infinity]) {
+      const tampered = { ...unsigned, header: { ...unsigned.header, ttlMs: badTtl } }
+      const diagnostics = validateEnvelope(tampered, 0)
+      expect(diagnostics.some((d) => d.level === 'error' && d.message.includes('ttlMs'))).toBe(true)
+    }
+  })
+
+  it('flags a non-finite timestampMs as an error instead of silently passing expiry checks', () => {
+    const unsigned = createEnvelope({
+      sender: 'agent.alpha',
+      intent: 'TASK',
+      content: 'x',
+      messageId: 'm7',
+      nonce: 'n7',
+      nowMs: 0,
+      ttlMs: 100,
+    })
+    for (const badTs of [NaN, Infinity, -Infinity]) {
+      const tampered = { ...unsigned, header: { ...unsigned.header, timestampMs: badTs } }
+      const diagnostics = validateEnvelope(tampered, 0)
+      expect(diagnostics.some((d) => d.level === 'error' && d.message.includes('timestampMs'))).toBe(true)
+    }
+  })
 })

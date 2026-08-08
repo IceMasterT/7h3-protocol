@@ -59,7 +59,12 @@ export function create7h3Middleware(env: MiddlewareEnv, extra?: Partial<GatewayC
     keyRegistry,
     replayStore,
     rateLimitStore,
-    defaultPolicy: (env.DEFAULT_POLICY as 'allow' | 'deny') ?? 'deny',
+    // `env.DEFAULT_POLICY` is a raw Worker env var string at runtime — the
+    // `MiddlewareEnv` type annotation doesn't validate it. Fail closed: only
+    // the exact string 'allow' opts into the permissive default; anything
+    // else (a typo, wrong casing, empty string) falls through to 'deny'
+    // rather than passing an unrecognized value straight to the gateway.
+    defaultPolicy: env.DEFAULT_POLICY === 'allow' ? 'allow' : 'deny',
     privateKey: env.GATEWAY_PRIVATE_KEY,
     sender: env.GATEWAY_SENDER,
     signResponses: !!env.GATEWAY_PRIVATE_KEY,

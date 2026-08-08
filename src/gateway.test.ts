@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest'
-import { createGateway, createProductionGateway, type GatewayRequest } from './gateway'
+import { createGateway, createProductionGateway, normalizeGatewayPath, type GatewayRequest } from './gateway'
 import { createStaticKeyRegistry } from './keyRegistry'
 import { generateEd25519KeypairBase64Url, createEnvelope, signEnvelopeEd25519, signEnvelopeHmac } from './protocol'
 import { SlidingWindowRateLimiter, type RateLimitStore } from './rateLimiter'
 import type { ReplayStore } from './replayStores'
+import { CAP_HEADER, issueCapabilityToken } from './capability'
 
 const noopReplayStore: ReplayStore = { check: async () => false }
 
@@ -107,6 +108,77 @@ describe('createProductionGateway', () => {
   it('returns a gateway when defaultPolicy is deny and replayStore is set', () => {
     const gw = createProductionGateway({ ...baseConfig, defaultPolicy: 'deny', replayStore: noopReplayStore })
     expect(typeof gw.verify).toBe('function')
+  })
+})
+
+describe('normalizeGatewayPath()', () => {
+  it('collapses .. segments', () => {
+    expect(normalizeGatewayPath('/public/../admin/secret')).toBe('/admin/secret')
+  })
+
+  it('rejects a .. that would escape above the root', () => {
+    expect(normalizeGatewayPath('/../etc/passwd')).toBeNull()
+  })
+
+  it('decodes percent-encoded traversal', () => {
+    expect(normalizeGatewayPath('/public/%2e%2e/admin')).toBe('/admin')
+  })
+
+  it('fully resolves double-encoded traversal instead of stopping after one decode pass', () => {
+    // %252e%252e -> %2e%2e (pass 1) -> .. (pass 2), then collapses normally.
+    // A single-pass decode would leave this as the literal string "%2e%2e"
+    // and miss the traversal entirely — the bounded multi-pass loop is what
+    // catches it.
+    expect(normalizeGatewayPath('/public/%252e%252e/admin')).toBe('/admin')
+  })
+
+  it('rejects malformed percent-encoding', () => {
+    expect(normalizeGatewayPath('/public/%zz')).toBeNull()
+  })
+
+  it('rejects control characters', () => {
+    expect(normalizeGatewayPath('/public/\x00admin')).toBeNull()
+  })
+
+  it('collapses redundant slashes and single-dot segments', () => {
+    expect(normalizeGatewayPath('/public//./x')).toBe('/public/x')
+  })
+
+  it('leaves an already-clean path unchanged', () => {
+    expect(normalizeGatewayPath('/api/payments/create')).toBe('/api/payments/create')
+  })
+
+  it('rejects a relative (non-absolute) path', () => {
+    expect(normalizeGatewayPath('admin/secret')).toBeNull()
+  })
+})
+
+describe('verify() — path traversal', () => {
+  it('does not let a traversal path borrow a more permissive policy', async () => {
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      defaultPolicy: 'deny',
+      policies: [{ path: '/public/**', require: 'none' }],
+    })
+    // Raw string matches /public/**, but normalizes to /admin/secret, which
+    // isn't covered by any policy — must fall through to defaultPolicy: deny,
+    // not be treated as an allowed /public/** request.
+    const req: GatewayRequest = { method: 'GET', path: '/public/../admin/secret', headers: {} }
+    const outcome = await gw.verify(req)
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) expect(outcome.status).toBe(403)
+  })
+
+  it('rejects an unnormalizable path with 400 rather than falling through to allow', async () => {
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+    })
+    const req: GatewayRequest = { method: 'GET', path: '/../etc/passwd', headers: {} }
+    const outcome = await gw.verify(req)
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) expect(outcome.status).toBe(400)
   })
 })
 
@@ -329,6 +401,22 @@ describe('handle()', () => {
     expect(response.status).toBe(403)
   })
 
+  it('forwards the normalized path to upstream, not the raw traversal string', async () => {
+    mockFetch(200, '{"ok":true}')
+
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      policies: [{ path: '/api/**', require: 'none' }],
+    })
+    const req: GatewayRequest = { method: 'GET', path: '/api/../api/data', headers: {} }
+    const response = await gw.handle(req)
+
+    expect(response.status).toBe(200)
+    const fetchMock = fetch as unknown as { mock: { calls: unknown[][] } }
+    expect(fetchMock.mock.calls[0][0]).toBe('http://upstream/api/data')
+  })
+
   it('forwards to upstream when verified and adds x-7h3 headers', async () => {
     mockFetch(200, '{"ok":true}')
 
@@ -351,6 +439,27 @@ describe('handle()', () => {
     const forwardedHeaders = fetchOpts?.headers as Record<string, string>
     expect(forwardedHeaders['x-7h3-sender']).toBe('agent-a')
     expect(forwardedHeaders['x-7h3-verified']).toBe('true')
+  })
+
+  it('does not claim x-7h3-verified: true for a request that skipped verification', async () => {
+    mockFetch(200, '{"ok":true}')
+
+    // require: 'none' means this route is intentionally unverified — the
+    // gateway must not tell the upstream otherwise.
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      policies: [{ path: '/public/**', require: 'none' }],
+    })
+    const req: GatewayRequest = { method: 'GET', path: '/public/data', headers: {} }
+    const response = await gw.handle(req)
+
+    expect(response.status).toBe(200)
+    const fetchMock = vi.mocked(fetch)
+    const [, fetchOpts] = fetchMock.mock.calls[0]
+    const forwardedHeaders = fetchOpts?.headers as Record<string, string>
+    expect(forwardedHeaders['x-7h3-verified']).toBeUndefined()
+    expect(forwardedHeaders['x-7h3-sender']).toBeUndefined()
   })
 
   it('calls upstream at correct URL', async () => {
@@ -436,5 +545,66 @@ describe('handle()', () => {
     const headers2 = await makeSignedHeader('agent-a', senderKeys.privateKey)
     const r2 = await gw.handle({ method: 'GET', path: '/api/data', headers: headers2 })
     expect(r2.status).toBe(429)
+  })
+})
+
+describe('verify() — capability-token auth path enforces allowedSenders + rate limit', () => {
+  let issuerKeys: { publicKey: string; privateKey: string }
+
+  beforeAll(async () => {
+    issuerKeys = await generateEd25519KeypairBase64Url()
+  })
+
+  async function makeCapHeader(subject: string, pathGlob = '/api/**'): Promise<Record<string, string>> {
+    const token = await issueCapabilityToken({
+      issuerPrivateKey: issuerKeys.privateKey,
+      issuerId: 'issuer-1',
+      subject,
+      scopes: [{ pathGlob }],
+      ttlMs: 60_000,
+    })
+    return { [CAP_HEADER]: JSON.stringify([token]) }
+  }
+
+  it('rejects a valid capability chain for a sender not in allowedSenders', async () => {
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      capabilityRegistry: { getPublicKey: async (id) => (id === 'issuer-1' ? issuerKeys.publicKey : null) },
+      policies: [{ path: '/api/**', require: 'any', allowedSenders: ['agent-allowed'] }],
+    })
+    const headers = await makeCapHeader('agent-not-allowed')
+    const outcome = await gw.verify({ method: 'GET', path: '/api/data', headers })
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) expect(outcome.status).toBe(403)
+  })
+
+  it('accepts a valid capability chain for a sender that is in allowedSenders', async () => {
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      capabilityRegistry: { getPublicKey: async (id) => (id === 'issuer-1' ? issuerKeys.publicKey : null) },
+      policies: [{ path: '/api/**', require: 'any', allowedSenders: ['agent-allowed'] }],
+    })
+    const headers = await makeCapHeader('agent-allowed')
+    const outcome = await gw.verify({ method: 'GET', path: '/api/data', headers })
+    expect(outcome.ok).toBe(true)
+  })
+
+  it('rate-limits repeated requests authenticated via capability token', async () => {
+    const gw = createGateway({
+      upstream: 'http://upstream',
+      keyRegistry: createStaticKeyRegistry({}),
+      capabilityRegistry: { getPublicKey: async (id) => (id === 'issuer-1' ? issuerKeys.publicKey : null) },
+      policies: [{ path: '/api/**', require: 'any', rateLimit: { requests: 1, windowMs: 10_000 } }],
+    })
+    const headers1 = await makeCapHeader('agent-cap')
+    const r1 = await gw.verify({ method: 'GET', path: '/api/data', headers: headers1 })
+    expect(r1.ok).toBe(true)
+
+    const headers2 = await makeCapHeader('agent-cap')
+    const r2 = await gw.verify({ method: 'GET', path: '/api/data', headers: headers2 })
+    expect(r2.ok).toBe(false)
+    if (!r2.ok) expect(r2.status).toBe(429)
   })
 })

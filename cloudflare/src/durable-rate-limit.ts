@@ -1,5 +1,10 @@
 import type { RateLimitPolicy, RateLimitResult, RateLimitStore } from '@7h3/protocol/rate-limiter'
 
+interface StoredWindow {
+  timestamps: number[]
+  windowMs: number
+}
+
 /**
  * Durable Object that provides fully atomic sliding-window rate limiting.
  *
@@ -31,14 +36,17 @@ export class RateLimitDurableObject {
   async fetch(request: Request): Promise<Response> {
     const { key, policy, nowMs } = await request.json<{ key: string; policy: RateLimitPolicy; nowMs: number }>()
     const cutoff = nowMs - policy.windowMs
-    const timestamps = ((await this.state.storage.get<number[]>(key)) ?? []).filter((t) => t > cutoff)
+    const stored = await this.state.storage.get<StoredWindow>(key)
+    const timestamps = (stored?.timestamps ?? []).filter((t) => t > cutoff)
     const used = timestamps.length
     const allowed = used < policy.requests
 
     if (allowed) {
       timestamps.push(nowMs)
-      await this.state.storage.put(key, timestamps)
-      this.state.storage.setAlarm(nowMs + policy.windowMs)
+      // windowMs travels with the timestamps so alarm() can sweep by this
+      // key's own real window instead of guessing one.
+      await this.state.storage.put(key, { timestamps, windowMs: policy.windowMs } satisfies StoredWindow)
+      await this.state.storage.setAlarm(nowMs + policy.windowMs)
     }
 
     const remaining = Math.max(0, policy.requests - timestamps.length)
@@ -47,12 +55,15 @@ export class RateLimitDurableObject {
   }
 
   async alarm(): Promise<void> {
-    // Clean up windows that have fully expired — Cloudflare fires alarm at set time.
-    const all = await this.state.storage.list<number[]>()
+    // Clean up windows that have fully expired, using each key's own stored
+    // windowMs — a fixed assumed window (e.g. "5 minutes") would delete a
+    // longer-window policy's state early, resetting a sender's rate limit
+    // before its real window actually elapsed.
+    const all = await this.state.storage.list<StoredWindow>()
     const now = Date.now()
     const expired: string[] = []
-    for (const [k, timestamps] of all) {
-      if (timestamps.every((t) => now - t > 300_000)) expired.push(k) // 5-min max window assumed stale
+    for (const [k, entry] of all) {
+      if (entry.timestamps.every((t) => now - t > entry.windowMs)) expired.push(k)
     }
     if (expired.length > 0) await this.state.storage.delete(expired)
   }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { wrapWebSocket, generateEd25519KeypairBase64Url, type WebSocketLike } from './wsBinding'
 import { signEnvelopeEd25519, createEnvelope, type ProtocolEnvelope } from './protocol'
 import { createStaticKeyRegistry } from './keyRegistry'
+import { InMemoryReplayCache } from './protocolReplay'
 
 // Mock WebSocket class that buffers sent messages and lets you inject received messages
 class MockWebSocket implements WebSocketLike {
@@ -217,5 +218,86 @@ describe('wrapWebSocket', () => {
     expect(frame1.body.correlationId).toBe('1')
     expect(frame2.body.correlationId).toBe('2')
     expect(frame3.body.correlationId).toBe('3')
+  })
+
+  it('without a replayCache, a captured valid frame can be re-delivered and is accepted again', async () => {
+    const keypair = await generateEd25519KeypairBase64Url()
+    const ws = new MockWebSocket()
+    const registry = createStaticKeyRegistry({ 'agent-B': keypair.publicKey })
+
+    const pws = wrapWebSocket(ws, {
+      privateKey: keypair.privateKey,
+      sender: 'agent-A',
+      keyRegistry: registry,
+    })
+
+    const received: unknown[] = []
+    pws.onMessage((payload) => received.push(payload))
+
+    const envelope = createEnvelope({ sender: 'agent-B', intent: 'TASK', content: 'hi', ttlMs: 30_000 })
+    const signed = await signEnvelopeEd25519(envelope, keypair.privateKey)
+    const raw = JSON.stringify(signed)
+
+    await new Promise<void>(resolve => { pws.onMessage(() => resolve()); ws.receive(raw) })
+    await new Promise<void>(resolve => { pws.onMessage(() => resolve()); ws.receive(raw) })
+
+    expect(received).toHaveLength(2)
+  })
+
+  it('with a replayCache, a captured valid frame is rejected on re-delivery', async () => {
+    const keypair = await generateEd25519KeypairBase64Url()
+    const ws = new MockWebSocket()
+    const registry = createStaticKeyRegistry({ 'agent-B': keypair.publicKey })
+    const replayCache = new InMemoryReplayCache()
+
+    const pws = wrapWebSocket(ws, {
+      privateKey: keypair.privateKey,
+      sender: 'agent-A',
+      keyRegistry: registry,
+      replayCache,
+    })
+
+    const received: unknown[] = []
+    const errors: Error[] = []
+    pws.onMessage((payload) => received.push(payload))
+    pws.onVerifyFail((err) => errors.push(err))
+
+    const envelope = createEnvelope({ sender: 'agent-B', intent: 'TASK', content: 'hi', ttlMs: 30_000 })
+    const signed = await signEnvelopeEd25519(envelope, keypair.privateKey)
+    const raw = JSON.stringify(signed)
+
+    await new Promise<void>(resolve => { pws.onMessage(() => resolve()); ws.receive(raw) })
+    await new Promise<void>(resolve => { pws.onVerifyFail(() => resolve()); ws.receive(raw) })
+
+    expect(received).toHaveLength(1)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].message.toLowerCase()).toContain('replay')
+  })
+
+  it('a fresh frame with a different nonce from the same sender still passes with a replayCache', async () => {
+    const keypair = await generateEd25519KeypairBase64Url()
+    const ws = new MockWebSocket()
+    const registry = createStaticKeyRegistry({ 'agent-B': keypair.publicKey })
+    const replayCache = new InMemoryReplayCache()
+
+    const pws = wrapWebSocket(ws, {
+      privateKey: keypair.privateKey,
+      sender: 'agent-A',
+      keyRegistry: registry,
+      replayCache,
+    })
+
+    const received: unknown[] = []
+    pws.onMessage((payload) => received.push(payload))
+
+    const envelope1 = createEnvelope({ sender: 'agent-B', intent: 'TASK', content: 'one', ttlMs: 30_000 })
+    const signed1 = await signEnvelopeEd25519(envelope1, keypair.privateKey)
+    const envelope2 = createEnvelope({ sender: 'agent-B', intent: 'TASK', content: 'two', ttlMs: 30_000 })
+    const signed2 = await signEnvelopeEd25519(envelope2, keypair.privateKey)
+
+    await new Promise<void>(resolve => { pws.onMessage(() => resolve()); ws.receive(JSON.stringify(signed1)) })
+    await new Promise<void>(resolve => { pws.onMessage(() => resolve()); ws.receive(JSON.stringify(signed2)) })
+
+    expect(received).toEqual(['one', 'two'])
   })
 })

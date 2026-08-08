@@ -167,9 +167,13 @@ export class KeyRotationManager {
     return {
       getPublicKey: async (senderId: string): Promise<string | null> => {
         const now = Date.now()
-        // Find by ID or return the current active key's public key
+        // A KeyRegistry must return null for an identity it doesn't manage —
+        // falling back to "the current key" here would mean a lookup for
+        // *any* unrecognized senderId resolves to whichever key happens to
+        // be current, letting one identity's signature verify while claiming
+        // to be a different, unrelated identity.
         const byId = this.keys.find(k => k.id === senderId && (!k.expiresAt || k.expiresAt > now))
-        return byId?.publicKey ?? this.getCurrentKey()?.publicKey ?? null
+        return byId?.publicKey ?? null
       },
     }
   }
@@ -221,7 +225,19 @@ export class RevocationRegistry {
         if (this.isRevoked(senderId)) return null
         return inner.getPublicKey(senderId)
       },
-      getSharedSecret: inner.getSharedSecret?.bind(inner),
+      // Forwarding inner.getSharedSecret unchanged (as a previous version of
+      // this method did) enforces revocation for Ed25519 senders but lets an
+      // HMAC identity keep authenticating after being revoked — the wrapper
+      // only wraps one of the two credential types it claims to cover.
+      // Revoked entries are keyed by whatever identifier revoke() was called
+      // with; since callers have been observed passing either a keyId or a
+      // sender id there, check both before delegating.
+      getSharedSecret: inner.getSharedSecret
+        ? async (keyId: string, sender: string) => {
+            if (this.isRevoked(keyId) || this.isRevoked(sender)) return null
+            return inner.getSharedSecret!(keyId, sender)
+          }
+        : undefined,
     }
   }
 }

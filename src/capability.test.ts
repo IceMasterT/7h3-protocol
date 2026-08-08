@@ -224,6 +224,62 @@ describe('delegateCapabilityToken', () => {
     ).rejects.toThrow(/exceed|subset/i)
   })
 
+  // matchGlob('/admin/*', '/admin/**') is true (it matches '**' as two literal
+  // asterisk characters against the regex [^/]* — a coincidence of the regex
+  // translation, not real glob containment), so a naive subset check that
+  // just calls matchGlob(parent, child) on the pattern *strings* wrongly
+  // treats a recursive '**' child as narrower than a single-segment '*'
+  // parent. It's the opposite: '**' can match arbitrarily deep paths a
+  // single '*' never would, so it must be rejected as broader, not narrower.
+  it('fails when delegated pathGlob uses ** under a parent restricted to a single *', async () => {
+    const rootKeys = await makeKeypair()
+    const agentBKeys = await makeKeypair()
+
+    const rootToken = await issueCapabilityToken({
+      issuerPrivateKey: rootKeys.privateKey,
+      issuerId: 'agent-root',
+      subject: 'agent-b',
+      scopes: [{ pathGlob: '/api/admin/*' }],
+      ttlMs: 60_000,
+      maxDelegations: 2,
+    })
+
+    await expect(
+      delegateCapabilityToken({
+        parentToken: rootToken,
+        delegatorPrivateKey: agentBKeys.privateKey,
+        delegatorId: 'agent-b',
+        newSubject: 'agent-c',
+        scopes: [{ pathGlob: '/api/admin/**' }],
+        ttlMs: 30_000,
+      }),
+    ).rejects.toThrow(/exceed|subset/i)
+  })
+
+  it('allows delegated pathGlob to narrow from ** to a more specific prefix', async () => {
+    const rootKeys = await makeKeypair()
+    const agentBKeys = await makeKeypair()
+
+    const rootToken = await issueCapabilityToken({
+      issuerPrivateKey: rootKeys.privateKey,
+      issuerId: 'agent-root',
+      subject: 'agent-b',
+      scopes: [{ pathGlob: '/api/**' }],
+      ttlMs: 60_000,
+      maxDelegations: 2,
+    })
+
+    const delegated = await delegateCapabilityToken({
+      parentToken: rootToken,
+      delegatorPrivateKey: agentBKeys.privateKey,
+      delegatorId: 'agent-b',
+      newSubject: 'agent-c',
+      scopes: [{ pathGlob: '/api/payments/**' }],
+      ttlMs: 30_000,
+    })
+    expect(delegated.scopes).toEqual([{ pathGlob: '/api/payments/**' }])
+  })
+
   it('fails when delegatorId does not match parentToken.subject', async () => {
     const rootKeys = await makeKeypair()
     const wrongKeys = await makeKeypair()
@@ -383,6 +439,138 @@ describe('verifyCapabilityChain', () => {
       expect(result.reason).toMatch(/expired/)
     }
   })
+
+  // A subject always controls their own signing key, so they can hand-sign
+  // a next hop directly instead of calling delegateCapabilityToken() — that
+  // function's own checks (scope/TTL/maxDelegations narrowing) are then
+  // just advice they can ignore. verifyCapabilityChain must independently
+  // enforce narrowing per hop, or a self-issued "delegation" can escalate
+  // scope, extend TTL past the parent, or delegate past maxDelegations=0.
+  describe('rejects forged escalation even with a structurally valid, correctly-signed chain', () => {
+    it('rejects a child token with broader scope than its parent', async () => {
+      const rootKeys = await makeKeypair()
+      const agentBKeys = await makeKeypair()
+
+      const rootToken = await issueCapabilityToken({
+        issuerPrivateKey: rootKeys.privateKey,
+        issuerId: 'agent-root',
+        subject: 'agent-b',
+        scopes: [{ pathGlob: '/api/payments/**', methods: ['POST'] }],
+        ttlMs: 60_000,
+        maxDelegations: 5,
+      })
+
+      // Hand-crafted, not via delegateCapabilityToken: scope escalated to /api/**
+      const forgedUnsigned = {
+        id: 'cap-forged-1',
+        version: '7h3-cap/1' as const,
+        issuer: 'agent-b',
+        subject: 'agent-mallory',
+        scopes: [{ pathGlob: '/api/**' }],
+        issuedAt: Date.now(),
+        expiresAt: rootToken.expiresAt,
+        delegationDepth: rootToken.delegationDepth + 1,
+        parentTokenId: rootToken.id,
+        maxDelegations: undefined,
+        keyId: 'agent-b-key',
+      }
+      const payload = canonicalizeCapabilityToken(forgedUnsigned)
+      const { signCanonicalPayloadEd25519 } = await import('./protocol')
+      const signature = await signCanonicalPayloadEd25519(payload, agentBKeys.privateKey)
+      const forged: CapabilityToken = { ...forgedUnsigned, signature }
+
+      const registry = makeKeyRegistry({
+        'agent-root': rootKeys.publicKey,
+        'agent-b': agentBKeys.publicKey,
+      })
+
+      const result = await verifyCapabilityChain([rootToken, forged], registry)
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.reason).toMatch(/scopes exceed/)
+    })
+
+    it('rejects a child token whose TTL extends past its parent', async () => {
+      const rootKeys = await makeKeypair()
+      const agentBKeys = await makeKeypair()
+
+      const rootToken = await issueCapabilityToken({
+        issuerPrivateKey: rootKeys.privateKey,
+        issuerId: 'agent-root',
+        subject: 'agent-b',
+        scopes: paymentScopes,
+        ttlMs: 60_000,
+        maxDelegations: 1,
+      })
+
+      const forgedUnsigned = {
+        id: 'cap-forged-2',
+        version: '7h3-cap/1' as const,
+        issuer: 'agent-b',
+        subject: 'agent-mallory',
+        scopes: paymentScopes,
+        issuedAt: Date.now(),
+        expiresAt: rootToken.expiresAt + 3_600_000, // 1 hour past parent expiry
+        delegationDepth: rootToken.delegationDepth + 1,
+        parentTokenId: rootToken.id,
+        maxDelegations: undefined,
+        keyId: 'agent-b-key',
+      }
+      const payload = canonicalizeCapabilityToken(forgedUnsigned)
+      const { signCanonicalPayloadEd25519 } = await import('./protocol')
+      const signature = await signCanonicalPayloadEd25519(payload, agentBKeys.privateKey)
+      const forged: CapabilityToken = { ...forgedUnsigned, signature }
+
+      const registry = makeKeyRegistry({
+        'agent-root': rootKeys.publicKey,
+        'agent-b': agentBKeys.publicKey,
+      })
+
+      const result = await verifyCapabilityChain([rootToken, forged], registry)
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.reason).toMatch(/expiresAt exceeds/)
+    })
+
+    it('rejects any further delegation once a token has maxDelegations=0', async () => {
+      const rootKeys = await makeKeypair()
+      const agentBKeys = await makeKeypair()
+
+      const rootToken = await issueCapabilityToken({
+        issuerPrivateKey: rootKeys.privateKey,
+        issuerId: 'agent-root',
+        subject: 'agent-b',
+        scopes: paymentScopes,
+        ttlMs: 60_000,
+        maxDelegations: 0,
+      })
+
+      const forgedUnsigned = {
+        id: 'cap-forged-3',
+        version: '7h3-cap/1' as const,
+        issuer: 'agent-b',
+        subject: 'agent-mallory',
+        scopes: paymentScopes,
+        issuedAt: Date.now(),
+        expiresAt: rootToken.expiresAt,
+        delegationDepth: rootToken.delegationDepth + 1,
+        parentTokenId: rootToken.id,
+        maxDelegations: undefined,
+        keyId: 'agent-b-key',
+      }
+      const payload = canonicalizeCapabilityToken(forgedUnsigned)
+      const { signCanonicalPayloadEd25519 } = await import('./protocol')
+      const signature = await signCanonicalPayloadEd25519(payload, agentBKeys.privateKey)
+      const forged: CapabilityToken = { ...forgedUnsigned, signature }
+
+      const registry = makeKeyRegistry({
+        'agent-root': rootKeys.publicKey,
+        'agent-b': agentBKeys.publicKey,
+      })
+
+      const result = await verifyCapabilityChain([rootToken, forged], registry)
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.reason).toMatch(/does not permit further delegation/)
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -456,6 +644,20 @@ describe('tokenMatchesScope', () => {
     expect(tokenMatchesScope(token, '/api/payments/status', 'GET')).toBe(true)
     // Multi-segment should NOT match single *
     expect(tokenMatchesScope(token, '/api/a/b/status', 'GET')).toBe(false)
+  })
+
+  it('fails closed when scope restricts methods but no method is given to check', async () => {
+    const rootKeys = await makeKeypair()
+    const token = await issueCapabilityToken({
+      issuerPrivateKey: rootKeys.privateKey,
+      issuerId: 'agent-root',
+      subject: 'agent-b',
+      scopes: [{ pathGlob: '/api/payments/**', methods: ['POST'] }],
+      ttlMs: 60_000,
+    })
+
+    // "can't confirm the method is allowed" must not be treated as "allowed"
+    expect(tokenMatchesScope(token, '/api/payments/create', undefined)).toBe(false)
   })
 })
 

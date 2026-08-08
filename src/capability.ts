@@ -126,21 +126,58 @@ export async function issueCapabilityToken(opts: {
 // ---------------------------------------------------------------------------
 
 /**
+ * Is every segment-for-segment pattern that `childSeg` could stand for also
+ * covered by `parentSeg`, given they're compared at the same position in the
+ * two globs? `matchGlob(parentSeg, childSeg)` (testing the child's pattern
+ * *string* as if it were literal path data) is NOT this — it happens to
+ * return true for `matchGlob('*', '**')` because `'**'` matches the regex
+ * `[^/]*` as literal characters, which incorrectly treats a recursive
+ * wildcard as a subset of a single-segment one. Only real containment
+ * relationships are: identical segments, or parent `*` containing any child
+ * segment that isn't itself `**` (since `*` only ever stands for one
+ * segment, `**` — which can stand for many — can never be narrower than it).
+ */
+function segmentIsSubset(childSeg: string, parentSeg: string): boolean {
+  if (childSeg === parentSeg) return true
+  if (parentSeg === '*') return childSeg !== '**'
+  return false
+}
+
+/**
+ * True iff every path `childGlob` can match is also matched by `parentGlob`.
+ * Walks both patterns segment-by-segment (split on `/`); a parent `**`
+ * segment covers everything from that position onward regardless of what
+ * remains in the child pattern, since `**` matches any depth. Anything this
+ * can't positively prove narrower — partial-wildcard segments like
+ * `admin*` that aren't character-identical, for instance — is treated as
+ * NOT a subset. Denying a legitimate-but-unprovable delegation is a
+ * usability cost; incorrectly approving an escalation is a security bug —
+ * this errs on the side of denial.
+ */
+function pathGlobIsSubset(childGlob: string, parentGlob: string): boolean {
+  const childSegs = childGlob.split('/')
+  const parentSegs = parentGlob.split('/')
+  let ci = 0
+  for (const parentSeg of parentSegs) {
+    if (parentSeg === '**') return true
+    if (ci >= childSegs.length) return false
+    const childSeg = childSegs[ci]
+    if (childSeg === '**') return false
+    if (!segmentIsSubset(childSeg, parentSeg)) return false
+    ci += 1
+  }
+  return ci === childSegs.length
+}
+
+/**
  * Check whether childScope is a subset of parentScope.
- * - pathGlob: the parent must matchGlob the child's pathGlob literal (or the child's glob must be
- *   at least as restrictive). We check that every path that matches child also matches parent by
- *   testing the child pathGlob against the parent pathGlob pattern.
+ * - pathGlob: every path childScope's pattern can match must also be
+ *   matched by parentScope's pattern (see pathGlobIsSubset).
  * - methods: parent undefined = any (child is allowed anything); child undefined = any =
  *   broader than a defined parent → reject.
  */
 function scopeIsSubset(child: CapabilityScope, parent: CapabilityScope): boolean {
-  // Path: child path must be covered by parent path pattern
-  if (!matchGlob(parent.pathGlob, child.pathGlob)) {
-    // Also try: child glob should be at most as broad as parent
-    // For glob subset we check that child's pathGlob matches under the parent glob pattern
-    // This covers the common case of /api/payments/** under /api/**
-    // We fall back: if parent.pathGlob doesn't match child.pathGlob directly,
-    // test by checking child is a "narrower" glob — just use matchGlob both ways
+  if (!pathGlobIsSubset(child.pathGlob, parent.pathGlob)) {
     return false
   }
 
@@ -309,6 +346,30 @@ export async function verifyCapabilityChain(
           reason: `chain-broken: token[${i}].delegationDepth ${token.delegationDepth} !== ${prev.delegationDepth + 1}`,
         }
       }
+      // These three checks are what actually enforce that delegation can
+      // only narrow, never escalate. delegateCapabilityToken() already
+      // enforces them at issuance time, but the subject of a token controls
+      // their own signing key and can always hand-sign a next hop directly
+      // — this is the only real enforcement point, since it's the one
+      // place a forged-but-validly-signed hop can't get past.
+      if (prev.maxDelegations !== undefined && prev.maxDelegations <= 0) {
+        return {
+          ok: false,
+          reason: `chain-broken: token[${i - 1}] does not permit further delegation (maxDelegations=0)`,
+        }
+      }
+      if (token.expiresAt > prev.expiresAt) {
+        return {
+          ok: false,
+          reason: `chain-broken: token[${i}].expiresAt exceeds token[${i - 1}].expiresAt`,
+        }
+      }
+      if (!scopesAreSubset(token.scopes, prev.scopes)) {
+        return {
+          ok: false,
+          reason: `chain-broken: token[${i}].scopes exceed token[${i - 1}].scopes`,
+        }
+      }
     }
 
     // Expiry check
@@ -354,14 +415,14 @@ export function tokenMatchesScope(token: CapabilityToken, pathGlob: string, meth
       continue
     }
 
-    // Check method: if scope has no methods restriction, any method is allowed
+    // Check method: if scope has no methods restriction, any method is allowed.
+    // A scope THAT DOES restrict methods but is checked with no method to
+    // compare against must fail closed — treating "can't confirm" as "assume
+    // satisfied" would let a method-restricted scope authorize every method.
     if (scope.methods === undefined) {
       return true
     }
-    if (method === undefined) {
-      return true
-    }
-    if (scope.methods.includes(method.toUpperCase())) {
+    if (method !== undefined && scope.methods.includes(method.toUpperCase())) {
       return true
     }
   }

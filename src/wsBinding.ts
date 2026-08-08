@@ -4,6 +4,7 @@ import {
   generateEd25519KeypairBase64Url, type ProtocolEnvelope
 } from './protocol'
 import type { KeyRegistry } from './keyRegistry'
+import type { ReplayCache } from './protocolReplay'
 import {
   SignedStreamWriter,
   verifyStream,
@@ -37,6 +38,13 @@ export interface WsBindingOptions {
   keyRegistry: KeyRegistry   // to look up peer public keys by sender ID
   ttlMs?: number             // per-frame TTL, default 30_000
   onVerifyFail?: (err: Error, rawData: string) => void
+  /**
+   * Optional — signature+TTL alone don't stop a captured frame from being
+   * replayed verbatim any number of times within its TTL window. Pass an
+   * InMemoryReplayCache (or a distributed one) to dedupe incoming frames by
+   * sender/messageId/nonce, same as the HTTP gateway does.
+   */
+  replayCache?: ReplayCache
 }
 
 export interface ProtectedWebSocket {
@@ -80,6 +88,14 @@ export function wrapWebSocket(ws: WebSocketLike, opts: WsBindingOptions): Protec
     if (diags.some(d => d.level === 'error')) {
       fireVerifyFail(new Error(`envelope invalid: ${diags.map(d => d.message).join('; ')}`), raw)
       return
+    }
+
+    if (opts.replayCache) {
+      const replayResult = await opts.replayCache.consume(envelope)
+      if (!replayResult.ok) {
+        fireVerifyFail(new Error(replayResult.reason ?? 'replay detected'), raw)
+        return
+      }
     }
 
     let payload: unknown = envelope.body.content

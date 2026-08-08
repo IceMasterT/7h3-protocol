@@ -95,6 +95,36 @@ describe('KeyRotationManager', () => {
     expect(current!.id).toBe('key-new')
   })
 
+  // A KeyRegistry.getPublicKey miss must mean "identity unknown," never "use
+  // whatever key happens to be current" — otherwise one managed identity's
+  // valid signature verifies while claiming to be an entirely different,
+  // unrelated senderId that was never actually registered.
+  it('toKeyRegistry().getPublicKey returns null for an unrecognized senderId instead of the current key', async () => {
+    const mgr = new KeyRotationManager({ maxAgeMs: 60_000 })
+    mgr.addKey({
+      id: 'key-real',
+      publicKey: 'pub-real',
+      privateKey: 'priv-real',
+      createdAt: Date.now(),
+    })
+
+    const result = await mgr.toKeyRegistry().getPublicKey('some-other-agent-id')
+    expect(result).toBeNull()
+  })
+
+  it('toKeyRegistry().getPublicKey still resolves a real managed key id', async () => {
+    const mgr = new KeyRotationManager({ maxAgeMs: 60_000 })
+    mgr.addKey({
+      id: 'key-real',
+      publicKey: 'pub-real',
+      privateKey: 'priv-real',
+      createdAt: Date.now(),
+    })
+
+    const result = await mgr.toKeyRegistry().getPublicKey('key-real')
+    expect(result).toBe('pub-real')
+  })
+
   // ── 5. rotateIfNeeded generates new key when current is too old ──────────
 
   it('rotateIfNeeded generates a new key when current key is too old', async () => {
@@ -274,5 +304,30 @@ describe('RevocationRegistry', () => {
 
     const result = await wrapped.getPublicKey('agent@example.com')
     expect(result).toBe('pub-key-abc')
+  })
+
+  it('wrapRegistry also blocks getSharedSecret (HMAC) for a revoked identity, not just getPublicKey (Ed25519)', async () => {
+    const inner = {
+      getPublicKey: async () => null,
+      getSharedSecret: async (_keyId: string, _sender: string) => 'the-shared-secret',
+    }
+
+    registry.revoke('agent@example.com')
+    const wrapped = registry.wrapRegistry(inner)
+
+    const result = await wrapped.getSharedSecret!('k1', 'agent@example.com')
+    expect(result).toBeNull()
+  })
+
+  it('wrapRegistry still returns the shared secret for a non-revoked identity', async () => {
+    const inner = {
+      getPublicKey: async () => null,
+      getSharedSecret: async (_keyId: string, _sender: string) => 'the-shared-secret',
+    }
+
+    const wrapped = registry.wrapRegistry(inner)
+
+    const result = await wrapped.getSharedSecret!('k1', 'agent@example.com')
+    expect(result).toBe('the-shared-secret')
   })
 })

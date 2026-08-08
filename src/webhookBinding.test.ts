@@ -8,6 +8,7 @@ import {
   generateEd25519KeypairBase64Url,
   WEBHOOK_SIG_HEADER,
   WEBHOOK_TS_HEADER,
+  InMemoryWebhookReplayCache,
 } from './webhookBinding'
 
 describe('webhookBinding', () => {
@@ -140,5 +141,71 @@ describe('webhookBinding', () => {
     const headers = await signWebhook(payloadBytes, { privateKey })
     const valid = await verifyWebhook(payloadBytes, headers, { publicKey })
     expect(valid).toBe(true)
+  })
+
+  // Replay protection — without a cache, a valid signature can be reused freely.
+  it('without a replayCache, the same valid webhook can be verified repeatedly', async () => {
+    const { privateKey, publicKey } = await generateEd25519KeypairBase64Url()
+    const payload = JSON.stringify({ event: 'payment.succeeded', amount: 100 })
+    const headers = await signWebhook(payload, { privateKey })
+    expect(await verifyWebhook(payload, headers, { publicKey })).toBe(true)
+    expect(await verifyWebhook(payload, headers, { publicKey })).toBe(true)
+  })
+
+  it('with a replayCache, a captured valid webhook is rejected on the second delivery (Ed25519)', async () => {
+    const { privateKey, publicKey } = await generateEd25519KeypairBase64Url()
+    const payload = JSON.stringify({ event: 'payment.succeeded', amount: 100 })
+    const headers = await signWebhook(payload, { privateKey })
+    const replayCache = new InMemoryWebhookReplayCache()
+
+    expect(await verifyWebhook(payload, headers, { publicKey, replayCache })).toBe(true)
+    expect(await verifyWebhook(payload, headers, { publicKey, replayCache })).toBe(false)
+  })
+
+  it('with a replayCache, a captured valid webhook is rejected on the second delivery (HMAC)', async () => {
+    const secret = 'super-secret-webhook-key'
+    const payload = JSON.stringify({ event: 'order.paid', orderId: 'abc' })
+    const headers = await signWebhookHmac(payload, { secret })
+    const replayCache = new InMemoryWebhookReplayCache()
+
+    expect(await verifyWebhookHmac(payload, headers, { secret, replayCache })).toBe(true)
+    expect(await verifyWebhookHmac(payload, headers, { secret, replayCache })).toBe(false)
+  })
+
+  it('replayCache does not consume a slot for a signature that fails verification', async () => {
+    const { privateKey, publicKey } = await generateEd25519KeypairBase64Url()
+    const payload = JSON.stringify({ event: 'ping' })
+    const headers = await signWebhook(payload, { privateKey })
+    const tamperedPayload = JSON.stringify({ event: 'pong' })
+    const replayCache = new InMemoryWebhookReplayCache()
+
+    // Tampered delivery fails verification and must not burn the real nonce.
+    expect(await verifyWebhook(tamperedPayload, headers, { publicKey, replayCache })).toBe(false)
+    // The real, untampered delivery still succeeds afterward.
+    expect(await verifyWebhook(payload, headers, { publicKey, replayCache })).toBe(true)
+  })
+
+  it('consumeWebhook rejects a replayed delivery when given a replayCache', async () => {
+    const { privateKey, publicKey } = await generateEd25519KeypairBase64Url()
+    const payload = JSON.stringify({ event: 'test' })
+    const headers = await signWebhook(payload, { privateKey })
+    const replayCache = new InMemoryWebhookReplayCache()
+
+    await expect(
+      consumeWebhook(payload, headers as unknown as Record<string, string>, { publicKey, replayCache }),
+    ).resolves.toEqual({ event: 'test' })
+    await expect(
+      consumeWebhook(payload, headers as unknown as Record<string, string>, { publicKey, replayCache }),
+    ).rejects.toThrow('7h3: webhook signature verification failed')
+  })
+
+  it('InMemoryWebhookReplayCache evicts oldest entries once maxEntries is exceeded', async () => {
+    const cache = new InMemoryWebhookReplayCache(2)
+    const now = Date.now()
+    expect(await cache.consume('a', now + 1000, now)).toBe(true)
+    expect(await cache.consume('b', now + 1000, now)).toBe(true)
+    expect(await cache.consume('c', now + 1000, now)).toBe(true) // evicts 'a'
+    // 'a' was evicted, so it can be "reused" as if never seen.
+    expect(await cache.consume('a', now + 1000, now)).toBe(true)
   })
 })

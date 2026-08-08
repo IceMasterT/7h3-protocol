@@ -36,20 +36,27 @@ export class ReplayDurableObject {
       return Response.json({ replay: true })
     }
 
-    await this.state.storage.put(key, Date.now())
-    // Schedule automatic deletion after TTL
-    this.state.storage.setAlarm(Date.now() + ttlMs)
+    // Store this key's own expiry (envelope-derived, up to MAX_TTL_MS = 24h),
+    // not the insertion time — alarm() needs the real deadline to sweep by,
+    // not a guess.
+    const expiresAt = Date.now() + ttlMs
+    await this.state.storage.put(key, expiresAt)
+    await this.state.storage.setAlarm(expiresAt)
 
     return Response.json({ replay: false })
   }
 
   async alarm(): Promise<void> {
-    // Clean up expired nonces — Cloudflare fires alarm at set time
+    // Clean up nonces whose OWN ttlMs-derived expiry has passed. A fixed
+    // window here (e.g. "5 minutes") would delete — and so stop protecting
+    // — any envelope with a longer real ttlMs before its actual expiry,
+    // silently reopening the replay window early for exactly the envelopes
+    // this store exists to protect.
     const all = await this.state.storage.list<number>()
     const now = Date.now()
     const expired: string[] = []
-    for (const [k, ts] of all) {
-      if (now - ts > 300_000) expired.push(k) // 5-min max TTL
+    for (const [k, expiresAt] of all) {
+      if (now >= expiresAt) expired.push(k)
     }
     if (expired.length > 0) await this.state.storage.delete(expired)
   }

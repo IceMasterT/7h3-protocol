@@ -20,6 +20,33 @@ describe('InMemoryReplayCache', () => {
     expect(cache.consume(envelope, 1101).ok).toBe(true)
   })
 
+  // A NaN expiresAt is falsy, so a naive `existingExpiry && existingExpiry >
+  // nowMs` check would treat "reserved, but with a corrupt expiry" the same
+  // as "never reserved" — letting the same envelope through repeatedly with
+  // no error ever surfacing. consume() must fail closed instead: refuse to
+  // store a non-finite expiry in the first place, and if one is somehow
+  // already present, treat the key as still blocked.
+  it('refuses to reserve an entry with a non-finite ttlMs/timestampMs expiry', () => {
+    const cache = new InMemoryReplayCache(100)
+    const envelope = createEnvelope({
+      sender: 'agent.alpha',
+      intent: 'PING',
+      content: 'hello',
+      messageId: 'r-nan',
+      nonce: 'n-nan',
+      nowMs: 1000,
+      ttlMs: 100,
+    })
+    const nanEnvelope = { ...envelope, header: { ...envelope.header, ttlMs: NaN } }
+
+    const first = cache.consume(nanEnvelope, 1001)
+    expect(first.ok).toBe(false)
+    // Consuming again must not silently succeed just because nothing valid
+    // was ever actually reserved for this key.
+    const second = cache.consume(nanEnvelope, 1002)
+    expect(second.ok).toBe(false)
+  })
+
   it('evicts by expiry order when capacity is reached', () => {
     const cache = new InMemoryReplayCache(2)
     const first = createEnvelope({

@@ -140,13 +140,23 @@ export class InMemoryReplayCache implements ReplayCache {
 
     const key = this.makeKey(envelope)
     const existingExpiry = this.entries.get(key)
-    if (existingExpiry && existingExpiry > nowMs) {
+    // A NaN existingExpiry is falsy, so `existingExpiry && ...` alone would
+    // silently treat "this key is already reserved, but with a corrupt
+    // expiry" as "no reservation exists" — the exact opposite of fail-closed.
+    // Callers are expected to reject non-finite timestampMs/ttlMs before
+    // ever reaching here (receiveEnvelope does, via validateEnvelope), but
+    // this is the last line of defense for any caller that doesn't.
+    if (existingExpiry !== undefined && (!Number.isFinite(existingExpiry) || existingExpiry > nowMs)) {
       return { ok: false, reason: 'Replay detected for sender/messageId/nonce' }
+    }
+
+    const expiresAt = envelope.header.timestampMs + envelope.header.ttlMs
+    if (!Number.isFinite(expiresAt)) {
+      return { ok: false, reason: 'Cannot track replay protection for a non-finite timestampMs/ttlMs' }
     }
 
     if (this.entries.size >= this.maxEntries) this.evictOne()
 
-    const expiresAt = envelope.header.timestampMs + envelope.header.ttlMs
     this.entries.set(key, expiresAt)
     this.expiries.push({ key, expiresAt })
     return { ok: true }
@@ -171,6 +181,9 @@ export class DistributedReplayCache implements ReplayCache {
   async consume(envelope: ProtocolEnvelope, nowMs = Date.now()): Promise<ReplayCheckResult> {
     const key = this.makeKey(envelope)
     const expiresAtMs = envelope.header.timestampMs + envelope.header.ttlMs
+    if (!Number.isFinite(expiresAtMs)) {
+      return { ok: false, reason: 'Cannot track replay protection for a non-finite timestampMs/ttlMs' }
+    }
     const reserved = await this.store.reserve(key, expiresAtMs, nowMs)
     if (!reserved) {
       return { ok: false, reason: 'Replay detected for sender/messageId/nonce' }

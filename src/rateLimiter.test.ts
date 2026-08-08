@@ -94,3 +94,54 @@ describe('SlidingWindowRateLimiter', () => {
     expect(limiter.consume('bob', policy).allowed).toBe(true)
   })
 })
+
+describe('SlidingWindowRateLimiter — bounded key growth', () => {
+  it('evicts least-recently-used keys once maxKeys is exceeded', () => {
+    const limiter = new SlidingWindowRateLimiter({ maxKeys: 3 })
+    const policy = { requests: 10, windowMs: 10_000 }
+
+    limiter.consume('a', policy)
+    limiter.consume('b', policy)
+    limiter.consume('c', policy)
+    // 'a' is now the least-recently-used key; adding a 4th key evicts it.
+    limiter.consume('d', policy)
+
+    // 'a' was evicted, so its window reset. Use check() (a pure read) so the
+    // assertion itself doesn't mutate the map and cascade a second eviction.
+    const aAfterEvict = limiter.check('a', policy)
+    expect(aAfterEvict.remaining).toBe(9) // requests(10) - used(0) - allowed(1)
+
+    // 'b', 'c', 'd' survived the eviction and kept their recorded usage.
+    const bStill = limiter.check('b', policy)
+    expect(bStill.remaining).toBe(8) // requests(10) - used(1) - allowed(1)
+  })
+
+  it('touching a key on consume() protects it from eviction as LRU', () => {
+    const limiter = new SlidingWindowRateLimiter({ maxKeys: 2 })
+    const policy = { requests: 10, windowMs: 10_000 }
+
+    limiter.consume('a', policy)
+    limiter.consume('b', policy)
+    // Re-touch 'a' so 'b' becomes the least-recently-used key.
+    limiter.consume('a', policy)
+    limiter.consume('c', policy) // evicts 'b', not 'a'
+
+    const bAfterEvict = limiter.check('b', policy)
+    expect(bAfterEvict.remaining).toBe(9) // 'b' was evicted, window reset
+
+    const aStillTracked = limiter.check('a', policy)
+    expect(aStillTracked.remaining).toBe(7) // 'a' consumed twice, still tracked
+  })
+
+  it('never exceeds maxKeys tracked windows regardless of unique key volume', () => {
+    const limiter = new SlidingWindowRateLimiter({ maxKeys: 5 })
+    const policy = { requests: 1, windowMs: 10_000 }
+    for (let i = 0; i < 100; i++) {
+      limiter.consume(`sender-${i}`, policy)
+    }
+    // Internal map size isn't exposed directly; verify indirectly by confirming
+    // an early key's usage was forgotten (proof it was evicted, not retained forever).
+    const earlyKeyFresh = limiter.consume('sender-0', policy)
+    expect(earlyKeyFresh.allowed).toBe(true)
+  })
+})
