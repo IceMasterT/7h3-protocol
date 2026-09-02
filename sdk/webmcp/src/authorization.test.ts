@@ -12,7 +12,7 @@ import {
   generateEd25519KeypairBase64Url,
   serializeCapabilityChain,
 } from '@7h3/protocol'
-import { guard, NONCE_FIELD } from './guard'
+import { guard, InMemoryReplayChecker, NONCE_FIELD } from './guard'
 import type { ModelContextLike, ModelContextTool } from './types'
 
 class FakeModelContext implements ModelContextLike {
@@ -284,5 +284,28 @@ describe('reserved namespace', () => {
         execute: async () => ({}),
       }),
     ).rejects.toThrow(/reserved/)
+  })
+})
+
+describe('replay store retention', () => {
+  it('remembers an accepted nonce even when handed a non-positive TTL', async () => {
+    const clock = 1_000_000
+    for (const ttl of [0, -5]) {
+      const store = new InMemoryReplayChecker(() => clock)
+      expect(await store.check('n', ttl)).toBe(false)
+      // Without a retention floor the entry expires the instant it is written,
+      // so the identical call reads as fresh and replay protection vanishes.
+      expect(await store.check('n', ttl)).toBe(true)
+    }
+  })
+
+  it('releases a nonce once its retention window has genuinely elapsed', async () => {
+    let clock = 1_000_000
+    const store = new InMemoryReplayChecker(() => clock)
+    expect(await store.check('n', 5 * 60_000)).toBe(false)
+    clock += 4 * 60_000
+    expect(await store.check('n', 5 * 60_000)).toBe(true)
+    clock += 2 * 60_000
+    expect(await store.check('n', 5 * 60_000)).toBe(false)
   })
 })

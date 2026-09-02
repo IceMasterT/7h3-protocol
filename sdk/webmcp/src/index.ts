@@ -29,6 +29,7 @@ export {
   guard,
   ToolGuard,
   InMemoryReplayChecker,
+  MIN_REPLAY_RETENTION_MS,
   isWebMcpSupported,
   parseCaps,
   GRANT_FIELD,

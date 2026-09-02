@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, TypedDict
 
@@ -493,11 +494,37 @@ def decode_envelope(raw: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _header_str(value: Any) -> str:
+    """A header string field, or "" when it is absent or not actually a string.
+
+    `str(value).strip()` is NOT equivalent: it renders None as "None", False as
+    "False" and 0 as "0" — all non-empty — so a JSON envelope carrying
+    `"nonce": null` or `"sender": 0` would satisfy a presence check while
+    carrying no usable identity or replay nonce at all.
+    """
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _header_number(value: Any) -> Optional[float]:
+    """A finite numeric header field, or None when absent, non-numeric or non-finite.
+
+    bool is excluded deliberately: `isinstance(True, int)` is True in Python, so
+    `"ttlMs": true` would otherwise be read as 1. NaN and ±Infinity are excluded
+    because every comparison against them is False, which silently defeats the
+    TTL ceiling, TTL expiry and clock-skew checks at once — and because int()
+    raises on them, which would turn a malformed envelope into an unhandled
+    exception inside a request handler rather than a clean rejection.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if math.isfinite(value) else None
+
+
 def validate_envelope(
     envelope: Dict[str, Any], now_ms: Optional[int] = None
 ) -> list[ProtocolDiagnostic]:
-    header = envelope["header"]
-    body = envelope["body"]
+    header = envelope.get("header") or {}
+    body = envelope.get("body") or {}
     current = int(now_ms if now_ms is not None else 0)
     diagnostics: list[ProtocolDiagnostic] = []
 
@@ -508,47 +535,64 @@ def validate_envelope(
                 message=f"Unsupported protocol version '{header.get('version')}'",
             )
         )
-    if not str(header.get("messageId", "")).strip():
+    if not _header_str(header.get("messageId")):
         diagnostics.append(
             ProtocolDiagnostic(level="error", message="Missing messageId")
         )
-    if not str(header.get("sender", "")).strip():
+    if not _header_str(header.get("sender")):
         diagnostics.append(
             ProtocolDiagnostic(level="error", message="Missing sender identity")
         )
-    if not str(header.get("nonce", "")).strip():
+    if not _header_str(header.get("nonce")):
         diagnostics.append(
             ProtocolDiagnostic(
                 level="error",
                 message="Missing nonce — replay protection requires a unique nonce per message",
             )
         )
-    if int(header.get("ttlMs", 0)) <= 0:
-        diagnostics.append(
-            ProtocolDiagnostic(level="error", message="ttlMs must be greater than zero")
-        )
-    if int(header.get("ttlMs", 0)) > MAX_TTL_MS:
+
+    timestamp_ms = _header_number(header.get("timestampMs"))
+    ttl_ms = _header_number(header.get("ttlMs"))
+
+    if timestamp_ms is None:
         diagnostics.append(
             ProtocolDiagnostic(
-                level="error",
-                message=f"ttlMs exceeds maximum allowed {MAX_TTL_MS} ms",
+                level="error", message="timestampMs must be a finite number"
             )
         )
+    if ttl_ms is None:
+        diagnostics.append(
+            ProtocolDiagnostic(level="error", message="ttlMs must be a finite number")
+        )
+    else:
+        if ttl_ms <= 0:
+            diagnostics.append(
+                ProtocolDiagnostic(
+                    level="error", message="ttlMs must be greater than zero"
+                )
+            )
+        if ttl_ms > MAX_TTL_MS:
+            diagnostics.append(
+                ProtocolDiagnostic(
+                    level="error",
+                    message=f"ttlMs exceeds maximum allowed {MAX_TTL_MS} ms",
+                )
+            )
 
-    if now_ms is not None:
-        if int(header.get("timestampMs", 0)) > current + MAX_CLOCK_SKEW_MS:
+    if now_ms is not None and timestamp_ms is not None:
+        if timestamp_ms > current + MAX_CLOCK_SKEW_MS:
             diagnostics.append(
                 ProtocolDiagnostic(
                     level="error",
                     message=f"timestampMs is more than {MAX_CLOCK_SKEW_MS} ms in the future",
                 )
             )
-        if int(header.get("timestampMs", 0)) + int(header.get("ttlMs", 0)) < current:
+        if ttl_ms is not None and timestamp_ms + ttl_ms < current:
             diagnostics.append(
                 ProtocolDiagnostic(level="error", message="Message TTL expired")
             )
 
-    if not str(body.get("content", "")).strip():
+    if not _header_str(body.get("content")):
         diagnostics.append(
             ProtocolDiagnostic(level="warning", message="Empty content payload")
         )

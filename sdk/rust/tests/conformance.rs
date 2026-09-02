@@ -211,3 +211,20 @@ fn rejects_post_dated_timestamp() {
         "timestamp within skew must not error, got {within:?}"
     );
 }
+
+/// Parity with the TypeScript, Python and Go SDKs: the nonce IS the
+/// replay-protection primitive, so an envelope without one must be rejected.
+#[test]
+fn rejects_missing_nonce() {
+    let fixtures = load_fixtures();
+    let mut envelope = fixtures.vectors[0].envelope.clone();
+    envelope.header.nonce = "   ".to_string();
+
+    let diagnostics = validate_envelope(&envelope, Some(envelope.header.timestamp_ms));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.level == "error" && d.message.contains("Missing nonce")),
+        "expected a missing-nonce error, got {diagnostics:?}"
+    );
+}

@@ -47,6 +47,17 @@ export interface ReplayChecker {
   check(key: string, ttlMs: number): Promise<boolean>
 }
 
+/**
+ * Shortest time an accepted nonce is remembered, whatever TTL the caller passes.
+ *
+ * A nonce we let through must be remembered, or it is not replay protection at
+ * all: with `ttlMs <= 0` the entry would expire the instant it was written, so
+ * the very next identical call would read as fresh. `decide()` never passes a
+ * non-positive TTL — the expiry check runs first — but this class is exported,
+ * and a replay store that silently fails open is the wrong kind of surprise.
+ */
+export const MIN_REPLAY_RETENTION_MS = 60_000
+
 /** Zero-dependency replay store. Adequate for a page session; swap for Redis/KV server-side. */
 export class InMemoryReplayChecker implements ReplayChecker {
   private seen = new Map<string, number>()
@@ -55,7 +66,7 @@ export class InMemoryReplayChecker implements ReplayChecker {
     const now = this.now()
     for (const [k, expiry] of this.seen) if (expiry <= now) this.seen.delete(k)
     if (this.seen.has(key)) return true
-    this.seen.set(key, now + ttlMs)
+    this.seen.set(key, now + Math.max(ttlMs, MIN_REPLAY_RETENTION_MS))
     return false
   }
 }

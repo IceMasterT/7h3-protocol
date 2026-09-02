@@ -363,6 +363,13 @@ pub fn validate_envelope(
             message: "Missing sender identity".to_string(),
         });
     }
+    if envelope.header.nonce.trim().is_empty() {
+        diagnostics.push(ProtocolDiagnostic {
+            level: "error".to_string(),
+            message: "Missing nonce — replay protection requires a unique nonce per message"
+                .to_string(),
+        });
+    }
     if envelope.header.ttl_ms <= 0 {
         diagnostics.push(ProtocolDiagnostic {
             level: "error".to_string(),

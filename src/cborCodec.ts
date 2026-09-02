@@ -232,18 +232,44 @@ export class CborEncoder {
   }
 }
 
+/**
+ * Maximum nesting depth accepted while decoding.
+ *
+ * RFC 8949 §10 calls this out explicitly: a decoder that recurses per nesting
+ * level turns a handful of attacker bytes into a stack overflow. `0x81` is
+ * "array of 1", so 50 KB of repeated `0x81` nests 50 000 deep and blows the
+ * stack — and CBOR arrives straight off the wire through the HTTP binding.
+ * 64 is far beyond any real envelope, which nests a handful of levels at most.
+ */
+export const MAX_CBOR_DEPTH = 64
+
 export class CborDecoder {
   private data!: Uint8Array
   private offset = 0
+  private depth = 0
 
   decode(data: Uint8Array): unknown {
     this.data = data
     this.offset = 0
+    this.depth = 0
     const result = this._decode()
     return result
   }
 
+  /** Depth-counting wrapper around the recursive decode body. */
   private _decode(): unknown {
+    if (this.depth >= MAX_CBOR_DEPTH) {
+      throw new Error(`CborDecoder: nesting depth exceeds maximum of ${MAX_CBOR_DEPTH}`)
+    }
+    this.depth++
+    try {
+      return this._decodeItem()
+    } finally {
+      this.depth--
+    }
+  }
+
+  private _decodeItem(): unknown {
     const initialByte = this._readByte()
     const majorType = (initialByte >> 5) & 0x7
     const additionalInfo = initialByte & 0x1f

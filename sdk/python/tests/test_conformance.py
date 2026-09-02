@@ -170,3 +170,39 @@ class ClockSkewCeilingTest(unittest.TestCase):
         now = 1_700_000_000_000
         diags = validate_envelope(self._envelope(now + MAX_CLOCK_SKEW_MS - 1_000), now)
         self.assertEqual([d for d in diags if d.level == "error"], [])
+
+
+class HeaderTypeConfusionTest(unittest.TestCase):
+    """`str(value).strip()` renders None as "None", False as "False" and 0 as
+    "0" — all non-empty — so a presence check written that way accepts an
+    envelope carrying no usable identity or replay nonce. Parity with the
+    TypeScript and Go SDKs, which reject every case here."""
+
+    def _envelope(self, **overrides):
+        header = {
+            "version": "7h3/0.1", "messageId": "m1", "timestampMs": 1_700_000_000_000,
+            "ttlMs": 60_000, "sender": "a@b.test", "nonce": "abc",
+        }
+        header.update(overrides)
+        return {"header": header, "body": {"intent": "TASK", "content": "x"}}
+
+    def _errors(self, **overrides):
+        diags = validate_envelope(self._envelope(**overrides), 1_700_000_000_000)
+        return [d.message for d in diags if d.level == "error"]
+
+    def test_null_and_non_string_identity_fields_are_rejected(self):
+        for field in ("sender", "messageId", "nonce"):
+            for bad in (None, 0, False, {"a": 1}, []):
+                with self.subTest(field=field, value=bad):
+                    self.assertTrue(self._errors(**{field: bad}), f"{field}={bad!r} slipped through")
+
+    def test_non_finite_and_non_numeric_numbers_are_rejected_not_raised(self):
+        for field in ("ttlMs", "timestampMs"):
+            for bad in (float("nan"), float("inf"), "abc", None, True, [1]):
+                with self.subTest(field=field, value=bad):
+                    # Must be a diagnostic, never an unhandled exception: these
+                    # reach validate_envelope straight off the wire.
+                    self.assertTrue(self._errors(**{field: bad}), f"{field}={bad!r} slipped through")
+
+    def test_a_well_formed_envelope_still_validates(self):
+        self.assertEqual(self._errors(), [])

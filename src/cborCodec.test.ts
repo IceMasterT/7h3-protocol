@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeCbor, decodeCbor, CborEncoder } from './cborCodec'
+import { encodeCbor, decodeCbor, CborEncoder, MAX_CBOR_DEPTH } from './cborCodec'
 import { encodeEnvelopeCbor, decodeEnvelopeCbor } from './envelopeCbor'
 import type { ProtocolEnvelope } from './protocol'
 
@@ -326,5 +326,34 @@ describe('envelopeCbor - rejects wrong-typed and non-finite fields', () => {
   it('rejects a non-string sender field', () => {
     const bytes = encodeRawEnvelope({ 5: 12345 })
     expect(() => decodeEnvelopeCbor(bytes)).toThrow(/sender must be a string/)
+  })
+})
+
+describe('CborDecoder — nesting depth limit', () => {
+  /** `0x81` is "array of 1", so N of them nests N deep for N bytes of input. */
+  function nested(depth: number): Uint8Array {
+    const bytes = new Uint8Array(depth + 1)
+    bytes.fill(0x81, 0, depth)
+    bytes[depth] = 0x00
+    return bytes
+  }
+
+  it('decodes nesting within the limit', () => {
+    expect(() => decodeCbor(nested(MAX_CBOR_DEPTH - 1))).not.toThrow()
+  })
+
+  it('rejects nesting at and beyond the limit instead of overflowing the stack', () => {
+    // Without a bound this is a stack overflow from a few bytes of wire input —
+    // RFC 8949 §10 calls the limit out explicitly.
+    expect(() => decodeCbor(nested(MAX_CBOR_DEPTH))).toThrow(/nesting depth/)
+    expect(() => decodeCbor(nested(200_000))).toThrow(/nesting depth/)
+  })
+
+  it('still round-trips a realistically nested envelope', () => {
+    const envelope = {
+      header: { version: '7h3/0.1', tags: [1, 2, { nested: { deeper: [3] } }] },
+      body: { intent: 'TASK', content: 'x' },
+    }
+    expect(decodeCbor(encodeCbor(envelope))).toEqual(envelope)
   })
 })
