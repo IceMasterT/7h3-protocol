@@ -1,0 +1,8 @@
+name = "7h3-webmcp-ledger"
+compatibility_date = "2026-09-01"
+
+# Assets-only Worker: WebMCP requires a secure context, and Workers serves the
+# built SPA over HTTPS with no additional configuration.
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"

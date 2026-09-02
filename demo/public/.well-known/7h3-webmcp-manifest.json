@@ -1,0 +1,80 @@
+{
+  "version": "7h3-webmcp-manifest/1",
+  "origin": "7h3-webmcp-ledger",
+  "issuedAt": 1788339033195,
+  "tools": [
+    {
+      "name": "list_invoices",
+      "description": "List invoices on the account, optionally filtered by status (open, paid, refunded).",
+      "scope": "public",
+      "method": "READ",
+      "digest": "42ab9ed4a263e67dde1b05af879dee95a6a23140ff5b18d6081dff2f013a5691"
+    },
+    {
+      "name": "get_invoice",
+      "description": "Read a single invoice by id, for example INV-1041.",
+      "scope": "public",
+      "method": "READ",
+      "digest": "36dd5f7d6ce736a912a83a0e5080e60e4e0f235046154b5e895b2c046011d4e6"
+    },
+    {
+      "name": "get_outstanding_balance",
+      "description": "Total value of all open invoices, in cents and formatted.",
+      "scope": "public",
+      "method": "READ",
+      "digest": "12c0c6218c6ecca8502ea8421e72e12c30f3973e4f688a93756bb72a05f8c9c9"
+    },
+    {
+      "name": "create_invoice",
+      "description": "Create a new invoice for a customer.",
+      "scope": "invoices/create",
+      "method": "WRITE",
+      "digest": "e852c679311155fa2d10895afcbca3bc5dd887e000dfd486fe32cc9fb8545a58"
+    },
+    {
+      "name": "pay_invoice",
+      "description": "Pay an open invoice from the operating account.",
+      "scope": "money/pay_invoice",
+      "method": "WRITE",
+      "digest": "d43b77b2a465e41dd3ab96caca74db355642d9f10f97e6d9ed7245199467171e"
+    },
+    {
+      "name": "issue_refund",
+      "description": "Refund a paid invoice back to the customer.",
+      "scope": "money/refund",
+      "method": "WRITE",
+      "digest": "76380cfafc519467257d2f5f99eb5c2f567827254f968e469a5c2fdd8e28158a"
+    },
+    {
+      "name": "delete_invoice",
+      "description": "Permanently delete an invoice. This cannot be undone.",
+      "scope": "invoices/delete",
+      "method": "WRITE",
+      "digest": "3e17c4db0ac399902295b8973cc20fe84272a83289fa80e52f1dfcdfa3cb8bd4"
+    },
+    {
+      "name": "export_customers",
+      "description": "Export the full customer list, including email addresses.",
+      "scope": "data/export",
+      "method": "WRITE",
+      "digest": "8238e5c9218e3e05e5429ff9cc3f6ceae2824008395c0b671220fbfabede9373"
+    },
+    {
+      "name": "wire_funds",
+      "description": "Wire funds to an external bank account.",
+      "scope": "money/wire",
+      "method": "WRITE",
+      "digest": "d6222d6df8108382912a2db1537147b13dd4ef99829d573e583f76be499ce217"
+    },
+    {
+      "name": "request_access",
+      "description": "Ask the account owner for permission to perform an action you are not currently authorized for. Explain what you need and why; the owner sees your request and approves or denies it in the page. Call this when another tool refuses you with no-active-grant or scope-not-covered.",
+      "scope": "public",
+      "method": "WRITE",
+      "digest": "e88ab8cb04d4efc079d9599de551973fe6ddf8fdecb99d306f62cde7e4bc5275"
+    }
+  ],
+  "surfaceDigest": "1b7d39a7f621e7fe90f13ef5e8633d131bfd5cd802644fa4658341be4c4bf03c",
+  "keyId": "7h3-webmcp-ledger-origin-k1",
+  "signature": "QisJygZLf0KYgjjh2GsjFxQsvsDQ7DfbshEw9NuUPg1Nz8lkTv-CdXn8uvLrWCJ_kKvRuwhLYEFDyyMINIYcDw"
+}

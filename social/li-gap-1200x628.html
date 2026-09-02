@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 628px; overflow: hidden;
+    background: #08080f;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Grid bg */
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(99,102,241,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Glow blobs */
+  .blob1 {
+    position: absolute; width: 480px; height: 480px;
+    background: radial-gradient(circle, rgba(99,102,241,.22) 0%, transparent 70%);
+    top: -80px; left: -80px; pointer-events: none;
+  }
+  .blob2 {
+    position: absolute; width: 360px; height: 360px;
+    background: radial-gradient(circle, rgba(6,182,212,.18) 0%, transparent 70%);
+    bottom: -60px; right: 60px; pointer-events: none;
+  }
+
+  .layout {
+    position: relative; z-index: 2;
+    display: grid; grid-template-columns: 1fr 1px 1fr;
+    height: 100%; padding: 0 0;
+  }
+
+  /* Divider */
+  .divider {
+    background: linear-gradient(to bottom, transparent, rgba(99,102,241,.5) 30%, rgba(6,182,212,.5) 70%, transparent);
+    align-self: stretch; margin: 32px 0;
+  }
+
+  /* LEFT — problem */
+  .left {
+    padding: 52px 56px 52px 64px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+
+  .badge-danger {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3);
+    border-radius: 24px; padding: 6px 16px; margin-bottom: 28px;
+    width: fit-content;
+  }
+  .badge-danger .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+  .badge-danger span { color: #f87171; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+
+  .left h2 {
+    color: #e2e8f0; font-size: 15px; font-weight: 500; letter-spacing: .06em;
+    text-transform: uppercase; margin-bottom: 18px; opacity: .6;
+  }
+
+  .problem-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    margin-bottom: 22px;
+  }
+  .problem-item .icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
+  }
+  .problem-item .text strong {
+    display: block; color: #f1f5f9; font-size: 17px; font-weight: 600; margin-bottom: 4px;
+  }
+  .problem-item .text p {
+    color: #94a3b8; font-size: 13.5px; line-height: 1.5;
+  }
+
+  .strike { text-decoration: line-through; opacity: .5; }
+
+  /* RIGHT — solution */
+  .right {
+    padding: 52px 64px 52px 56px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+
+  .badge-solve {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.35);
+    border-radius: 24px; padding: 6px 16px; margin-bottom: 28px;
+    width: fit-content;
+  }
+  .badge-solve span { color: #a5b4fc; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+
+  .right h2 {
+    color: #e2e8f0; font-size: 15px; font-weight: 500; letter-spacing: .06em;
+    text-transform: uppercase; margin-bottom: 18px; opacity: .6;
+  }
+
+  .solution-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    margin-bottom: 20px;
+  }
+  .solution-item .icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.25);
+  }
+  .solution-item .text strong {
+    display: block; color: #f1f5f9; font-size: 17px; font-weight: 600; margin-bottom: 4px;
+  }
+  .solution-item .text p {
+    color: #94a3b8; font-size: 13.5px; line-height: 1.5;
+  }
+  .solution-item .text code {
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    color: #a5b4fc; font-size: 12.5px;
+    background: rgba(99,102,241,.12); border-radius: 4px; padding: 1px 6px;
+  }
+
+  /* Bottom strip */
+  .bottom-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+    height: 52px;
+    background: linear-gradient(90deg, rgba(99,102,241,.15), rgba(6,182,212,.1));
+    border-top: 1px solid rgba(99,102,241,.2);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 64px;
+  }
+  .bottom-bar .tagline {
+    color: #64748b; font-size: 13px;
+  }
+  .bottom-bar .pkg {
+    font-family: monospace; color: #a5b4fc; font-size: 13px; font-weight: 600;
+    background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.25);
+    border-radius: 6px; padding: 4px 12px;
+  }
+  .bottom-bar .langs {
+    display: flex; gap: 8px;
+  }
+  .lang-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 4px;
+  }
+  .lang-ts { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.25); }
+  .lang-py { background: rgba(234,179,8,.12); color: #fbbf24; border: 1px solid rgba(234,179,8,.25); }
+  .lang-rs { background: rgba(249,115,22,.12); color: #fb923c; border: 1px solid rgba(249,115,22,.25); }
+
+  /* Big headline spans full top */
+  .headline-strip {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 4;
+    height: 72px;
+    display: flex; align-items: center; justify-content: center;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .headline-strip h1 {
+    font-size: 26px; font-weight: 800; letter-spacing: -.01em;
+    background: linear-gradient(90deg, #c7d2fe, #67e8f9);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .headline-strip h1 em {
+    font-style: normal;
+    background: linear-gradient(90deg, #f87171, #fb923c);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="blob1"></div>
+<div class="blob2"></div>
+
+<div class="headline-strip">
+  <h1>Your agent stack has a <em>security gap</em> — here's where.</h1>
+</div>
+
+<div class="layout" style="margin-top:72px; height: calc(100% - 72px - 52px);">
+  <!-- LEFT -->
+  <div class="left">
+    <div class="badge-danger"><div class="dot"></div><span>The gap</span></div>
+    <h2>What existing protocols miss</h2>
+
+    <div class="problem-item">
+      <div class="icon">📡</div>
+      <div class="text">
+        <strong>MCP — unsigned JSON-RPC</strong>
+        <p>Every tool call sent in the clear. No signature, no freshness guarantee. Traffic is trivially replayable.</p>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="icon">🪪</div>
+      <div class="text">
+        <strong>A2A — signs the identity card, not the traffic</strong>
+        <p>Authentication at connection time. Individual messages remain unsigned and replayable mid-session.</p>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="icon">🔁</div>
+      <div class="text">
+        <strong>No replay protection by default</strong>
+        <p>Captured messages can be reinjected. Duplicate execution = silent data corruption or double-spend.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="badge-solve"><span>✦ AIP Solution</span></div>
+    <h2>What @7h3/protocol adds</h2>
+
+    <div class="solution-item">
+      <div class="icon">✍️</div>
+      <div class="text">
+        <strong>Per-message signing</strong>
+        <p>Every envelope: <code>HMAC-SHA256</code> or <code>Ed25519</code> over deterministic canonical form. Tamper is detectable in transit.</p>
+      </div>
+    </div>
+
+    <div class="solution-item">
+      <div class="icon">🛡️</div>
+      <div class="text">
+        <strong>Replay cache (Redis, atomic)</strong>
+        <p><code>SET NX PX</code> per <code>(sender, messageId, nonce)</code>. Fleet-wide — revoke a key on one node, rejected everywhere.</p>
+      </div>
+    </div>
+
+    <div class="solution-item">
+      <div class="icon">📦</div>
+      <div class="text">
+        <strong>Drop-in MCP wrapper</strong>
+        <p>Wrap your existing handler: <code>wrapMcpServer(handler)</code>. Four threat bindings enforced. Zero handler changes.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <span class="tagline">The signing-and-replay layer your agent protocol forgot.</span>
+  <span class="pkg">npm install @7h3/protocol</span>
+  <div class="langs">
+    <span class="lang-badge lang-ts">TypeScript</span>
+    <span class="lang-badge lang-py">Python</span>
+    <span class="lang-badge lang-rs">Rust</span>
+  </div>
+</div>
+</body>
+</html>

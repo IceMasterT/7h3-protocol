@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { buildScaffold } from './scaffold'
+import { MCP_PACKAGE_SPEC, MCP_VERSION } from './version'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -13,7 +15,7 @@ import {
 } from '@7h3/protocol'
 import { randomBytes } from 'node:crypto'
 
-const server = new McpServer({ name: '@7h3/protocol-mcp', version: '0.5.0' })
+const server = new McpServer({ name: '@7h3/protocol-mcp', version: MCP_VERSION })
 
 // Agent identifiers get embedded into generated source code (buildScaffold,
 // buildBoilerplate) that this tool tells callers is "ready-to-paste" with
@@ -180,9 +182,11 @@ server.registerTool(
 server.registerTool(
   '7h3_scaffold',
   {
-    description: 'Generate ready-to-paste integration code that adds 7h3 Protocol verification to a target framework or runtime.',
+    description:
+      'Generate ready-to-paste integration code that adds 7h3 Protocol verification to a target framework or runtime. ' +
+      "Use framework='webmcp' to put signed, capability-scoped, receipted WebMCP tools (document.modelContext) on a web page.",
     inputSchema: {
-      framework: z.enum(['cloudflare-worker', 'nextjs', 'express', 'hono', 'fastify', 'claude-code', 'raw']).describe(
+      framework: z.enum(['webmcp', 'cloudflare-worker', 'nextjs', 'express', 'hono', 'fastify', 'claude-code', 'raw']).describe(
         'Target framework or runtime to generate scaffold code for.',
       ),
       signingMethod: z.enum(['ed25519', 'hmac']).describe(
@@ -215,7 +219,7 @@ server.registerTool(
           mcpServers: {
             '7h3-protocol': {
               command: 'npx',
-              args: ['-y', '@7h3/protocol-mcp@0.5.0'],
+              args: ['-y', MCP_PACKAGE_SPEC],
             },
           },
         },
@@ -226,7 +230,7 @@ server.registerTool(
           mcpServers: {
             '7h3-protocol': {
               command: 'npx',
-              args: ['-y', '@7h3/protocol-mcp@0.5.0'],
+              args: ['-y', MCP_PACKAGE_SPEC],
             },
           },
         },
@@ -237,14 +241,14 @@ server.registerTool(
           mcp: {
             '7h3-protocol': {
               type: 'local',
-              command: ['npx', '-y', '@7h3/protocol-mcp@0.5.0'],
+              command: ['npx', '-y', MCP_PACKAGE_SPEC],
             },
           },
         },
       },
       npx: {
         description: 'Run directly without installing',
-        command: 'npx -y @7h3/protocol-mcp@0.5.0',
+        command: `npx -y ${MCP_PACKAGE_SPEC}`,
       },
     }
 
@@ -278,324 +282,6 @@ server.registerTool(
     }
   },
 )
-
-// ── scaffold generator ────────────────────────────────────────────────────────
-
-// Safely embed a runtime string as a JS/TS string-literal expression inside
-// generated source. JSON.stringify escapes quotes, backslashes, and newlines
-// into their two-character escape sequences, so the value can never break out
-// of the literal it's embedded in (or, when embedded inside a `//` comment,
-// can never introduce an actual newline that would end the comment early).
-function jsStr(value: string): string {
-  return JSON.stringify(value)
-}
-
-function buildScaffold(
-  framework: 'cloudflare-worker' | 'nextjs' | 'express' | 'hono' | 'fastify' | 'claude-code' | 'raw',
-  signingMethod: 'ed25519' | 'hmac',
-  sender: string,
-  upstream?: string,
-): string {
-  const envBlock = signingMethod === 'hmac'
-    ? `const SECRET = process.env.P7H3_SECRET ?? 'REPLACE_ME'`
-    : `const PUBLIC_KEY = process.env.P7H3_PUBLIC_KEY ?? 'REPLACE_ME'`
-
-  const verifyCall = signingMethod === 'hmac'
-    ? `await verifyHttpEnvelope(request, { secretResolver: async () => SECRET })`
-    : `await verifyHttpEnvelope(request, { publicKey: PUBLIC_KEY })`
-
-  switch (framework) {
-    case 'cloudflare-worker': {
-      const upstreamUrl = upstream ?? 'https://your-upstream.example.com'
-      return `// 7h3 Protocol Gateway — Cloudflare Worker
-// Install: npm install @7h3/protocol
-// Generated for sender: ${jsStr(sender)}
-
-import { createGateway } from '@7h3/protocol/gateway'
-import { KvKeyRegistry, KvReplayStore } from './kv-replay-store'
-
-export interface Env {
-  P7H3_KV: KVNamespace
-${signingMethod === 'hmac' ? '  P7H3_SECRET: string' : '  P7H3_PUBLIC_KEY: string'}
-}
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const registry = new KvKeyRegistry(env.P7H3_KV)
-    const replayStore = new KvReplayStore(env.P7H3_KV)
-
-    const gateway = createGateway({
-      upstream: ${jsStr(upstreamUrl)},
-      signingMethod: '${signingMethod}',
-${signingMethod === 'hmac'
-  ? '      secretResolver: async () => env.P7H3_SECRET,'
-  : '      publicKeyResolver: async () => env.P7H3_PUBLIC_KEY,'}
-      keyRegistry: registry,
-      replayStore,
-    })
-
-    return gateway.fetch(request, ctx)
-  },
-}
-
-// ── wrangler.toml snippet ──────────────────────────────────────────────────
-//
-// [vars]
-// # add secret via: wrangler secret put P7H3_${signingMethod === 'hmac' ? 'SECRET' : 'PUBLIC_KEY'}
-//
-// [[kv_namespaces]]
-// binding = "P7H3_KV"
-// id = "YOUR_KV_NAMESPACE_ID"
-`
-    }
-
-    case 'nextjs': {
-      return `// 7h3 Protocol — Next.js Middleware
-// File: middleware.ts (project root)
-// Install: npm install @7h3/protocol
-// Generated for sender: ${jsStr(sender)}
-
-import { NextRequest, NextResponse } from 'next/server'
-import { verifyHttpEnvelope } from '@7h3/protocol'
-
-${envBlock}
-
-export async function middleware(request: NextRequest): Promise<NextResponse> {
-  // Only enforce 7h3 verification on API routes
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    const envelope = request.headers.get('x-7h3-envelope')
-    if (!envelope) {
-      return NextResponse.json({ error: 'Missing x-7h3-envelope header' }, { status: 401 })
-    }
-
-    try {
-      const valid = ${verifyCall}
-      if (!valid) {
-        return NextResponse.json({ error: 'Invalid 7h3 envelope signature' }, { status: 401 })
-      }
-    } catch (err) {
-      return NextResponse.json(
-        { error: \`7h3 verification failed: \${err instanceof Error ? err.message : String(err)}\` },
-        { status: 401 },
-      )
-    }
-  }
-
-  return NextResponse.next()
-}
-
-export const config = {
-  matcher: '/api/:path*',
-}
-`
-    }
-
-    case 'express': {
-      return `// 7h3 Protocol — Express Middleware
-// Install: npm install @7h3/protocol express
-// Generated for sender: ${jsStr(sender)}
-
-import express, { Request, Response, NextFunction } from 'express'
-import { verifyHttpEnvelope } from '@7h3/protocol'
-
-${envBlock}
-
-async function verify7h3(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const envelope = req.headers['x-7h3-envelope']
-  if (!envelope || typeof envelope !== 'string') {
-    res.status(401).json({ error: 'Missing x-7h3-envelope header' })
-    return
-  }
-
-  try {
-    const valid = ${verifyCall}
-    if (!valid) {
-      res.status(401).json({ error: 'Invalid 7h3 envelope signature' })
-      return
-    }
-    next()
-  } catch (err) {
-    res.status(401).json({ error: \`7h3 verification failed: \${err instanceof Error ? err.message : String(err)}\` })
-  }
-}
-
-// Usage:
-const app = express()
-app.use(express.json())
-
-// Apply globally
-app.use(verify7h3)
-
-// Or per-route
-// app.post('/webhook', verify7h3, (req, res) => { ... })
-
-app.listen(3000, () => console.log('Server running on :3000'))
-`
-    }
-
-    case 'hono': {
-      return `// 7h3 Protocol — Hono Middleware
-// Install: npm install @7h3/protocol hono
-// Generated for sender: ${jsStr(sender)}
-
-import { Hono } from 'hono'
-import { createMiddleware } from 'hono/factory'
-import { verifyHttpEnvelope } from '@7h3/protocol'
-
-${envBlock}
-
-const verify7h3 = createMiddleware(async (c, next) => {
-  const envelope = c.req.header('x-7h3-envelope')
-  if (!envelope) {
-    return c.json({ error: 'Missing x-7h3-envelope header' }, 401)
-  }
-
-  try {
-    const valid = ${verifyCall}
-    if (!valid) {
-      return c.json({ error: 'Invalid 7h3 envelope signature' }, 401)
-    }
-  } catch (err) {
-    return c.json(
-      { error: \`7h3 verification failed: \${err instanceof Error ? err.message : String(err)}\` },
-      401,
-    )
-  }
-
-  await next()
-})
-
-const app = new Hono()
-
-// Apply globally
-app.use('*', verify7h3)
-
-// Or per-route
-// app.post('/webhook', verify7h3, (c) => c.json({ ok: true }))
-
-app.get('/', (c) => c.json({ ok: true }))
-
-export default app
-`
-    }
-
-    case 'fastify': {
-      return `// 7h3 Protocol — Fastify Hook
-// Install: npm install @7h3/protocol fastify
-// Generated for sender: ${jsStr(sender)}
-
-import Fastify, { FastifyRequest, FastifyReply } from 'fastify'
-import { verifyHttpEnvelope } from '@7h3/protocol'
-
-${envBlock}
-
-const fastify = Fastify({ logger: true })
-
-// Add preHandler hook globally for 7h3 verification
-fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
-  const envelope = request.headers['x-7h3-envelope']
-  if (!envelope || typeof envelope !== 'string') {
-    reply.status(401).send({ error: 'Missing x-7h3-envelope header' })
-    return
-  }
-
-  try {
-    const valid = ${verifyCall}
-    if (!valid) {
-      reply.status(401).send({ error: 'Invalid 7h3 envelope signature' })
-      return
-    }
-  } catch (err) {
-    reply.status(401).send({
-      error: \`7h3 verification failed: \${err instanceof Error ? err.message : String(err)}\`,
-    })
-  }
-})
-
-fastify.get('/', async () => ({ ok: true }))
-
-fastify.listen({ port: 3000 }, (err) => {
-  if (err) {
-    fastify.log.error(err)
-    process.exit(1)
-  }
-})
-`
-    }
-
-    case 'claude-code': {
-      return `// 7h3 Protocol — Claude Code MCP installation
-// Paste the following into .claude/settings.json
-
-{
-  "mcpServers": {
-    "7h3-protocol": {
-      "command": "npx",
-      "args": ["-y", "@7h3/protocol-mcp@0.5.0"]
-    }
-  }
-}
-
-// After saving, restart Claude Code. The following tools become available:
-//   7h3_generate_secret    — generate HMAC secret
-//   7h3_generate_keypair   — generate Ed25519 keypair
-//   7h3_wrap_mcp_server    — wrap an MCP server with 7h3 signing
-//   7h3_sign               — sign a test envelope
-//   7h3_verify             — verify an envelope
-//   7h3_scaffold           — generate integration code for a framework
-//   7h3_mcp_config         — show install config for all editors
-//
-// Sender identity configured for this scaffold: ${jsStr(sender)}
-// Signing method: ${signingMethod}
-`
-    }
-
-    case 'raw': {
-      return `// 7h3 Protocol — Minimal Node.js HTTP Server
-// Install: npm install @7h3/protocol
-// Generated for sender: ${jsStr(sender)}
-
-import http from 'node:http'
-import { verifyHttpEnvelope } from '@7h3/protocol'
-
-${envBlock}
-
-const server = http.createServer(async (req, res) => {
-  // Verify 7h3 envelope on every incoming request
-  const envelope = req.headers['x-7h3-envelope']
-  if (!envelope || typeof envelope !== 'string') {
-    res.writeHead(401, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: 'Missing x-7h3-envelope header' }))
-    return
-  }
-
-  try {
-    const valid = ${verifyCall}
-    if (!valid) {
-      res.writeHead(401, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: 'Invalid 7h3 envelope signature' }))
-      return
-    }
-  } catch (err) {
-    res.writeHead(401, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({
-      error: \`7h3 verification failed: \${err instanceof Error ? err.message : String(err)}\`,
-    }))
-    return
-  }
-
-  // Request is verified — handle it
-  res.writeHead(200, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify({ ok: true, sender: ${jsStr(sender)} }))
-})
-
-server.listen(3000, () => {
-  console.log('7h3-verified server listening on http://localhost:3000')
-})
-`
-    }
-  }
-}
 
 // ── boilerplate generator ─────────────────────────────────────────────────────
 

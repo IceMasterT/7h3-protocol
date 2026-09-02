@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 675px; overflow: hidden;
+    background: #07070e;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(99,102,241,.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,.055) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+  .blob-l {
+    position: absolute; width: 420px; height: 420px;
+    background: radial-gradient(circle, rgba(239,68,68,.15) 0%, transparent 65%);
+    top: 50%; left: 0; transform: translateY(-50%);
+  }
+  .blob-r {
+    position: absolute; width: 420px; height: 420px;
+    background: radial-gradient(circle, rgba(99,102,241,.18) 0%, transparent 65%);
+    top: 50%; right: 0; transform: translateY(-50%);
+  }
+
+  .wrap {
+    position: relative; z-index: 2;
+    height: 100%;
+    display: flex; flex-direction: column;
+  }
+
+  /* Top bar */
+  .topbar {
+    padding: 22px 64px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .topbar .brand {
+    font-family: monospace; font-size: 15px; font-weight: 700; color: #a5b4fc;
+    background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.25);
+    border-radius: 7px; padding: 5px 14px;
+  }
+  .topbar .tagline {
+    color: #475569; font-size: 13px; font-style: italic;
+  }
+
+  /* Main compare area */
+  .compare {
+    flex: 1;
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0;
+  }
+
+  /* LEFT — before */
+  .panel-left {
+    padding: 36px 52px 36px 64px;
+    display: flex; flex-direction: column; align-items: flex-start;
+  }
+  .label-before {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25);
+    border-radius: 20px; padding: 5px 14px; margin-bottom: 20px;
+    color: #f87171; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .label-before .x { color: #ef4444; font-size: 14px; }
+
+  .before-h { font-size: 24px; font-weight: 800; color: #f1f5f9; margin-bottom: 10px; line-height: 1.2; }
+  .before-sub { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+
+  .before-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .before-list li {
+    display: flex; align-items: center; gap: 10px;
+    color: #94a3b8; font-size: 14px;
+  }
+  .before-list li .x-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0; color: #f87171; font-weight: 700;
+  }
+
+  /* CENTER divider */
+  .vs-divider {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    padding: 0 20px;
+  }
+  .vs-line {
+    width: 1px; flex: 1;
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255,.12) 50%, transparent);
+    min-height: 120px;
+  }
+  .vs-badge {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    display: flex; align-items: center; justify-content: center;
+    color: #64748b; font-size: 13px; font-weight: 800; letter-spacing: .04em;
+  }
+
+  /* RIGHT — after */
+  .panel-right {
+    padding: 36px 64px 36px 52px;
+    display: flex; flex-direction: column; align-items: flex-start;
+  }
+  .label-after {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.28);
+    border-radius: 20px; padding: 5px 14px; margin-bottom: 20px;
+    color: #a5b4fc; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  }
+
+  .after-h { font-size: 24px; font-weight: 800; margin-bottom: 10px; line-height: 1.2; }
+  .after-h span {
+    background: linear-gradient(90deg, #818cf8, #34d399);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .after-sub { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+
+  .after-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .after-list li {
+    display: flex; align-items: center; gap: 10px;
+    color: #e2e8f0; font-size: 14px;
+  }
+  .after-list li .check-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; flex-shrink: 0;
+  }
+
+  /* Bottom */
+  .bottom {
+    padding: 16px 64px;
+    border-top: 1px solid rgba(255,255,255,.05);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .bottom .npm-cmd {
+    font-family: monospace; font-size: 14px; color: #a5b4fc; font-weight: 600;
+  }
+  .bottom .langs {
+    display: flex; gap: 8px;
+  }
+  .lang-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 4px;
+  }
+  .lang-ts { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.2); }
+  .lang-py { background: rgba(234,179,8,.12); color: #fbbf24; border: 1px solid rgba(234,179,8,.2); }
+  .lang-rs { background: rgba(249,115,22,.12); color: #fb923c; border: 1px solid rgba(249,115,22,.2); }
+  .bottom .hash { color: #334155; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="blob-l"></div>
+<div class="blob-r"></div>
+
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">@7h3/protocol · aip/0.1</span>
+    <span class="tagline">The signing-and-replay layer your agent protocol forgot.</span>
+  </div>
+
+  <div class="compare">
+    <!-- LEFT: Before -->
+    <div class="panel-left">
+      <span class="label-before"><span class="x">✕</span> Without AIP</span>
+      <div class="before-h">Your agent traffic<br>is wide open</div>
+      <div class="before-sub">MCP and A2A leave individual messages unsigned and replayable by default.</div>
+      <ul class="before-list">
+        <li><span class="x-icon">✕</span> JSON-RPC sent unsigned in the clear</li>
+        <li><span class="x-icon">✕</span> Captured messages replayable forever</li>
+        <li><span class="x-icon">✕</span> No way to detect mid-session tampering</li>
+        <li><span class="x-icon">✕</span> Identity at connect ≠ per-message proof</li>
+      </ul>
+    </div>
+
+    <!-- CENTER -->
+    <div class="vs-divider">
+      <div class="vs-line"></div>
+      <div class="vs-badge">VS</div>
+      <div class="vs-line"></div>
+    </div>
+
+    <!-- RIGHT: After -->
+    <div class="panel-right">
+      <span class="label-after">✦ With @7h3/protocol</span>
+      <div class="after-h"><span>Every message<br>is its own proof</span></div>
+      <div class="after-sub">AIP wraps your existing handler. Signing and replay protection are on by default.</div>
+      <ul class="after-list">
+        <li><span class="check-icon">✓</span> Ed25519 / HS256 per-envelope signature</li>
+        <li><span class="check-icon">✓</span> TTL + Redis replay cache (atomic)</span></li>
+        <li><span class="check-icon">✓</span> Fleet-wide key revocation, fail-closed</li>
+        <li><span class="check-icon">✓</span> Drop-in — zero handler changes needed</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <span class="npm-cmd">npm install @7h3/protocol</span>
+    <div class="langs">
+      <span class="lang-badge lang-ts">TypeScript</span>
+      <span class="lang-badge lang-py">Python</span>
+      <span class="lang-badge lang-rs">Rust</span>
+    </div>
+    <span class="hash">#agentSecurity #MCP #AI</span>
+  </div>
+</div>
+</body>
+</html>
