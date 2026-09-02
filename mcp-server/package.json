@@ -36,6 +36,7 @@
     "directory": "mcp-server"
   },
   "overrides": {
-    "qs": "^6.16.0"
+    "qs": "^6.16.0",
+    "fast-uri": "^3.1.6"
   }
 }
