@@ -14,37 +14,12 @@ judgement call.**
 
 ## 1. Install
 
-> **Note:** `@7h3/protocol-webmcp` is not yet on npm. Install from source until
-> it is published; the API below is final and will not change on publish.
-
-```bash
-git clone https://github.com/IceMasterT/7h3-protocol.git
-cd 7h3-protocol && npm install && npm run build:protocol
-```
-
-Then reference it from your app. With a bundler, alias the package to the
-source — both it and the core are pure Web Crypto with zero dependencies, so
-they bundle for the browser unchanged:
-
-```ts
-// vite.config.ts
-import { fileURLToPath } from 'node:url'
-
-export default {
-  resolve: {
-    alias: [
-      { find: /^@7h3\/protocol-webmcp$/, replacement: fileURLToPath(new URL('../7h3-protocol/sdk/webmcp/src/index.ts', import.meta.url)) },
-      { find: /^@7h3\/protocol$/,        replacement: fileURLToPath(new URL('../7h3-protocol/src/index.ts', import.meta.url)) },
-    ],
-  },
-}
-```
-
-Once published, this becomes:
-
 ```bash
 npm install @7h3/protocol-webmcp @7h3/protocol
 ```
+
+Zero runtime dependencies — pure Web Crypto, so it bundles for the browser
+unchanged. `@7h3/protocol` is a peer dependency.
 
 ## 2. Two platform rules that bite first
 

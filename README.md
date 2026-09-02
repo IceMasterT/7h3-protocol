@@ -4,6 +4,7 @@
   <br/><br/>
 
   [![npm](https://img.shields.io/npm/v/@7h3/protocol?style=flat-square&color=818cf8&logo=npm&logoColor=white&label=%407h3%2Fprotocol)](https://www.npmjs.com/package/@7h3/protocol)
+  [![npm webmcp](https://img.shields.io/npm/v/@7h3/protocol-webmcp?style=flat-square&color=6ee7a8&logo=npm&logoColor=white&label=%407h3%2Fprotocol-webmcp)](https://www.npmjs.com/package/@7h3/protocol-webmcp)
   [![npm pq](https://img.shields.io/npm/v/@7h3/protocol-pq?style=flat-square&color=6366f1&logo=npm&logoColor=white&label=%407h3%2Fprotocol-pq)](https://www.npmjs.com/package/@7h3/protocol-pq)
   [![npm threshold](https://img.shields.io/npm/v/@7h3/protocol-threshold?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-threshold)](https://www.npmjs.com/package/@7h3/protocol-threshold)
   [![PyPI](https://img.shields.io/pypi/v/7h3-protocol?style=flat-square&color=818cf8&logo=python&logoColor=white)](https://pypi.org/project/7h3-protocol/)
