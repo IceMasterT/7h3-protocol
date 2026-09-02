@@ -1,5 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+# Upper-bounded deliberately: hatchling >= 1.28 emits Metadata-Version 2.5,
+# which the twine bundled in the pinned pypa/gh-action-pypi-publish rejects
+# with "InvalidDistribution: '2.5' is not a valid metadata version" — it
+# failed the v0.6.0 publish. Lift this once the publish action is bumped to a
+# release whose twine understands 2.5.
+requires = ["hatchling>=1.21,<1.28"]
 build-backend = "hatchling.build"
 
 [project]
