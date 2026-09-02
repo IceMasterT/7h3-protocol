@@ -47,7 +47,20 @@ jobs:
 
       - name: Publish @7h3/protocol
         if: steps.check.outputs.exists == 'false'
-        run: npm publish --provenance --access public
+        # A newly created package's document can lag the publish endpoint, so
+        # the pre-check above can report "not published" for a version that
+        # actually is. Treat npm's own "cannot publish over" as success rather
+        # than a false failure — the intent here is idempotency, not novelty.
+        run: |
+          set +e
+          output=$(npm publish --provenance --access public 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q 'cannot publish over'; then
+            echo 'Version is already on the registry; treating as published.'
+            exit 0
+          fi
+          exit $status
         working-directory: dist/npm-protocol
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -112,7 +125,20 @@ jobs:
 
       - name: Publish @7h3/protocol-mcp
         if: steps.check.outputs.exists == 'false'
-        run: npm publish --provenance --access public
+        # A newly created package's document can lag the publish endpoint, so
+        # the pre-check above can report "not published" for a version that
+        # actually is. Treat npm's own "cannot publish over" as success rather
+        # than a false failure — the intent here is idempotency, not novelty.
+        run: |
+          set +e
+          output=$(npm publish --provenance --access public 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q 'cannot publish over'; then
+            echo 'Version is already on the registry; treating as published.'
+            exit 0
+          fi
+          exit $status
         working-directory: mcp-server
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -145,10 +171,16 @@ jobs:
         run: npm install --no-audit --no-fund
         working-directory: sdk/webmcp
 
-      - name: Build and test @7h3/protocol-webmcp
+      # smoke packs the real tarball, installs it, and imports it under plain
+      # Node. The unit suite cannot catch what this catches: vitest resolves
+      # extensionless relative specifiers, so a build emitting `from './guard'`
+      # passes every test and then fails at install with ERR_MODULE_NOT_FOUND.
+      # 0.6.0 shipped exactly that way.
+      - name: Build, test and smoke @7h3/protocol-webmcp
         run: |
           npm run build
           npm test
+          npm run smoke
         working-directory: sdk/webmcp
 
       - name: Check if already published
@@ -165,7 +197,20 @@ jobs:
 
       - name: Publish @7h3/protocol-webmcp
         if: steps.check.outputs.exists == 'false'
-        run: npm publish --provenance --access public
+        # A newly created package's document can lag the publish endpoint, so
+        # the pre-check above can report "not published" for a version that
+        # actually is. Treat npm's own "cannot publish over" as success rather
+        # than a false failure — the intent here is idempotency, not novelty.
+        run: |
+          set +e
+          output=$(npm publish --provenance --access public 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q 'cannot publish over'; then
+            echo 'Version is already on the registry; treating as published.'
+            exit 0
+          fi
+          exit $status
         working-directory: sdk/webmcp
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -210,7 +255,20 @@ jobs:
 
       - name: Publish @7h3/protocol-pq
         if: steps.check.outputs.exists == 'false'
-        run: npm publish --provenance --access public
+        # A newly created package's document can lag the publish endpoint, so
+        # the pre-check above can report "not published" for a version that
+        # actually is. Treat npm's own "cannot publish over" as success rather
+        # than a false failure — the intent here is idempotency, not novelty.
+        run: |
+          set +e
+          output=$(npm publish --provenance --access public 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q 'cannot publish over'; then
+            echo 'Version is already on the registry; treating as published.'
+            exit 0
+          fi
+          exit $status
         working-directory: sdk/pq
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -255,7 +313,20 @@ jobs:
 
       - name: Publish @7h3/protocol-threshold
         if: steps.check.outputs.exists == 'false'
-        run: npm publish --provenance --access public
+        # A newly created package's document can lag the publish endpoint, so
+        # the pre-check above can report "not published" for a version that
+        # actually is. Treat npm's own "cannot publish over" as success rather
+        # than a false failure — the intent here is idempotency, not novelty.
+        run: |
+          set +e
+          output=$(npm publish --provenance --access public 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q 'cannot publish over'; then
+            echo 'Version is already on the registry; treating as published.'
+            exit 0
+          fi
+          exit $status
         working-directory: sdk/threshold
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

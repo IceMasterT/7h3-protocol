@@ -1,6 +1,6 @@
 {
   "name": "@7h3/protocol-webmcp",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "7h3 Protocol \u2014 signed, capability-scoped, receipted WebMCP tools. Deterministic authorization for browser agents.",
   "type": "module",
   "main": "./dist/index.js",
@@ -28,7 +28,8 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "smoke": "node scripts/smoke-test-package.mjs"
   },
   "license": "Apache-2.0",
   "keywords": [

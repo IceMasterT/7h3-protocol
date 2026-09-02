@@ -6,6 +6,42 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.2 — `@7h3/protocol-webmcp` 0.6.1
+
+### Fixed
+
+- **`@7h3/protocol-webmcp@0.6.0` was published broken.** Importing it threw
+  `ERR_MODULE_NOT_FOUND: Cannot find module '.../dist/guard'`. TypeScript does
+  not rewrite module specifiers when emitting ESM, so a source import of
+  `'./guard'` stays `'./guard'` in the output, and Node's ESM resolver requires
+  the explicit `.js`. All relative specifiers now carry it.
+
+  The unit suite could not have caught this: vitest resolves extensionless
+  imports happily, so all 61 tests passed against a build that no consumer
+  could import. Only the bundled core, `-pq` and `-threshold` escaped it — they
+  are single-file packages with no relative imports.
+
+### Added
+
+- `npm run smoke` in `sdk/webmcp` — packs the real tarball, installs it into a
+  scratch project, and imports it under plain Node, exercising a refusal, an
+  allowed call, a bound spend cap, receipt-chain verification and manifest
+  verification. Verified to fail with the exact `ERR_MODULE_NOT_FOUND` against
+  the broken build and pass against the fix. Wired into both CI and the publish
+  job, so this class of defect cannot reach a registry again.
+
+### Changed
+
+- npm publish steps now treat npm's own "cannot publish over the previously
+  published versions" as success. A newly created package's document can lag
+  the publish endpoint, so the pre-existing "check if already published" step
+  reported *not published* for `@7h3/protocol-webmcp@0.6.0` moments after it
+  was published, and the job failed re-publishing it. The intent of that check
+  is idempotency, not novelty.
+
+Only `@7h3/protocol-webmcp` changes version, to 0.6.1. Everything else stays as
+published.
+
 ## v0.6.1 — `@7h3/protocol-mcp` only
 
 ### Fixed

@@ -13,8 +13,8 @@
  */
 
 import { signCanonicalPayloadEd25519, verifyCanonicalPayloadEd25519 } from '@7h3/protocol'
-import { canonicalJson, sha256Hex } from './crypto'
-import type { ChainVerification, Receipt } from './types'
+import { canonicalJson, sha256Hex } from './crypto.js'
+import type { ChainVerification, Receipt } from './types.js'
 
 /** Genesis value for `prevHash`, so entry 0 is chained like every other entry. */
 export const GENESIS_HASH = '0'.repeat(64)

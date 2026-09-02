@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { generateEd25519KeypairBase64Url } from '@7h3/protocol'
-import { GENESIS_HASH, ReceiptLog, verifyChain } from './receipts'
-import type { Receipt } from './types'
+import { GENESIS_HASH, ReceiptLog, verifyChain } from './receipts.js'
+import type { Receipt } from './types.js'
 
 async function seeded(count: number) {
   const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()

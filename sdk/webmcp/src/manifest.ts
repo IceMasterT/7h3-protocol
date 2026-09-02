@@ -13,8 +13,8 @@
  */
 
 import { signCanonicalPayloadEd25519, verifyCanonicalPayloadEd25519 } from '@7h3/protocol'
-import { canonicalJson, sha256Hex } from './crypto'
-import type { GuardedTool, ManifestEntry, SignedManifest, ToolSurface } from './types'
+import { canonicalJson, sha256Hex } from './crypto.js'
+import type { GuardedTool, ManifestEntry, SignedManifest, ToolSurface } from './types.js'
 
 /** Tools that declare `readOnlyHint` are READ; everything else is treated as WRITE. */
 export function toolMethod(tool: Pick<GuardedTool, 'annotations'>): 'READ' | 'WRITE' {

@@ -21,9 +21,9 @@ import {
   type CapabilityScope,
   type CapabilityToken,
 } from '@7h3/protocol'
-import { canonicalJson, sha256Hex } from './crypto'
-import { manifestEntry, signManifest, toolMethod } from './manifest'
-import { ReceiptLog } from './receipts'
+import { canonicalJson, sha256Hex } from './crypto.js'
+import { manifestEntry, signManifest, toolMethod } from './manifest.js'
+import { ReceiptLog } from './receipts.js'
 import type {
   GuardDecision,
   GuardEvent,
@@ -33,7 +33,7 @@ import type {
   ModelContextTool,
   RegisterToolOptions,
   SignedManifest,
-} from './types'
+} from './types.js'
 
 /** Reserved input field carrying an explicit bearer grant chain (cross-agent delegation). */
 export const GRANT_FIELD = '__7h3_grant'

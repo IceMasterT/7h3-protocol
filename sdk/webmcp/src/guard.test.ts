@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { generateEd25519KeypairBase64Url } from '@7h3/protocol'
-import { guard, GRANT_FIELD, NONCE_FIELD, parseCaps, type ToolGuard } from './guard'
-import { verifyChain } from './receipts'
-import type { GuardedTool, ModelContextLike, ModelContextTool } from './types'
+import { guard, GRANT_FIELD, NONCE_FIELD, parseCaps, type ToolGuard } from './guard.js'
+import { verifyChain } from './receipts.js'
+import type { GuardedTool, ModelContextLike, ModelContextTool } from './types.js'
 
 /** Captures registered tools so tests can invoke exactly what an agent would call. */
 class FakeModelContext implements ModelContextLike {

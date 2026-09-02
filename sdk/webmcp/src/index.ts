@@ -38,7 +38,7 @@ export {
   type GuardOptions,
   type GrantRequest,
   type ReplayChecker,
-} from './guard'
+} from './guard.js'
 
 export {
   ReceiptLog,
@@ -47,7 +47,7 @@ export {
   canonicalReceiptPayload,
   GENESIS_HASH,
   type AppendReceiptInput,
-} from './receipts'
+} from './receipts.js'
 
 export {
   signManifest,
@@ -59,9 +59,9 @@ export {
   toolMethod,
   canonicalManifestPayload,
   type ManifestVerification,
-} from './manifest'
+} from './manifest.js'
 
-export { sha256Hex, canonicalJson } from './crypto'
+export { sha256Hex, canonicalJson } from './crypto.js'
 
 export type {
   ChainVerification,
@@ -78,4 +78,4 @@ export type {
   SignedManifest,
   ToolAnnotations,
   ToolSurface,
-} from './types'
+} from './types.js'

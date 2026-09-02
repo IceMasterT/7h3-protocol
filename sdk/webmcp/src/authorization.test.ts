@@ -12,8 +12,8 @@ import {
   generateEd25519KeypairBase64Url,
   serializeCapabilityChain,
 } from '@7h3/protocol'
-import { guard, InMemoryReplayChecker, NONCE_FIELD } from './guard'
-import type { ModelContextLike, ModelContextTool } from './types'
+import { guard, InMemoryReplayChecker, NONCE_FIELD } from './guard.js'
+import type { ModelContextLike, ModelContextTool } from './types.js'
 
 class FakeModelContext implements ModelContextLike {
   readonly registered = new Map<string, ModelContextTool>()

@@ -27,6 +27,18 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run test
       - run: npm run build:protocol
+
+      # sdk/webmcp ships multiple files, so unlike the bundled core its emitted
+      # ESM specifiers have to resolve under Node. vitest does not exercise that
+      # — it resolves extensionless imports — so pack/install/import here, where
+      # a break is cheap, rather than discovering it on the registry.
+      - name: Smoke test @7h3/protocol-webmcp package
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          npm run smoke
+        working-directory: sdk/webmcp
+
       - name: Fuzz smoke (decode + verify harnesses)
         run: npm run fuzz:ts
         env:
