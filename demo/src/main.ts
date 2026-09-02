@@ -403,22 +403,6 @@ function render(): void {
       </div>
 
       <div class="card">
-        <h2>Tool surface provenance</h2>
-        <div class="card-body">
-          ${provenanceBlock()}
-          <div class="rowflex" style="margin-top:10px">
-            <button class="danger" id="poison">Inject a poisoned tool</button>
-            <button id="recheck">Re-check surface</button>
-          </div>
-        </div>
-        <div class="hint">
-          The manifest is signed at deploy time by this origin's identity key and served at
-          <code>/.well-known/7h3-webmcp-manifest.json</code>. The browser never holds that private key.
-          A tool the origin never published cannot be hidden from this check.
-        </div>
-      </div>
-
-      <div class="card">
         <h2>Simulated agent</h2>
         <div class="card-body">
           <div class="rowflex">
@@ -470,6 +454,23 @@ function render(): void {
           so deleting or editing history breaks verification. Try <code>Simulate tampering</code>.
         </div>
       </div>
+
+      <div class="card">
+        <h2>Tool surface provenance</h2>
+        <div class="card-body">
+          ${provenanceBlock()}
+          <div class="rowflex" style="margin-top:10px">
+            <button class="danger" id="poison">Inject a poisoned tool</button>
+            <button id="recheck">Re-check surface</button>
+          </div>
+        </div>
+        <div class="hint">
+          The manifest is signed at deploy time by this origin's identity key and served at
+          <code>/.well-known/7h3-webmcp-manifest.json</code>. The browser never holds that private key.
+          A tool the origin never published cannot be hidden from this check.
+        </div>
+      </div>
+
     </div>
   </div>
 
