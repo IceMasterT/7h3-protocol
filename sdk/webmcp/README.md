@@ -180,6 +180,17 @@ Numeric ceilings are encoded as reserved `caps/<field>/<max>` scopes, so a spend
 cap is **bound inside the signed token** rather than trusted from page state. A
 grant can tighten a tool's ceiling; it can never loosen it.
 
+Ceilings **fail closed**: if a tool declares `limit: { field: 'amountCents', … }`
+and a call omits `amountCents`, the call is refused rather than allowed
+unchecked. Schema `required` is not a defense — the guard does not trust a
+caller to honour it.
+
+Grant selection is **permissive across grants**: a call is allowed if *any*
+active grant authorizes it. A narrow grant cannot veto a broader one that covers
+the call, and one corrupt grant cannot disable the whole tool surface. When
+nothing authorizes, the most specific refusal is reported — `limit-exceeded`
+tells an agent more than `scope-not-covered`.
+
 Refusals are structured, not thrown, so an agent can read *why* and ask the human
 for authority:
 

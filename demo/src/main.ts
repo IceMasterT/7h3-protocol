@@ -68,10 +68,17 @@ interface Provenance {
 
 const state: {
   verdict: { ok: boolean; text: string } | null
-  confirm: PendingConfirm | null
+  /**
+   * Pending confirmations, oldest first.
+   *
+   * A queue rather than a single slot: an agent can call two confirm-required
+   * tools before the human answers either, and overwriting one slot would drop
+   * the first promise's resolve, hanging that tool call forever.
+   */
+  confirmQueue: PendingConfirm[]
   manifest: SignedManifest | null
   provenance: Provenance | null
-} = { verdict: null, confirm: null, manifest: null, provenance: null }
+} = { verdict: null, confirmQueue: [], manifest: null, provenance: null }
 
 const ledger = new Ledger()
 const keys = await loadKeys()
@@ -85,12 +92,12 @@ const g = guard({
       // Show the human the application arguments only; reserved 7h3 fields are
       // plumbing and just add noise to a consent prompt.
       const shown = Object.fromEntries(Object.entries(input).filter(([k]) => !k.startsWith('__7h3')))
-      state.confirm = {
+      state.confirmQueue.push({
         title: `Confirm: ${tool.name}`,
         body: tool.description,
         scopes: JSON.stringify(shown, null, 2),
         resolve,
-      }
+      })
       render()
     }),
 })
@@ -98,12 +105,12 @@ const g = guard({
 /** The agent asking the human for authority, resolved by the same modal. */
 async function requestAccess(reason: string, scopes: string[], capCents?: number): Promise<boolean> {
   const approved = await new Promise<boolean>((resolve) => {
-    state.confirm = {
+    state.confirmQueue.push({
       title: 'The agent is requesting access',
       body: reason,
       scopes: scopes.join('\n') + (capCents ? `\ncap: ${money(capCents)}` : ''),
       resolve,
-    }
+    })
     render()
   })
   if (approved) {
@@ -332,6 +339,7 @@ function provenanceBlock(): string {
 }
 
 function render(): void {
+  const pending = state.confirmQueue[0]
   const grants = g.activeGrants()
   const receipts = [...g.receipts.all()].reverse()
   const supported = isWebMcpSupported()
@@ -466,11 +474,12 @@ function render(): void {
   </div>
 
   ${
-    state.confirm
+    pending
       ? `<div class="modal-backdrop"><div class="modal">
-          <h3>${esc(state.confirm.title)}</h3>
-          <p>${esc(state.confirm.body)}</p>
-          <div class="scopes" style="white-space:pre-wrap">${esc(state.confirm.scopes)}</div>
+          <h3>${esc(pending.title)}</h3>
+          <p>${esc(pending.body)}</p>
+          <div class="scopes" style="white-space:pre-wrap">${esc(pending.scopes)}</div>
+          ${state.confirmQueue.length > 1 ? `<p style="margin-top:10px">${state.confirmQueue.length - 1} more awaiting your decision</p>` : ''}
           <div class="actions">
             <button id="deny">Deny</button>
             <button class="primary" id="approve">Approve</button>
@@ -499,9 +508,8 @@ function render(): void {
   root.querySelector('#export')?.addEventListener('click', exportReceipts)
 
   const settle = (ok: boolean) => {
-    const pending = state.confirm
-    state.confirm = null
-    pending?.resolve(ok)
+    const answered = state.confirmQueue.shift()
+    answered?.resolve(ok)
     render()
   }
   root.querySelector('#approve')?.addEventListener('click', () => settle(true))

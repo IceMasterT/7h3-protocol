@@ -213,6 +213,15 @@ export class ToolGuard {
   /**
    * Decide whether a call may proceed. Pure with respect to application state,
    * so a UI can preview a decision without executing anything.
+   *
+   * Grant selection is *permissive across grants*: a call is allowed if ANY
+   * active grant authorizes it. A narrow grant that happens to be iterated
+   * first must not veto a broader one that plainly covers the call, and one
+   * corrupt grant must not disable the whole tool surface.
+   *
+   * Side effects run only after a grant has been found: human confirmation is
+   * asked once, and the replay nonce is consumed last, so a call that is
+   * ultimately refused never burns its nonce.
    */
   async decide(tool: GuardedTool, input: Record<string, unknown>): Promise<GuardDecision> {
     // A tool with no declared scope is published unguarded, by explicit choice.
@@ -220,50 +229,85 @@ export class ToolGuard {
 
     const method = toolMethod(tool)
     const bearer = input[GRANT_FIELD]
-    const candidates: CapabilityToken[] = []
+
+    let candidates: CapabilityToken[]
+    // A bearer chain has already been verified end to end by verifyBearer,
+    // including issuers other than this origin. Re-checking it against this
+    // origin's key alone would reject every legitimately delegated chain.
+    let preVerified = false
 
     if (typeof bearer === 'string' && bearer.length > 0) {
       const chainResult = await this.verifyBearer(bearer, tool.scope, method)
       if (!chainResult.ok) return chainResult.decision
-      candidates.push(chainResult.token)
+      candidates = [chainResult.token]
+      preVerified = true
     } else {
-      candidates.push(...this.grants.values())
+      candidates = [...this.grants.values()]
     }
 
     if (candidates.length === 0) {
       return { allowed: false, reason: 'no-active-grant', detail: `no grant covers ${tool.scope}` }
     }
 
-    let sawExpired = false
-    let sawRevoked = false
+    let bestLimitFailure: Extract<LimitOutcome, { ok: false }> | null = null
+    let refusal: GuardDecision | null = null
+    const note = (d: GuardDecision) => {
+      if (!refusal || refusalRank(d) > refusalRank(refusal)) refusal = d
+    }
+
+    let authorizing: CapabilityToken | null = null
 
     for (const token of candidates) {
-      if (this.revoked.has(token.id)) { sawRevoked = true; continue }
-      if (this.now() >= token.expiresAt) { sawExpired = true; continue }
-      if (!(await verifyCapabilityToken(token, this.opts.publicKey, { now: this.now() }))) {
-        return { allowed: false, reason: 'grant-invalid-signature', detail: `grant ${token.id} failed signature verification` }
+      if (this.revoked.has(token.id)) {
+        note({ allowed: false, reason: 'grant-revoked', detail: `grant ${token.id} was revoked` })
+        continue
+      }
+      if (this.now() >= token.expiresAt) {
+        note({ allowed: false, reason: 'grant-expired', detail: `grant ${token.id} has expired` })
+        continue
+      }
+      if (!preVerified && !(await verifyCapabilityToken(token, this.opts.publicKey, { now: this.now() }))) {
+        note({ allowed: false, reason: 'grant-invalid-signature', detail: `grant ${token.id} failed signature verification` })
+        continue
       }
       if (!tokenMatchesScope(token, tool.scope, method)) continue
 
-      const limitCheck = checkLimit(tool, input, parseCaps(token))
-      if (limitCheck) return limitCheck
-
-      const replayCheck = await this.checkReplay(tool, input, token)
-      if (replayCheck) return replayCheck
-
-      if (tool.confirm) {
-        const confirmed = this.opts.onConfirm ? await this.opts.onConfirm(tool, input) : false
-        if (!confirmed) {
-          return { allowed: false, reason: 'confirmation-denied', detail: `${tool.name} requires human confirmation` }
-        }
+      const limit = evaluateLimit(tool, input, parseCaps(token))
+      if (!limit.ok) {
+        // Keep the most permissive ceiling seen: if the caller holds a $50 and a
+        // $1,000 grant, the constraint they are actually up against is $1,000.
+        if (!bestLimitFailure || limit.ceiling > bestLimitFailure.ceiling) bestLimitFailure = limit
+        continue
       }
 
-      return { allowed: true, grantId: token.id }
+      authorizing = token
+      break
     }
 
-    if (sawRevoked) return { allowed: false, reason: 'grant-revoked', detail: 'the grant covering this tool was revoked' }
-    if (sawExpired) return { allowed: false, reason: 'grant-expired', detail: 'the grant covering this tool has expired' }
-    return { allowed: false, reason: 'scope-not-covered', detail: `no active grant covers ${tool.scope} (${method})` }
+    if (!authorizing) {
+      if (bestLimitFailure) return limitRefusal(tool, bestLimitFailure)
+      return (
+        refusal ?? {
+          allowed: false,
+          reason: 'scope-not-covered',
+          detail: `no active grant covers ${tool.scope} (${method})`,
+        }
+      )
+    }
+
+    if (tool.confirm) {
+      const confirmed = this.opts.onConfirm ? await this.opts.onConfirm(tool, input) : false
+      if (!confirmed) {
+        return { allowed: false, reason: 'confirmation-denied', detail: `${tool.name} requires human confirmation` }
+      }
+    }
+
+    // Consumed last: an authorized, confirmed call is the only kind that should
+    // spend its nonce.
+    const replayCheck = await this.checkReplay(tool, input, authorizing)
+    if (replayCheck) return replayCheck
+
+    return { allowed: true, grantId: authorizing.id }
   }
 
   private async verifyBearer(
@@ -278,9 +322,14 @@ export class ToolGuard {
       return { ok: false, decision: { allowed: false, reason: 'grant-invalid-signature', detail: 'grant chain is not parseable' } }
     }
 
+    // verifyCapabilityChain resolves keys by the token's *issuer*, not by keyId.
+    // Accept both so a chain rooted at this origin verifies, and fall back to
+    // configured peer keys for issuers other than us.
     const registry = {
-      getPublicKey: async (id: string): Promise<string | null> =>
-        id === this.keyId ? this.opts.publicKey : (this.opts.peerKeys?.[id] ?? null),
+      getPublicKey: async (id: string): Promise<string | null> => {
+        if (id === this.opts.origin || id === this.keyId) return this.opts.publicKey
+        return this.opts.peerKeys?.[id] ?? null
+      },
     }
 
     const result = await verifyCapabilityChain(chain, registry, {
@@ -413,31 +462,66 @@ export class ToolGuard {
   }
 }
 
+/**
+ * Precedence for reporting refusals when several grants fail for different
+ * reasons. The most specific and actionable reason wins: "you exceeded the
+ * ceiling" tells an agent far more than "nothing covers this scope".
+ */
+function refusalRank(decision: GuardDecision): number {
+  if (decision.allowed) return 0
+  switch (decision.reason) {
+    case 'limit-exceeded': return 4
+    case 'grant-invalid-signature': return 3
+    case 'grant-revoked':
+    case 'grant-expired': return 2
+    default: return 1
+  }
+}
+
 /** Remove reserved 7h3 fields so application handlers see only their own inputs. */
 function stripReserved(input: Record<string, unknown>): Record<string, unknown> {
   const { [GRANT_FIELD]: _g, [NONCE_FIELD]: _n, ...rest } = input
   return rest
 }
 
+export type LimitOutcome =
+  | { ok: true }
+  | { ok: false; reason: 'missing-field' | 'not-finite' | 'over-ceiling'; ceiling: number; value?: number }
+
 /** Enforce the tool's ceiling, tightened by any cap bound inside the grant. */
-function checkLimit(
+function evaluateLimit(
   tool: GuardedTool,
   input: Record<string, unknown>,
   caps: Record<string, number>,
-): GuardDecision | null {
-  if (!tool.limit) return null
-  const raw = input[tool.limit.field]
-  if (raw === undefined) return null
-
-  const value = Number(raw)
-  if (!Number.isFinite(value)) {
-    return { allowed: false, reason: 'limit-exceeded', detail: `${tool.limit.field} is not a finite number` }
-  }
+): LimitOutcome {
+  if (!tool.limit) return { ok: true }
 
   const ceiling = Math.min(tool.limit.max, caps[tool.limit.field] ?? Number.POSITIVE_INFINITY)
-  return value > ceiling
-    ? { allowed: false, reason: 'limit-exceeded', detail: `${tool.limit.field}=${value} exceeds the authorized ceiling of ${ceiling}` }
-    : null
+  const raw = input[tool.limit.field]
+
+  if (raw === undefined) {
+    // Fail closed. The tool declared a ceiling on this field, so a call that
+    // omits it cannot be shown to be within the ceiling — and schema `required`
+    // is not a defense, since the guard must not trust the caller to honour it.
+    return { ok: false, reason: 'missing-field', ceiling }
+  }
+
+  const value = Number(raw)
+  if (!Number.isFinite(value)) return { ok: false, reason: 'not-finite', ceiling, value: NaN }
+
+  return value > ceiling ? { ok: false, reason: 'over-ceiling', ceiling, value } : { ok: true }
+}
+
+/** Render a limit failure, naming the most permissive ceiling the caller holds. */
+function limitRefusal(tool: GuardedTool, outcome: Extract<LimitOutcome, { ok: false }>): GuardDecision {
+  const field = tool.limit!.field
+  const detail =
+    outcome.reason === 'missing-field'
+      ? `${field} is required: this tool declares a ceiling on it`
+      : outcome.reason === 'not-finite'
+        ? `${field} is not a finite number`
+        : `${field}=${outcome.value} exceeds the authorized ceiling of ${outcome.ceiling}`
+  return { allowed: false, reason: 'limit-exceeded', detail }
 }
 
 /** Resolve `document.modelContext` when present; undefined in tests and old browsers. */

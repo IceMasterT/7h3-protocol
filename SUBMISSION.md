@@ -21,11 +21,15 @@ Submission Period** (from 2026-08-25).
 | `demo/` | Ledger — the WebMCP demo app, its tool surface and trust panel |
 | `SUBMISSION.md` | This file |
 
-Commit evidence — every line of WebMCP work lands in these two commits:
+Commit evidence — every commit below was made inside the Submission Period:
 
 ```
-458cd2d  2026-09-02 01:28:34 -0700  feat(demo): add Ledger — an agent-operable business console
-59985e5  2026-09-02 01:21:51 -0700  feat(webmcp): add @7h3/protocol-webmcp
+feat(webmcp)  @7h3/protocol-webmcp: guard, signed manifests, hash-chained receipts
+feat(demo)    Ledger: the WebMCP demo app and its trust panel
+docs(webmcp)  package README, SUBMISSION.md, Devpost copy and video script
+feat(webmcp)  verifiable tool-surface provenance + live poisoning demo
+feat(mcp)     webmcp scaffold target; server version derived from package.json
+fix(webmcp)   authorization fixes from code review (see below)
 ```
 
 The branch also carries one unrelated housekeeping commit that is **not** part of
@@ -34,6 +38,15 @@ this submission and should not be judged:
 ```
 49d9cd8  2026-09-02 01:01:12 -0700  docs: catch CHANGELOG up to v0.5.6
 ```
+
+The authorization layer was reviewed before merge and six real defects were
+found and fixed, each with a regression test in
+`sdk/webmcp/src/authorization.test.ts`: a spend ceiling that failed *open* when
+the limited field was omitted; a key registry keyed on `keyId` while lookups
+came by issuer, which made cross-agent delegation impossible; first-matching
+grant deciding instead of any authorizing grant; one corrupt grant vetoing
+valid ones; a replay nonce spent by calls that were then refused; and a demo
+confirmation dialog that dropped concurrent requests.
 
 Verify the boundary yourself:
 
