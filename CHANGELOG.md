@@ -6,6 +6,51 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.7 — `@7h3/protocol` 0.6.2
+
+Findings from a fourth adversarial pass, this time over security controls that
+had only ever been read, never attacked.
+
+### Security
+
+- **Revoking a keyId left Ed25519 fully valid.** `RevocationRegistry`'s two
+  credential paths disagreed: `getSharedSecret` receives both a keyId and a
+  sender and checked both, while `getPublicKey` receives only a sender and
+  checked only that. So `revoke('k1')` blocked the HMAC credential and silently
+  did nothing for Ed25519 — a revoked, compromised key kept authenticating.
+
+  A registry lookup is keyed by sender and structurally cannot see
+  `signature.keyId`, so this could not be fixed in place. Added
+  `isEnvelopeRevoked(envelope)`, which checks both the sender and the keyId the
+  envelope was signed under, and documented which identifier `revoke()` affects
+  — and that `RevocationStore` is the right tool for fleet-wide
+  `(sender, keyId)` revocation.
+
+- **Rate-limiter eviction was a rate-limit reset.** The key map is LRU-bounded,
+  and evicting a key sitting at its quota restores its full allowance, so
+  pushing enough distinct keys through the store cleared a victim's limit.
+  Verified: a victim blocked after three requests was allowed again after a
+  500-key flood.
+
+  Eviction now runs in order — fully-expired windows first (they hold no live
+  state), then keys under quota (losing their state grants nothing), and keys at
+  or over quota only as a last resort. The bound is still real and documented:
+  with more concurrently-active keys than `maxKeys`, something live must go.
+
+### Verified clean under attack
+
+The stream binding rejected all seven attacks — dropped chunk, reordered
+chunks, tampered chunk content, removed final frame, cross-stream splice, and
+verification under a foreign key. Signed responses rejected tampered bodies,
+missing headers and foreign keys. The gateway rejected all nine, including a
+capability token attempting to bypass `allowedSenders`, and a post-dated
+envelope. Webhooks rejected all nine malformed and replayed cases. Cloudflare's
+middleware fails closed on any `DEFAULT_POLICY` other than exactly `'allow'`,
+the KV key registry percent-encodes both identifiers, and the KV replay race
+window is documented with a pointer to the Durable Object store. `mcpWrapper`
+pins `requireSignature: true` after the option spread, so it cannot be
+overridden.
+
 ## v0.6.6 — queue payload integrity (TypeScript, Python, Rust)
 
 ### Security
