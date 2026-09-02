@@ -48,9 +48,11 @@ signature or an uncovered scope, not a judgement call.**
 | **Capability-scoped execution** | Scoped, expiring, revocable grants. Held page-side, so the token never passes through the agent. Spend ceilings are bound *inside* the signed token. |
 | **Hash-chained receipts** | Every call recorded — allowed and refused. Deleting or reordering history breaks verification. |
 
-Adoption is an import, a constructor, and one field per tool — see
-[`sdk/webmcp/README.md`](./sdk/webmcp/README.md), which also documents the
-threat model and what this explicitly does **not** protect against.
+Adoption is an import, a constructor, and one field per tool. Start with the
+**[WebMCP install guide](./docs/install/webmcp.md)** (or the
+**[ChatGPT guide](./docs/install/chatgpt.md)** for site tools in the built-in
+browser); [`sdk/webmcp/README.md`](./sdk/webmcp/README.md) has the full API and
+the threat model, including what this explicitly does **not** protect against.
 
 ---
 
@@ -61,7 +63,7 @@ threat model and what this explicitly does **not** protect against.
 - [What 7h3 Protocol Does](#what-7h3-protocol-does)
 - [How It Works](#how-it-works)
 - [Security Guarantees](#security-guarantees)
-- [Installation](#installation)
+- [Installation](#installation) — [step-by-step guides](./docs/install/README.md)
 - [Quick Start](#quick-start)
 - [Core API](#core-api)
 - [Transports](#transports)
@@ -217,6 +219,28 @@ Every envelope carries `timestampMs`, `ttlMs`, and a random `nonce`. A receiver 
 ---
 
 ## Installation
+
+> **Step-by-step guides for every install method live in
+> [`docs/install/`](./docs/install/README.md)** — each one verified against this
+> repository before being written down.
+
+| Guide | For |
+|---|---|
+| **[WebMCP](./docs/install/webmcp.md)** | Browser agents calling your page's tools |
+| **[ChatGPT](./docs/install/chatgpt.md)** | Site tools in the built-in browser, and the MCP server for Codex |
+| **[MCP server](./docs/install/mcp-server.md)** | Claude Code, Cursor, Codex, and other MCP clients |
+| **[TypeScript / Node](./docs/install/typescript.md)** | `npm install @7h3/protocol` |
+| **[Python](./docs/install/python.md)** | `pip install 7h3-protocol` |
+| **[Rust](./docs/install/rust.md)** | `cargo add protocol-7h3` |
+| **[Go](./docs/install/go.md)** | `go get .../sdk/go` |
+| **[Browser](./docs/install/browser.md)** | `@7h3/protocol-browser` |
+| **[CLI](./docs/install/cli.md)** | `npx 7h3` — keygen, sign, verify, gateway |
+| **[Cloudflare Workers](./docs/install/cloudflare.md)** | Gateway and drop-in middleware |
+| **[Docker](./docs/install/docker.md)** | Running the gateway as a container |
+| **[Post-quantum](./docs/install/post-quantum.md)** | ML-DSA (FIPS 204) signatures |
+| **[Threshold](./docs/install/threshold.md)** | BLS12-381 M-of-N signing |
+
+The quick versions follow.
 
 ### TypeScript / Node.js
 

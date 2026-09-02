@@ -455,10 +455,83 @@ async function cmdKeysServe(argv: string[]): Promise<void> {
 
 // ─── 7h3 add ───────────────────────────────────────────────────────────────────
 
-const ADD_FRAMEWORKS = ['cloudflare-worker', 'nextjs', 'express', 'hono', 'fastify', 'claude-code', 'opencode', 'codex', 'grok'] as const
+const ADD_FRAMEWORKS = ['webmcp', 'cloudflare-worker', 'nextjs', 'express', 'hono', 'fastify', 'claude-code', 'opencode', 'codex', 'grok'] as const
 type Framework = typeof ADD_FRAMEWORKS[number]
 
 const FRAMEWORK_SNIPPETS: Record<Framework, (sender: string) => string> = {
+  webmcp: (sender) => `// 7h3 — signed, capability-scoped WebMCP tools
+// Install: npm install @7h3/protocol-webmcp @7h3/protocol
+//
+// WebMCP requires a secure context (HTTPS) and tools must be registered in the
+// TOP-LEVEL page — tools inside an iframe are not discoverable by agents.
+
+import { guard, isWebMcpSupported } from '@7h3/protocol-webmcp'
+import { generateEd25519KeypairBase64Url } from '@7h3/protocol'
+
+if (isWebMcpSupported()) {
+  // Per-session key: fine for signing this visitor's grants and receipts. The
+  // manifest is signed separately, at deploy time, by a key the browser never sees.
+  const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
+
+  const g = guard({
+    origin: ${JSON.stringify(sender)},
+    privateKey,
+    publicKey,
+    onConfirm: async (tool, input) =>
+      window.confirm(\`Allow \${tool.name}?\\n\\n\${JSON.stringify(input, null, 2)}\`),
+  })
+
+  // An unguarded read: no scope, so no grant is required.
+  await g.registerTool({
+    name: 'search_items',
+    description: 'Search the catalog',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+    execute: async ({ query }) => searchItems(String(query)),
+  })
+
+  // A guarded write. \`scope\` gates it behind a capability; \`limit\` is a ceiling
+  // this site will never exceed, whatever a grant says.
+  await g.registerTool({
+    name: 'place_order',
+    description: 'Place an order for the current cart',
+    inputSchema: {
+      type: 'object',
+      properties: { cartId: { type: 'string' }, amountCents: { type: 'number' } },
+      required: ['cartId', 'amountCents'],
+      additionalProperties: false,
+    },
+    annotations: { destructiveHint: true },
+    scope: 'orders/place',
+    limit: { field: 'amountCents', max: 500_00 },
+    confirm: true,
+    execute: async ({ cartId }) => placeOrder(String(cartId)),
+  })
+
+  // Wire this to a consent control in your own UI — never grant automatically.
+  // The token is held page-side, so it never passes through the agent.
+  document.querySelector('#allow-agent')?.addEventListener('click', async () => {
+    await g.grant({
+      subject: 'browser-agent',
+      scopes: ['orders/place'],
+      caps: { amountCents: 100_00 },  // bound inside the signed token
+      ttlMs: 10 * 60_000,             // authority lapses on its own
+    })
+  })
+
+  // Every call — allowed and refused — lands on a hash-chained signed log.
+  g.on((event) => {
+    if (event.type === 'call') {
+      console.log(event.receipt.outcome, event.receipt.tool, event.receipt.reason ?? '')
+    }
+  })
+}
+`,
   'cloudflare-worker': (sender) => `// cloudflare/src/worker.ts — 7h3 Gateway Worker
 // Install: npm install @7h3/protocol
 // See: cloudflare/DEPLOY.md for full setup
