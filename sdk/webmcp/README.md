@@ -113,6 +113,25 @@ await diffAgainstManifest(liveTools, manifest)
 An injected lookalike tool, a silently reworded description, or a removed tool
 all change the surface. This turns "a tool's claim" into something checkable.
 
+**Two keys, deliberately.** The *origin identity key* is long-lived, lives on the
+deploy machine, and signs the manifest — only its public half is served. The
+*session key* is generated in the browser per visitor and signs that visitor's
+grants and receipts. Conflating them would mean shipping a private key in the
+bundle, which is exactly the mistake a signing layer must not make.
+
+Sign at deploy time from a declarative tool table, with no handlers in scope —
+`manifestEntry` accepts a `ToolSurface`, which is a tool minus its `execute`:
+
+```js
+const entries = await Promise.all(TOOL_DEFS.map(manifestEntry))
+const manifest = await signManifest({ origin, entries, privateKey, keyId })
+// → serve at /.well-known/7h3-webmcp-manifest.json, public key at /.well-known/7h3-keys.json
+```
+
+The page then fetches both, verifies the manifest under the published key, and
+diffs it against the tools actually registered. Anyone can run the same check
+from outside the page.
+
 ### 2. Capability-scoped execution — authorization
 
 Grants are **page-held by default**: the token never passes through the agent, so

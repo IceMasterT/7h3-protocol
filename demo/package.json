@@ -3,17 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Ledger — an agent-operable business console demonstrating @7h3/protocol-webmcp",
+  "description": "Ledger \u2014 an agent-operable business console demonstrating @7h3/protocol-webmcp",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run sign && vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "sign": "tsx scripts/sign-manifest.ts"
   },
   "devDependencies": {
     "typescript": "~6.0.3",
     "vite": "^8.0.16",
-    "wrangler": "^4.118.0"
+    "wrangler": "^4.118.0",
+    "tsx": "^4.20.6"
   },
   "license": "Apache-2.0"
 }

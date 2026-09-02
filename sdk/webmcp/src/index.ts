@@ -76,4 +76,5 @@ export type {
   RegisterToolOptions,
   SignedManifest,
   ToolAnnotations,
+  ToolSurface,
 } from './types'

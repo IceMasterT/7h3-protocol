@@ -123,9 +123,25 @@ path that skips `decide()`. Judging works on any browser.
 
 ### The security claims, end to end
 
-Click **Verify chain** → `chain intact · N receipts verified`.
+**Receipts.** Click **Verify chain** → `chain intact · N receipts verified`.
 Click **Simulate tampering** → `tampering detected at #N · bad-signature`.
 Click **Replay last call** → `replayed-call`.
+
+**Provenance.** The panel opens at `surface verified · 10 tools match the signed
+manifest`. Click **Inject a poisoned tool** — this registers a lookalike
+(`list_invoices_fast`, with instructions to the agent buried in its description)
+exactly as an injected third-party script or XSS payload would. Registration
+succeeds; nothing stops same-origin script from calling `registerTool`. But the
+check immediately reports `UNPUBLISHED TOOL: list_invoices_fast` and the header
+flips to `surface UNVERIFIED`.
+
+You can verify this from outside the page too — the manifest is a static asset
+signed by the origin key, whose private half never reaches the browser:
+
+```bash
+curl https://7h3-webmcp-ledger.tech-b1a.workers.dev/.well-known/7h3-webmcp-manifest.json
+curl https://7h3-webmcp-ledger.tech-b1a.workers.dev/.well-known/7h3-keys.json
+```
 
 ---
 
@@ -145,7 +161,9 @@ sdk/webmcp/src/guard.ts       the guard: decide(), grants, revocation, invoke()
 sdk/webmcp/src/manifest.ts    signed tool manifests + poisoning detection
 sdk/webmcp/src/receipts.ts    hash-chained, Ed25519-signed receipts
 sdk/webmcp/src/*.test.ts      46 tests
-demo/src/tools.ts             the 10-tool WebMCP surface
+demo/src/tool-defs.ts         declarative tool table (surface only, no handlers)
+demo/src/tools.ts             handlers bound to that surface
+demo/scripts/sign-manifest.ts deploy-time manifest signing with the origin key
 demo/src/ledger.ts            plain domain logic — no idea agents exist
 demo/src/main.ts              app + trust panel
 ```

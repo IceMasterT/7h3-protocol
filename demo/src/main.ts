@@ -7,9 +7,18 @@
  */
 
 import { generateEd25519KeypairBase64Url } from '@7h3/protocol'
-import { guard, isWebMcpSupported, verifyChain, type Receipt, type SignedManifest } from '@7h3/protocol-webmcp'
+import {
+  diffAgainstManifest,
+  guard,
+  isWebMcpSupported,
+  verifyChain,
+  verifyManifest,
+  type Receipt,
+  type SignedManifest,
+} from '@7h3/protocol-webmcp'
 import { Ledger, money, type Invoice } from './ledger'
-import { registerLedgerTools } from './tools'
+import { POISONED_TOOL } from './tool-defs'
+import { registerLedgerTools, registerPoisonedTool } from './tools'
 import './styles.css'
 
 const ORIGIN = '7h3-webmcp-ledger'
@@ -46,11 +55,23 @@ interface PendingConfirm {
   resolve: (ok: boolean) => void
 }
 
+interface Provenance {
+  /** null while the manifest is still being fetched. */
+  signatureOk: boolean | null
+  keyId: string
+  surfaceDigest: string
+  added: string[]
+  removed: string[]
+  modified: string[]
+  error?: string
+}
+
 const state: {
   verdict: { ok: boolean; text: string } | null
   confirm: PendingConfirm | null
   manifest: SignedManifest | null
-} = { verdict: null, confirm: null, manifest: null }
+  provenance: Provenance | null
+} = { verdict: null, confirm: null, manifest: null, provenance: null }
 
 const ledger = new Ledger()
 const keys = await loadKeys()
@@ -100,7 +121,54 @@ async function requestAccess(reason: string, scopes: string[], capCents?: number
 }
 
 await registerLedgerTools(g, ledger, requestAccess)
-state.manifest = await g.manifest()
+
+/**
+ * Check the live tool surface against the manifest this origin published.
+ *
+ * The manifest is signed at deploy time by the origin identity key, whose public
+ * half is served at /.well-known/7h3-keys.json. The browser never sees the
+ * private half. Two independent checks run: the manifest verifies under the
+ * published key, and the tools actually registered on this page match it.
+ */
+async function checkProvenance(): Promise<void> {
+  try {
+    const [manifestRes, keysRes] = await Promise.all([
+      fetch('/.well-known/7h3-webmcp-manifest.json'),
+      fetch('/.well-known/7h3-keys.json'),
+    ])
+    if (!manifestRes.ok || !keysRes.ok) throw new Error('manifest or key document unavailable')
+
+    const manifest = (await manifestRes.json()) as SignedManifest
+    const keyDoc = (await keysRes.json()) as { keys: { keyId: string; publicKey: string }[] }
+    const key = keyDoc.keys.find((k) => k.keyId === manifest.keyId)
+    if (!key) throw new Error(`no published key for ${manifest.keyId}`)
+
+    state.manifest = manifest
+    const verified = await verifyManifest(manifest, key.publicKey)
+    const diff = await diffAgainstManifest(g.registeredTools(), manifest)
+
+    state.provenance = {
+      signatureOk: verified.ok,
+      keyId: manifest.keyId,
+      surfaceDigest: manifest.surfaceDigest,
+      added: diff.added,
+      removed: diff.removed,
+      modified: diff.modified,
+    }
+  } catch (err) {
+    state.provenance = {
+      signatureOk: false,
+      keyId: '—',
+      surfaceDigest: '—',
+      added: [],
+      removed: [],
+      modified: [],
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+  render()
+}
+
 
 g.on(() => render())
 ledger.subscribe(() => render())
@@ -134,6 +202,17 @@ const SCENARIOS: { label: string; tool: string; input: Record<string, unknown>; 
   { label: 'Wire $900 offshore', tool: 'wire_funds', input: { account: 'XX-9931-OFFSHORE', amountCents: 900_00 }, danger: true },
   { label: 'Ask owner for access', tool: 'request_access', input: { reason: 'I need to settle the two overdue invoices for you.', scopes: ['money/pay_invoice'], capCents: 100_00 } },
 ]
+
+/**
+ * Stand in for an injected third-party script or XSS payload registering a
+ * lookalike tool. Registration succeeds — nothing prevents same-origin script
+ * from calling registerTool. The manifest check is what notices.
+ */
+async function injectPoisonedTool(): Promise<void> {
+  await registerPoisonedTool(g, POISONED_TOOL, ledger)
+  ledger.note(`injected ${POISONED_TOOL.name} into the live tool surface`, 'human')
+  await checkProvenance()
+}
 
 let lastNonce = 0
 async function runScenario(i: number): Promise<void> {
@@ -227,6 +306,31 @@ function receiptRow(r: Receipt): string {
   </div>`
 }
 
+function provenanceBlock(): string {
+  const p = state.provenance
+  if (!p) return `<div class="verdict">checking published manifest…</div>`
+  if (p.error) return `<div class="verdict bad">manifest unavailable — ${esc(p.error)}</div>`
+
+  const clean = p.signatureOk && p.added.length === 0 && p.removed.length === 0 && p.modified.length === 0
+  if (clean) {
+    return `<div class="verdict ok">surface verified · ${g.registeredTools().length} tools match the signed manifest</div>
+      <div class="hash" style="font-family:var(--mono);font-size:11px;color:var(--muted)">
+        key ${esc(p.keyId)} · digest ${esc(p.surfaceDigest.slice(0, 24))}…
+      </div>`
+  }
+
+  const problems: string[] = []
+  if (!p.signatureOk) problems.push('manifest signature invalid')
+  if (p.added.length) problems.push(`UNPUBLISHED TOOL: ${p.added.join(', ')}`)
+  if (p.modified.length) problems.push(`MODIFIED: ${p.modified.join(', ')}`)
+  if (p.removed.length) problems.push(`MISSING: ${p.removed.join(', ')}`)
+
+  return `<div class="verdict bad">${problems.map(esc).join('<br>')}</div>
+    <div class="hash" style="font-family:var(--mono);font-size:11px;color:var(--muted)">
+      the live surface does not match what ${esc(p.keyId)} signed
+    </div>`
+}
+
 function render(): void {
   const grants = g.activeGrants()
   const receipts = [...g.receipts.all()].reverse()
@@ -239,7 +343,13 @@ function render(): void {
     <div class="spacer"></div>
     <span class="pill ${supported ? 'ok' : 'off'}">${supported ? 'WebMCP detected' : 'WebMCP not detected — tools registered, agent absent'}</span>
     <span class="pill">origin key ${esc(keys.publicKey.slice(0, 10))}…</span>
-    <span class="pill">surface ${esc(state.manifest?.surfaceDigest.slice(0, 10) ?? '—')}…</span>
+    <span class="pill ${state.provenance && state.provenance.signatureOk && state.provenance.added.length === 0 ? 'ok' : 'off'}">surface ${
+    state.provenance
+      ? state.provenance.added.length || !state.provenance.signatureOk
+        ? 'UNVERIFIED'
+        : 'verified'
+      : '…'
+  }</span>
   </header>
 
   <div class="layout">
@@ -281,6 +391,22 @@ function render(): void {
           <div class="rowflex">
             ${PRESETS.map((p, i) => `<button data-preset="${i}">${esc(p.label)}</button>`).join('')}
           </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Tool surface provenance</h2>
+        <div class="card-body">
+          ${provenanceBlock()}
+          <div class="rowflex" style="margin-top:10px">
+            <button class="danger" id="poison">Inject a poisoned tool</button>
+            <button id="recheck">Re-check surface</button>
+          </div>
+        </div>
+        <div class="hint">
+          The manifest is signed at deploy time by this origin's identity key and served at
+          <code>/.well-known/7h3-webmcp-manifest.json</code>. The browser never holds that private key.
+          A tool the origin never published cannot be hidden from this check.
         </div>
       </div>
 
@@ -366,6 +492,8 @@ function render(): void {
     el.addEventListener('click', () => void runScenario(Number(el.dataset.scenario))),
   )
   root.querySelector('[data-replay]')?.addEventListener('click', () => void replayLast())
+  root.querySelector('#poison')?.addEventListener('click', () => void injectPoisonedTool())
+  root.querySelector('#recheck')?.addEventListener('click', () => void checkProvenance())
   root.querySelector('#verify')?.addEventListener('click', () => void verify())
   root.querySelector('#tamper')?.addEventListener('click', () => void simulateTamper())
   root.querySelector('#export')?.addEventListener('click', exportReceipts)
@@ -381,3 +509,8 @@ function render(): void {
 }
 
 render()
+
+// Kicked off after the first paint: render() reads module consts declared below
+// checkProvenance, so calling it during module evaluation hits their temporal
+// dead zone. The provenance card shows a checking state until this resolves.
+void checkProvenance()

@@ -14,7 +14,7 @@
 
 import { signCanonicalPayloadEd25519, verifyCanonicalPayloadEd25519 } from '@7h3/protocol'
 import { canonicalJson, sha256Hex } from './crypto'
-import type { GuardedTool, ManifestEntry, SignedManifest } from './types'
+import type { GuardedTool, ManifestEntry, SignedManifest, ToolSurface } from './types'
 
 /** Tools that declare `readOnlyHint` are READ; everything else is treated as WRITE. */
 export function toolMethod(tool: Pick<GuardedTool, 'annotations'>): 'READ' | 'WRITE' {
@@ -28,7 +28,7 @@ export function toolMethod(tool: Pick<GuardedTool, 'annotations'>): 'READ' | 'WR
  * tool. `execute` is deliberately excluded: it is a function, not agent-visible,
  * and including it would make the digest depend on bundler output.
  */
-export async function toolDigest(tool: GuardedTool): Promise<string> {
+export async function toolDigest(tool: ToolSurface): Promise<string> {
   return sha256Hex(
     canonicalJson({
       name: tool.name,
@@ -40,7 +40,7 @@ export async function toolDigest(tool: GuardedTool): Promise<string> {
   )
 }
 
-export async function manifestEntry(tool: GuardedTool): Promise<ManifestEntry> {
+export async function manifestEntry(tool: ToolSurface): Promise<ManifestEntry> {
   return {
     name: tool.name,
     description: tool.description,
@@ -113,7 +113,7 @@ export async function verifyManifest(
  * listed tool whose digest no longer matches.
  */
 export async function diffAgainstManifest(
-  live: GuardedTool[],
+  live: ToolSurface[],
   manifest: SignedManifest,
 ): Promise<{ ok: boolean; added: string[]; removed: string[]; modified: string[] }> {
   const liveEntries = await Promise.all(live.map(manifestEntry))

@@ -77,6 +77,16 @@ export interface GuardedTool extends ModelContextTool {
   confirm?: boolean
 }
 
+/**
+ * The agent-visible surface of a tool: everything a manifest covers.
+ *
+ * `execute` is excluded deliberately. A manifest describes what an agent can
+ * see and decide from, so it can be built and signed at deploy time from a
+ * declarative tool table, with no handlers — and therefore no application code —
+ * in scope.
+ */
+export type ToolSurface = Omit<GuardedTool, 'execute'>
+
 /** Why a call was refused. Stable string ids — they end up in signed receipts. */
 export type RefusalReason =
   | 'no-active-grant'

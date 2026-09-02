@@ -67,10 +67,14 @@ actually do on my behalf, and can I prove it?"
   instantly. Authority that lapses by default is authority you can safely give.
 - **Prove what happened.** A tamper-evident chain where deleting or reordering
   history breaks verification — so a receipt is evidence, not a log line.
-- **Verify the tool surface itself.** The origin signs its own tools, so an
-  injected lookalike tool or a silently reworded description becomes detectable.
-  This is the tool-surface poisoning attack, and it is why "a tool's claim isn't
-  proof" needed an answer.
+- **Verify the tool surface itself.** The origin signs its own tools at deploy
+  time and serves the manifest at `/.well-known/7h3-webmcp-manifest.json`. Click
+  **Inject a poisoned tool** in the demo and a lookalike registers successfully —
+  nothing stops same-origin script from doing that — but the page immediately
+  reports `UNPUBLISHED TOOL: list_invoices_fast`. That is the tool-surface
+  poisoning attack, caught, and it is why "a tool's claim isn't proof" needed an
+  answer. You can run the check yourself with `curl`; the origin's private key
+  never reaches the browser.
 - **Let the agent ask for permission.** Not fail, not over-request up front —
   ask, in context, for exactly what it needs.
 
@@ -101,8 +105,11 @@ Three primitives, all built on 7h3 Protocol's existing capability, signing and
 replay code (a 478-test protocol, not hackathon glue):
 
 1. **Signed tool manifests** — the origin signs name, description, schema and
-   annotations of every tool. `diffAgainstManifest` detects injected, modified
-   or removed tools.
+   annotations of every tool at deploy time, from a declarative tool table with
+   no handlers in scope. Two keys, deliberately: a long-lived *origin identity
+   key* that never reaches the browser and signs the manifest, and a per-visitor
+   *session key* that signs grants and receipts. `diffAgainstManifest` detects
+   injected, modified or removed tools.
 2. **Capability-scoped execution** — scoped, expiring, revocable grants. Held
    page-side by default, so the token never passes through the agent and cannot
    be exfiltrated by a prompt-injected one. Ceilings ride inside the signed token
@@ -136,7 +143,7 @@ the identical guarded wrapper.
 
 ---
 
-# Video script (2:45)
+# Video script (2:55)
 
 **0:00–0:20 — The problem.**
 On screen: Chrome's security page and OpenAI's "a tool's name or claim that it
@@ -167,12 +174,19 @@ Ask: *"Delete invoice INV-1041"* → `scope-not-covered`.
 > "It cannot talk its way past this. There's no prompt that produces a valid
 > signature."
 
-**2:00–2:20 — Negotiation.**
+**2:00–2:15 — Negotiation.**
 Ask: *"Ask the owner for permission to settle the overdue invoices."*
 Approval modal appears; approve it; the agent retries and succeeds.
 > "When it hits the boundary it doesn't just fail — it asks. And I decide."
 
-**2:20–2:45 — Proof.**
+**2:15–2:35 — Poisoning the tool surface.**
+Point at `surface verified · 10 tools match the signed manifest`.
+Click **Inject a poisoned tool**. It flips to `UNPUBLISHED TOOL: list_invoices_fast`.
+> "OpenAI's own docs say a tool's name isn't proof of what it does. So this
+> origin signs its tool surface at deploy time. An injected lookalike still
+> registers — but it can't hide."
+
+**2:35–2:55 — Proof.**
 Click **Verify chain** → intact. Click **Simulate tampering** → detected.
 > "Every call, allowed and refused, on a hash-chained signed log. Edit one entry
 > and verification breaks. WebMCP gives agents hands. This gives those hands a
