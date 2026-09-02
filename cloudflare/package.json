@@ -1,8 +1,8 @@
 {
   "name": "@7h3/protocol-cf",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "7h3 Protocol — Cloudflare Workers gateway and middleware",
+  "description": "7h3 Protocol \u2014 Cloudflare Workers gateway and middleware",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "wrangler dev",

@@ -492,19 +492,41 @@ class HttpAdapter implements TransportAdapter {
           // Ignore per-stream protocol errors under overload; client handles retries.
         })
 
+        // Under open-loop overload the client routinely destroys a stream before
+        // the server gets to answer. `respond()`/`end()` then throw
+        // ERR_HTTP2_INVALID_STREAM *synchronously* — not as an 'error' event, so
+        // the listener above never sees it — and the throw inside a catch block
+        // escaped as an unhandled error and killed the whole benchmark run.
+        const safeRespond = (responseHeaders: http2.OutgoingHttpHeaders): void => {
+          if (stream.destroyed || stream.closed) return
+          try {
+            safeRespond(responseHeaders)
+          } catch {
+            // Stream went away between the check and the write.
+          }
+        }
+        const safeEnd = (body?: string): void => {
+          if (stream.destroyed || stream.closed) return
+          try {
+            safeEnd(body)
+          } catch {
+            // Same race, on the terminating write.
+          }
+        }
+
         if (headers[':method'] !== 'POST') {
-          stream.respond({ ':status': 405 })
-          stream.end()
+          safeRespond({ ':status': 405 })
+          safeEnd()
           return
         }
 
         if (this.inFlight >= this.maxServerInFlight) {
-          stream.respond({
+          safeRespond({
             ':status': 503,
             'content-type': 'application/json',
             'x-retry-after-ms': '2',
           })
-          stream.end(JSON.stringify({ ok: false, error: 'overloaded' }))
+          safeEnd(JSON.stringify({ ok: false, error: 'overloaded' }))
           return
         }
 
@@ -525,8 +547,8 @@ class HttpAdapter implements TransportAdapter {
               ? (JSON.parse(rawBody as string) as string[]).map((b64) => Buffer.from(b64, 'base64'))
               : (JSON.parse(rawBody as string) as string[])
             if (!Array.isArray(payloads)) {
-              stream.respond({ ':status': 400, 'content-type': 'application/json' })
-              stream.end(JSON.stringify({ ok: false, error: 'batch payload must be array' }))
+              safeRespond({ ':status': 400, 'content-type': 'application/json' })
+              safeEnd(JSON.stringify({ ok: false, error: 'batch payload must be array' }))
               return
             }
 
@@ -571,11 +593,11 @@ class HttpAdapter implements TransportAdapter {
             }
 
             await Promise.all(Array.from({ length: workerCount }, () => worker()))
-            stream.respond({ ':status': results.some((r) => !r.ok) ? 400 : 200, 'content-type': 'application/json' })
-            stream.end(JSON.stringify(results))
+            safeRespond({ ':status': results.some((r) => !r.ok) ? 400 : 200, 'content-type': 'application/json' })
+            safeEnd(JSON.stringify(results))
           } catch {
-            stream.respond({ ':status': 500, 'content-type': 'application/json' })
-            stream.end(JSON.stringify({ ok: false, error: 'internal http batch error' }))
+            safeRespond({ ':status': 500, 'content-type': 'application/json' })
+            safeEnd(JSON.stringify({ ok: false, error: 'internal http batch error' }))
           } finally {
             this.inFlight -= 1
           }
@@ -587,8 +609,8 @@ class HttpAdapter implements TransportAdapter {
           const decoded = decodeEnvelope(rawBody)
           const decodeMs = performance.now() - decodeStart
           if (!decoded.ok || !decoded.envelope) {
-            stream.respond({ ':status': 400, 'content-type': 'application/json' })
-            stream.end(JSON.stringify({ ok: false, queueMs, verifyMs: 0, decodeMs, error: 'decode failed' }))
+            safeRespond({ ':status': 400, 'content-type': 'application/json' })
+            safeEnd(JSON.stringify({ ok: false, queueMs, verifyMs: 0, decodeMs, error: 'decode failed' }))
             return
           }
 
@@ -609,22 +631,22 @@ class HttpAdapter implements TransportAdapter {
           }
 
           if (result.ok && this.fastAck) {
-            stream.respond({
+            safeRespond({
               ':status': 204,
               [ACK_HEADER_OK]: '1',
               [ACK_HEADER_QUEUE_MS]: String(queueMs),
               [ACK_HEADER_VERIFY_MS]: String(verifyMs),
               [ACK_HEADER_DECODE_MS]: String(decodeMs),
             })
-            stream.end()
+            safeEnd()
             return
           }
 
-          stream.respond({ ':status': result.ok ? 200 : 400, 'content-type': 'application/json' })
-          stream.end(JSON.stringify(ack))
+          safeRespond({ ':status': result.ok ? 200 : 400, 'content-type': 'application/json' })
+          safeEnd(JSON.stringify(ack))
         } catch {
-          stream.respond({ ':status': 500, 'content-type': 'application/json' })
-          stream.end(JSON.stringify({ ok: false, queueMs, verifyMs: 0, decodeMs: 0, error: 'internal http receive error' }))
+          safeRespond({ ':status': 500, 'content-type': 'application/json' })
+          safeEnd(JSON.stringify({ ok: false, queueMs, verifyMs: 0, decodeMs: 0, error: 'internal http receive error' }))
         } finally {
           this.inFlight -= 1
         }

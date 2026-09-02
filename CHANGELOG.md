@@ -6,7 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## Unreleased
+## v0.6.0
+
+Security release. Every SDK tightens envelope acceptance, and a new package
+brings the protocol to WebMCP. **Wire format is unchanged (`7h3/0.1`)** — only
+what each SDK is willing to accept has changed, so peers interoperate exactly
+as before.
+
+### Added
+
+- **`@7h3/protocol-webmcp`** — signed, capability-scoped, receipted WebMCP
+  (`document.modelContext`) tools. Three primitives: manifests signed by the
+  origin at deploy time so an injected lookalike tool is detectable; scoped,
+  expiring, revocable grants with spend ceilings bound *inside* the signed
+  token; and a hash-chained receipt log recording every call, allowed and
+  refused. Grants are held page-side by default, so the token never passes
+  through the agent.
+- `webmcp` scaffold target in both `7h3 add` and the MCP server's
+  `7h3_scaffold`.
+- `docs/install/` — a guide per install surface, including WebMCP and ChatGPT.
+- `MAX_CLOCK_SKEW_MS` (TypeScript, Python, Rust, Go) and `MAX_CBOR_DEPTH`
+  (TypeScript).
 
 ### Changed
 
@@ -29,7 +49,59 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `docs/assets/banner-github.png` regenerated at its real 1280x400 size (478
   tests, 5 transport bindings, v0.5.6).
 
-Wire format unchanged: `7h3/0.1`.
+### Security
+
+- **`MAX_TTL_MS` bounded nothing.** `validateEnvelope` never rejected a
+  post-dated timestamp, and `verifyHttpEnvelope` calls only `validateEnvelope` —
+  the clock-skew check lived solely in `protocolTransport`. On the primary HTTP
+  path a sender could set `timestampMs` a year ahead with a legal 24h `ttlMs`
+  and keep an envelope valid, and replayable, for a year. Now bounded at 30s
+  across all four SDKs.
+- **Python accepted `null` and non-string identity fields.** Presence checks
+  used `str(value).strip()`, which renders `None` as `"None"`, `False` as
+  `"False"` and `0` as `"0"` — all non-empty. `"nonce": null` passed validation
+  with no replay nonce at all; `"sender": null` passed with no identity.
+- **Python raised instead of rejecting on malformed numbers.** `"ttlMs": "abc"`,
+  `NaN`, `Infinity` or `null` threw out of `validate_envelope` — an unhandled
+  exception in a request handler, on input straight off the wire.
+- **Rust never checked for a missing nonce**, so it accepted an envelope with no
+  replay-protection primitive. TypeScript, Python and Go all rejected it.
+- **Unsound delegation scope containment.** `pathGlobIsSubset` returned true as
+  soon as a parent segment was `**`, even with no child segments left — but
+  `a/**` matches `a/x` and never bare `a`, so a child of `a` reached a path its
+  parent could not.
+- **CBOR had no nesting bound.** `0x81` is "array of 1", so 50 KB of repeated
+  `0x81` nested 50 000 deep and overflowed the decoder's stack — reachable
+  through the HTTP CBOR binding. Bounded at 64 per RFC 8949 §10.
+- **`verifyHttpEnvelope` threw on attacker-chosen input.** Both signature
+  branches dereferenced `opts.keyRegistry` unguarded, so an HMAC envelope sent
+  to a registry-less server raised a `TypeError` inside the handler instead of
+  returning a clean refusal. Now fails closed.
+
+### Fixed
+
+- `bin/gateway-cli.test.ts` spawns `bin/7h3.ts` as a separate process, so it
+  resolves `@7h3/protocol` from disk and needs `dist/` — but `ci.yml` ran tests
+  before the build. CI had been red since 2026-08-08; a `pretest` hook fixes it
+  everywhere, so `npm test` now works on a fresh clone.
+- The open-loop benchmark crashed the whole run at high concurrency: a client
+  destroying a stream first makes `respond()` throw `ERR_HTTP2_INVALID_STREAM`
+  *synchronously*, so the stream `error` listener never saw it and the throw
+  inside a `catch` escaped unhandled. `npm run release:gate` could not complete.
+- `@7h3/protocol-mcp` hardcoded `@7h3/protocol-mcp@0.5.0` in six places while
+  shipping 0.5.6, so every generated install config pinned a stale release. Now
+  derived from `package.json`.
+- Peer ranges widened from `^0.5.0` to `>=0.5.0 <1.0.0`. Under 0.x semver
+  `^0.5.0` means `<0.6.0`, so this release would otherwise have broken every
+  satellite package's peer resolution.
+
+### Note for upgraders
+
+Validation is strictly tighter. An envelope that previously passed will now be
+rejected if it is post-dated by more than 30s, carries a non-string or missing
+nonce or sender, or carries a non-finite `ttlMs`/`timestampMs`. All of those
+were already invalid in principle; they are now enforced consistently in every
+SDK. Wire format unchanged: `7h3/0.1`.
 
 ## v0.5.6 — 2026-08-08
 

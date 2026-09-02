@@ -117,6 +117,59 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  publish-webmcp:
+    name: publish @7h3/protocol-webmcp
+    needs: publish-protocol
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # The package's tsconfig resolves @7h3/protocol's types through
+      # ../../dist/protocol, so the core has to be built at the repo root before
+      # sdk/webmcp can typecheck — unlike sdk/pq, which only needs its own deps.
+      - name: Build the core protocol
+        run: |
+          npm ci
+          npm run build:protocol
+
+      # npm install (not ci): sdk/webmcp's lockfile pins the @7h3/protocol peer
+      # dep, which changes every release and would desync npm ci on each bump
+      # (see the same note in ci.yml).
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: sdk/webmcp
+
+      - name: Build and test @7h3/protocol-webmcp
+        run: |
+          npm run build
+          npm test
+        working-directory: sdk/webmcp
+
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: sdk/webmcp
+
+      - name: Publish @7h3/protocol-webmcp
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish --provenance --access public
+        working-directory: sdk/webmcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   publish-pq:
     name: publish @7h3/protocol-pq
     needs: publish-protocol
