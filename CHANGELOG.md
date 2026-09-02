@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.1 — `@7h3/protocol-mcp` only
+
+### Fixed
+
+- `@7h3/protocol-mcp` failed to build during the v0.6.0 publish:
+  `src/scaffold.test.ts(2,38): error TS2307: Cannot find module 'vitest'`. The
+  package's `tsconfig.json` compiled all of `src`, which now includes a test
+  file, but its tests run under the repo-root vitest and `vitest` is not a
+  dependency here. It typechecked locally only because Node resolution walks up
+  into the root `node_modules`; the publish job installs the package in
+  isolation, where there is nothing to walk up to. Test files are now excluded
+  from the build, verified against an isolated `npm ci` that mirrors CI.
+
+Only `@7h3/protocol-mcp` changes version. Every other package remains at 0.6.0,
+which is already published; the workflow's idempotency checks skip them.
+
 ## v0.6.0
 
 Security release. Every SDK tightens envelope acceptance, and a new package
