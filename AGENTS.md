@@ -4,7 +4,7 @@
 
 ## What this repo is
 
-**7h3 Protocol** is a cryptographic signing and replay-protection layer for AI agent messages. It has TypeScript, Python, Rust, and Go SDKs, a Cloudflare Workers gateway, and 478 tests.
+**7h3 Protocol** is a cryptographic signing and replay-protection layer for AI agent messages. It has TypeScript, Python, Rust, and Go SDKs, a Cloudflare Workers gateway, and 542 tests.
 
 Wire version: `7h3/0.1` — **never change this string** (breaking for all peers).
 

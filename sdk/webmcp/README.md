@@ -93,6 +93,44 @@ document.modelContext.registerTool({
 
 ---
 
+## Adopting it in an app that already has WebMCP tools
+
+A guarded tool is shape-compatible with an unguarded one, so adoption is an
+import, a constructor, and one field per tool you want to protect:
+
+```diff
++import { guard } from '@7h3/protocol-webmcp'
++
++const g = guard({ origin: 'shop.example', privateKey, publicKey })
+
+-await document.modelContext.registerTool({
++await g.registerTool({
+   name: 'place_order',
+   description: 'Place an order for the current cart',
+   inputSchema: { /* unchanged */ },
+   annotations: { destructiveHint: true },
++  scope: 'orders/place',
++  limit: { field: 'amountCents', max: 500_00 },
+   execute: async ({ cartId }) => placeOrder(cartId),   // unchanged
+ })
+```
+
+Your handler does not change, and neither does the schema an agent sees. Tools
+you leave on `document.modelContext` keep working exactly as before, so you can
+adopt one tool at a time.
+
+Or generate it. The repo's MCP server ships a WebMCP scaffold target:
+
+```
+7h3_scaffold framework="webmcp" sender="shop.example"
+```
+
+```bash
+claude mcp add 7h3-protocol -- npx -y @7h3/protocol-mcp
+```
+
+---
+
 ## Three primitives
 
 ### 1. Signed tool manifests — provenance

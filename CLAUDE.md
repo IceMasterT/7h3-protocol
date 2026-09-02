@@ -12,7 +12,8 @@ Key properties:
 - ML-DSA (NIST FIPS 204) post-quantum signatures
 - BLS12-381 M-of-N threshold signatures
 - Cloudflare Workers native (Web Crypto only, zero deps)
-- 478 tests across TypeScript, Python, Rust, Go, Browser
+- 542 tests across TypeScript, Python, Rust, Go, Browser
+- WebMCP: capability-scoped, receipted `document.modelContext` tools (`sdk/webmcp/`)
 
 ## MCP Tools (install once, use in every session)
 
@@ -50,6 +51,7 @@ Or add to `.claude/settings.json` in any project:
 ### Scaffold any framework
 
 ```
+7h3_scaffold framework="webmcp" sender="shop.example"
 7h3_scaffold framework="cloudflare-worker" sender="agent@example.com" signingMethod="ed25519"
 7h3_scaffold framework="nextjs" sender="agent@example.com"
 7h3_scaffold framework="express" sender="agent@example.com"
@@ -75,6 +77,7 @@ src/replayStores.ts     — ReplayStore interface + Redis + in-memory
 src/telemetry.ts        — Prometheus metrics + OpenTelemetry
 cloudflare/src/         — Cloudflare Workers gateway + middleware
 cloudflare/DEPLOY.md    — Cloudflare deployment guide
+sdk/webmcp/             — @7h3/protocol-webmcp (signed WebMCP tools)
 sdk/pq/                 — @7h3/protocol-pq (ML-DSA post-quantum)
 sdk/threshold/          — @7h3/protocol-threshold (BLS M-of-N)
 mcp-server/src/         — @7h3/protocol-mcp MCP server
@@ -100,7 +103,7 @@ const ok = await verifyEnvelopeEd25519(signed, publicKey)
 ## Running tests
 
 ```bash
-npm test                    # all 478 tests
+npm test                    # all 542 tests
 npm run conformance:python  # cross-SDK conformance
 npm run conformance:rust    # Rust SDK
 ```
