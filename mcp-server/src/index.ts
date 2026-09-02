@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { buildScaffold } from './scaffold'
-import { MCP_PACKAGE_SPEC, MCP_VERSION } from './version'
+import { buildScaffold } from './scaffold.js'
+import { MCP_PACKAGE_SPEC, MCP_VERSION } from './version.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'

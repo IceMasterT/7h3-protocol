@@ -107,8 +107,15 @@ jobs:
         run: npm ci
         working-directory: mcp-server
 
-      - name: Build mcp-server
-        run: npm run build
+      # smoke packs the tarball, installs it, launches the built server and
+      # drives a real MCP session over stdio. Importing is not enough for a
+      # binary: 0.6.1 shipped unable to start at all (ERR_MODULE_NOT_FOUND from
+      # extensionless ESM specifiers) and every unit test still passed, because
+      # they import the modules directly rather than launching the server.
+      - name: Build and smoke mcp-server
+        run: |
+          npm run build
+          npm run smoke
         working-directory: mcp-server
 
       - name: Check if already published

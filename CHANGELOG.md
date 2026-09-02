@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.4 — `@7h3/protocol-mcp` 0.6.2
+
+### Fixed
+
+- **`@7h3/protocol-mcp@0.6.1` could not start.** Running it failed immediately
+  with `ERR_MODULE_NOT_FOUND: Cannot find module '.../dist/scaffold'`. The
+  regression was introduced in this release series by splitting `scaffold.ts`
+  and `version.ts` out of `index.ts`: `tsc` does not rewrite specifiers when
+  emitting ESM, so `from './scaffold'` stays extensionless and Node's resolver
+  rejects it. The package was a single file before that split, which is why it
+  had never been exposed. 0.5.6 is unaffected.
+
+  Every unit test still passed, because they import the modules directly rather
+  than launching the built server.
+
+### Added
+
+- `npm run smoke` in `mcp-server` — packs the tarball, installs it, **launches
+  the built server and drives a real MCP session over stdio**: `initialize`,
+  `tools/list`, then a `tools/call` of `7h3_generate_keypair`, asserting the
+  server identifies itself, lists the expected tools, and returns a keypair.
+  Importing the entry point would not have caught this; only starting the
+  binary does. Verified to fail with `server exited early (code 1)` against the
+  broken build. Wired into CI and the publish job.
+
+Only `@7h3/protocol-mcp` changes version, to 0.6.2.
+
 ## v0.6.3 — `@7h3/protocol-browser` 0.6.1
 
 `@7h3/protocol-browser` had been stuck at 0.4.0 with no build tooling and no

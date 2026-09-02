@@ -5,7 +5,7 @@
  * StdioServerTransport at module load, so importing it from a test would hang.
  */
 
-import { MCP_PACKAGE_SPEC } from './version'
+import { MCP_PACKAGE_SPEC } from './version.js'
 
 // ── scaffold generator ────────────────────────────────────────────────────────
 

@@ -46,6 +46,13 @@ jobs:
           npm run smoke
         working-directory: sdk/browser
 
+      - name: Smoke test @7h3/protocol-mcp package
+        run: |
+          npm ci
+          npm run build
+          npm run smoke
+        working-directory: mcp-server
+
       - name: Fuzz smoke (decode + verify harnesses)
         run: npm run fuzz:ts
         env:
