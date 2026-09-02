@@ -10,6 +10,107 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- **`README.md` rewritten to match the shipped API surface.** Many examples were
+  aspirational and had never matched the real code: `createEnvelope` shown with
+  three positional arguments (the real signature takes a single options object),
+  `verifyEnvelopeEd25519` / `verifyEnvelopeHmac` documented as returning
+  `{ ok, error }` (they return a plain boolean), and `createWsBinding`,
+  `grpcSigningInterceptor` / `grpcVerifyingInterceptor`, `createKeyRotator`, and
+  a Python/Rust `generate_keypair()` that exist in no SDK. Replaced with the real
+  `wrapWebSocket`, `signGrpcCall` / `withGrpcVerification`, `KeyRotationManager`,
+  and verified per-SDK keygen patterns. Also corrected `RoutePolicy.pathGlob` to
+  `path`, the reversed argument order on `matchPolicy` / `isAllowedSender`, and
+  the `SlidingWindowRateLimiter`, `createCachingKeyRegistry`, and
+  `createAuditLog` shapes.
+- The README's CLI and Gateway sections assumed a `--config <yaml>` flag that was
+  never implemented — rewritten against the real flag-based CLI. The Docker
+  section claimed a published `ghcr.io` image that no CI job produces — rewritten
+  to build locally from the repo `Dockerfile`.
+- `docs/assets/banner-github.png` regenerated at its real 1280x400 size (478
+  tests, 5 transport bindings, v0.5.6).
+
+Wire format unchanged: `7h3/0.1`.
+
+## v0.5.6 — 2026-08-08
+
+### Fixed
+
+- CLI build regression that broke v0.5.5's npm publish. `bin/7h3.ts` passed an
+  `InMemoryRedisLikeClient` straight to `RedisReplayStore`, which takes an
+  options object (`{ client, redisUrl, keyPrefix }`) — and the two interfaces
+  were never compatible in the first place. Replaced with a small
+  `InMemoryCliReplayStore` implementing the gateway's `ReplayStore` interface
+  directly; a single-process CLI store needs no Redis abstraction. Only
+  `tsc -p tsconfig.bin.json` (what `package:protocol` and `publish.yml` run)
+  catches this class of error — the root `tsc --noEmit` does not compile
+  `bin/7h3.ts`'s dynamic imports against built `dist/` output.
+
+### Release note
+
+crates.io and PyPI published `v0.5.5` successfully — neither artifact includes
+`bin/7h3.ts` — and only the npm publish failed. Rather than force-move an
+already-pushed tag, all six targets were bumped to `v0.5.6`.
+
+Wire format unchanged: `7h3/0.1`.
+
+## v0.5.5 — 2026-08-08
+
+### Security
+
+- **Gateway capability-token auth bypassed `allowedSenders` and rate limiting.**
+  The capability path returned `ok: true` immediately; both checks now run on
+  every auth path through a shared post-auth check.
+- **Path-traversal bypass in the gateway.** Request paths are now normalized once
+  and the normalized path is used for both policy matching and upstream
+  forwarding. `x-7h3-verified` is no longer set on requests that skipped
+  verification.
+- **Capability delegation chains accepted escalation** — broader scope, longer
+  TTL, and `maxDelegations: 0` all passed verification. Also fixed a
+  glob-containment bug that treated `**` as narrower than `*`.
+- **Non-finite `timestampMs` / `ttlMs` defeated TTL expiry, clock-skew, and replay
+  checks** in `protocol.ts`, `protocolTransport.ts`, and `protocolReplay.ts`.
+- **CBOR map decoding allowed `__proto__` prototype pollution**; envelope field
+  decoding now validates types instead of blindly casting.
+- **`mcpWrapper`'s `requireSignature` could be silently overridden to `false`**
+  through option spread order.
+- **Key revocation only blocked Ed25519**, not the same key's HMAC shared-secret
+  path; unrecognized sender IDs no longer fall back to the current key.
+- **Webhook and WebSocket bindings had no replay protection** — a captured valid
+  message could be replayed indefinitely inside its TTL window. Both now accept
+  an optional `replayCache` (`InMemoryWebhookReplayCache` included).
+- **`SlidingWindowRateLimiter` grew without bound** while tracking unique senders;
+  its key map is now LRU-evicted.
+- **The CLI refuses to start an unverified passthrough gateway** without
+  `--allow-unverified`. Added `--private-key-file` and env-var alternatives to
+  `--private-key` so keys stop leaking through shell history and process
+  listings; all HTTP servers gained error handlers.
+- **Code-generation injection in `mcp-server`**: user-supplied `sender`,
+  `upstream`, `serverAgentId`, and `clientAgentId` are now escaped before being
+  interpolated into the templates emitted by `7h3_scaffold` and
+  `7h3_wrap_mcp_server`.
+- Cloudflare hardening: `wrangler.toml` was missing KV bindings for the staging
+  and production environments (Wrangler does not inherit them); KV registry keys
+  now percent-encode sender and keyId to prevent delimiter collisions between
+  senders; Durable Object cleanup alarms use each entry's real TTL/window instead
+  of a hardcoded 5-minute sweep; `DEFAULT_POLICY` now fails closed on any value
+  other than exactly `'allow'`.
+
+### Fixed
+
+- Dependency advisories closed across every workspace: `cryptography`
+  49.0.0 → 50.0.0 (GHSA-g6cj-pr64-35w5 — a PKCS#7 Bleichenbacher oracle;
+  CI/test-only for the Python SDK, which has no runtime dependencies and never
+  touches PKCS#7), `nanoid` (GHSA-2v37-7h3g-55p8) in root, `mcp-server`,
+  `sdk/pq`, `sdk/threshold`, and `cloudflare`, and an `undici` 7.29.0 override in
+  `cloudflare/` closing three advisories pulled in through
+  `wrangler` → `miniflare`.
+
+Wire format unchanged: `7h3/0.1`.
+
+## v0.5.4 — 2026-08-03
+
+### Changed
+
 - **License changed from MIT to Apache-2.0.** 7h3 Protocol is a wire protocol
   meant to be implemented independently. Apache-2.0 §3 supplies the express,
   irrevocable patent grant and the patent-retaliation clause that MIT lacks, and
@@ -21,6 +122,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `@7h3/protocol-pq`, `@7h3/protocol-threshold`, `@7h3/protocol-browser`,
   `protocol-7h3` (crates.io), `7h3-protocol` (PyPI), and the Go module.
 - `cloudflare/package.json` declared no license at all; now `Apache-2.0`.
+
+### Security
+
+- **Critical: gateway rate limiting was backed by in-process state** that reset on
+  restart — now backed by persistent state.
+- Queue bindings gained TTL and replay protection.
+- HMAC shared-secret lookup is now bound to the claimed sender.
+- Rust private keys are zeroized on drop and redacted from `Debug` output.
+- `/metrics` is gated by default, and `ttlMs` is capped at 24 h across all SDKs.
+- `@7h3/protocol-pq` no longer derives `keyId` from private key material.
 
 ### Fixed
 
@@ -36,12 +147,55 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   lists `LICENSE` and `NOTICE`.
 - `mcp-server/package.json` `files` allowlist omitted `NOTICE`. npm force-includes
   `LICENSE` but not `NOTICE`, so the attribution notice would not have shipped.
+- **`@7h3/protocol/<subpath>` imports were broken in the shipped package** —
+  `gateway`, `http`, `key-registry`, and the rest resolved to per-module `dist`
+  files that vite's single-bundle lib build never produced. This was live, not
+  just a publish-artifact bug: `cloudflare/src/worker.ts` and `middleware.ts`
+  import `createGateway` from `@7h3/protocol/gateway`, and that import threw
+  `ERR_MODULE_NOT_FOUND`. Every subpath's `import` condition now points at
+  `dist/protocol/index.js` (types stay per-module).
+- **`@7h3/protocol-pq@0.5.0` was live and broken on npm.** Its `main`/`types`/
+  `exports` pointed at `./index.js`, but a `rootDir` reaching across the monorepo
+  produced deeply nested paths like `dist/7h3-protocol/sdk/pq/src/index.js` that
+  never matched, so importing it gave `ERR_MODULE_NOT_FOUND`. `sdk/pq/src/index.ts`
+  now imports from the public `@7h3/protocol` package it already declares as a
+  peer dependency, with a self-contained `rootDir: ./src`. Added
+  `prepublishOnly` build steps to `sdk/pq` and `sdk/threshold` so a
+  "published without a fresh build" bug cannot recur.
+- `release-gate.ts` referenced a nonexistent `bench:openloop:adaptive:ci` script,
+  and `policy:validate` had no default path — `npm run release:gate` now runs.
+- The `Dockerfile` swallowed `build:protocol` failures with `|| true`; the build
+  must now succeed, since the runtime stage ships `bin/7h3.js` and runs it with
+  plain `node` instead of tsx-executing TypeScript source.
+- Documentation drift from the pre-rename repo: wrong clone URL, nonexistent npm
+  scripts, and references to UI files that do not exist here in
+  `docs/CLEAN_CLONE_RUNBOOK.md` and `docs/AGENTS.md`; `aip_*` tool names in
+  `mcp-server/README.md`; the `aip/0.1` wire version in `CONTRIBUTING.md`;
+  `AIP_*` env var names in `docs/MCP_WRAPPER.md`; and six operational docs still
+  worded for "GLUV".
 
 ### Added
 
 - `NOTICE` — attribution notice required to propagate under Apache-2.0 §4(d),
   recording copyright in IceMasterT.
 - `## License` section in `README.md`. There was previously only a badge.
+- `createProductionGateway()` — throws unless `defaultPolicy` is explicitly
+  `'deny'` and a `replayStore` is set, instead of silently allowing unmatched
+  routes through unverified or losing replay protection across instances.
+  `createGateway()` now warns once when a signature-requiring policy has no
+  `replayStore`.
+- `scripts/smoke-test-package.ts` — packs the real npm artifact and imports every
+  documented subpath plus the CLI bin through `node_modules`.
+- `npm run install:all` — restores `sdk/pq` and `sdk/threshold` alongside the root
+  install. Previously undocumented, so a fresh clone's root test run failed on
+  missing `@noble/*` deps.
+- Compiled CLI: `bin/7h3.ts` is built to `bin/7h3.js` and shipped in the publish
+  artifact, with internal dynamic imports rewritten to the package's own public
+  subpaths so it works compiled, not just under tsx.
+- Release pipeline: PyPI trusted publishing, crates.io publishing via OIDC
+  trusted publishing (no long-lived `CARGO_REGISTRY_TOKEN`), and `publish-pq` /
+  `publish-threshold` / `mcp-server` jobs, all gated on `publish-protocol`. Every
+  publish job is idempotent and skips work already published.
 
 ### Downstream note
 
