@@ -113,6 +113,19 @@ def verify_queue_message(
         if replay_store.check(header["nonce"], header["ttlMs"]):
             raise ValueError("7h3: replay detected — nonce already seen")
 
+    # The signature covers envelope.body.content, NOT the sibling "payload"
+    # field. Returning it unchecked meant an attacker could take any validly
+    # signed message, swap the payload for anything, and the signature would
+    # still verify while the consumer acted on attacker-controlled data — a
+    # complete integrity bypass on a transport whose whole purpose is integrity.
+    # Serialized exactly as sign_queue_message does, so honest messages match.
+    presented = payload if isinstance(payload, str) else json.dumps(payload, separators=(",", ":"))
+    if presented != envelope.get("body", {}).get("content"):
+        raise ValueError(
+            "7h3: queue message payload does not match the signed content "
+            "— the payload field was modified in transit"
+        )
+
     return {"payload": payload, "envelope": envelope}
 
 

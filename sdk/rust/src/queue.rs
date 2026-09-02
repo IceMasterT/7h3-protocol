@@ -75,5 +75,21 @@ pub fn verify_queue_message(
         return Err("invalid signature".into());
     }
 
-    Ok((wrapper["payload"].clone(), envelope))
+    // The signature covers envelope.body.content, NOT the sibling "payload"
+    // field. Returning it unchecked meant an attacker could take any validly
+    // signed message, swap the payload for anything, and the signature would
+    // still verify while the consumer acted on attacker-controlled data — a
+    // complete integrity bypass on a transport whose whole purpose is integrity.
+    // Serialized exactly as sign_queue_message does, so honest messages match.
+    let payload = wrapper["payload"].clone();
+    let presented = serde_json::to_string(&payload)
+        .map_err(|e| -> Box<dyn std::error::Error> { format!("malformed payload: {e}").into() })?;
+    if presented != envelope.body.content {
+        return Err(
+            "queue message payload does not match the signed content — the payload field was modified in transit"
+                .into(),
+        );
+    }
+
+    Ok((payload, envelope))
 }

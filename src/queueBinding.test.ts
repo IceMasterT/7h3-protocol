@@ -163,3 +163,72 @@ describe('verifyQueueBatch', () => {
     await expect(verifyQueueBatch(['{}', 'nope', '{"envelope":null,"payload":1}'], { publicKey })).resolves.toBeDefined()
   })
 })
+
+describe('queue payload integrity — the payload must be what was signed', () => {
+  async function signed() {
+    const kp = await generateEd25519KeypairBase64Url()
+    const message = await signQueueMessage(
+      { job: 'reindex', amount: 10 },
+      { sender: 'a@b.test', privateKey: kp.privateKey, keyId: 'k1', ttlMs: 60_000 },
+    )
+    return { kp, message, parsed: JSON.parse(message) as { envelope: unknown; payload: unknown } }
+  }
+
+  it('rejects a message whose payload was swapped under a valid signature', async () => {
+    const { kp, parsed } = await signed()
+    // The envelope is untouched, so the signature still verifies. Only the
+    // sibling `payload` field — which the signature does not cover — changed.
+    const forged = JSON.stringify({
+      envelope: parsed.envelope,
+      payload: { job: 'DROP TABLE users', amount: 1_000_000_000 },
+    })
+    await expect(verifyQueueMessage(forged, { publicKey: kp.publicKey })).rejects.toThrow(
+      /payload does not match the signed content/,
+    )
+  })
+
+  it('rejects a payload removed entirely', async () => {
+    const { kp, parsed } = await signed()
+    const forged = JSON.stringify({ envelope: parsed.envelope })
+    await expect(verifyQueueMessage(forged, { publicKey: kp.publicKey })).rejects.toThrow(
+      /payload does not match the signed content/,
+    )
+  })
+
+  it('rejects a subtly altered numeric field', async () => {
+    const { kp, parsed } = await signed()
+    const forged = JSON.stringify({
+      envelope: parsed.envelope,
+      payload: { job: 'reindex', amount: 11 },
+    })
+    await expect(verifyQueueMessage(forged, { publicKey: kp.publicKey })).rejects.toThrow(
+      /payload does not match the signed content/,
+    )
+  })
+
+  it('still accepts an untouched message and returns the signed payload', async () => {
+    const { kp, message } = await signed()
+    const out = await verifyQueueMessage<{ job: string; amount: number }>(message, {
+      publicKey: kp.publicKey,
+    })
+    expect(out.payload).toEqual({ job: 'reindex', amount: 10 })
+    expect(JSON.stringify(out.payload)).toBe(out.envelope.body.content)
+  })
+
+  it('round-trips a string payload', async () => {
+    const kp = await generateEd25519KeypairBase64Url()
+    const message = await signQueueMessage('plain-text-job', {
+      sender: 'a@b.test', privateKey: kp.privateKey, keyId: 'k1', ttlMs: 60_000,
+    })
+    const out = await verifyQueueMessage<string>(message, { publicKey: kp.publicKey })
+    expect(out.payload).toBe('plain-text-job')
+  })
+
+  it('verifyQueueBatch inherits the check', async () => {
+    const { kp, message, parsed } = await signed()
+    const forged = JSON.stringify({ envelope: parsed.envelope, payload: { job: 'evil' } })
+    const results = await verifyQueueBatch([message, forged], { publicKey: kp.publicKey })
+    expect(results[0].ok).toBe(true)
+    expect(results[1].ok).toBe(false)
+  })
+})

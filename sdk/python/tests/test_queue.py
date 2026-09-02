@@ -160,3 +160,59 @@ class TestVerifyQueueBatch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QueuePayloadIntegrityTest(unittest.TestCase):
+    """The signature covers envelope.body.content, not the sibling "payload"
+    field. Returning that field unchecked let an attacker take any validly
+    signed message, swap the payload, and have it accepted. Parity with the
+    TypeScript and Rust SDKs."""
+
+    def _keys(self):
+        import base64
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+
+        b64 = lambda b: base64.urlsafe_b64encode(b).decode().rstrip("=")
+        priv = Ed25519PrivateKey.generate()
+        sk = b64(priv.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ))
+        pk = b64(priv.public_key().public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ))
+        return sk, pk
+
+    def test_rejects_a_swapped_payload_under_a_valid_signature(self):
+        sk, pk = self._keys()
+        message = sign_queue_message({"job": "reindex", "amount": 10}, sk, "a@b.test", ttl_ms=60_000)
+        parsed = json.loads(message)
+        # Envelope untouched, so the signature still verifies.
+        forged = json.dumps({
+            "envelope": parsed["envelope"],
+            "payload": {"job": "DROP TABLE users", "amount": 10**9},
+        })
+        with self.assertRaises(ValueError) as ctx:
+            verify_queue_message(forged, pk)
+        self.assertIn("does not match the signed content", str(ctx.exception))
+
+    def test_rejects_a_removed_payload(self):
+        sk, pk = self._keys()
+        message = sign_queue_message({"job": "reindex"}, sk, "a@b.test", ttl_ms=60_000)
+        forged = json.dumps({"envelope": json.loads(message)["envelope"]})
+        with self.assertRaises(ValueError):
+            verify_queue_message(forged, pk)
+
+    def test_still_accepts_an_untouched_message(self):
+        sk, pk = self._keys()
+        message = sign_queue_message({"job": "reindex", "amount": 10}, sk, "a@b.test", ttl_ms=60_000)
+        out = verify_queue_message(message, pk)
+        self.assertEqual(out["payload"], {"job": "reindex", "amount": 10})
+
+    def test_round_trips_a_string_payload(self):
+        sk, pk = self._keys()
+        message = sign_queue_message("plain-text-job", sk, "a@b.test", ttl_ms=60_000)
+        self.assertEqual(verify_queue_message(message, pk)["payload"], "plain-text-job")

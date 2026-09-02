@@ -104,6 +104,20 @@ export async function verifyQueueMessage<T>(
     }
   }
 
+  // The signature covers envelope.body.content, NOT the sibling `payload`
+  // field. Returning `parsed.payload` unchecked meant an attacker could take any
+  // validly signed message, swap the payload for anything at all, and the
+  // signature would still verify while the consumer acted on attacker-controlled
+  // data — a complete integrity bypass on a transport whose entire purpose is
+  // integrity. Bind the two together, or reject.
+  const presented =
+    typeof parsed.payload === 'string' ? parsed.payload : JSON.stringify(parsed.payload)
+  if (presented !== parsed.envelope.body.content) {
+    throw new Error(
+      'Queue message payload does not match the signed content — the payload field was modified in transit',
+    )
+  }
+
   return { payload: parsed.payload, envelope: parsed.envelope }
 }
 

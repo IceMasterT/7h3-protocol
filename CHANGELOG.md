@@ -6,6 +6,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.6 — queue payload integrity (TypeScript, Python, Rust)
+
+### Security
+
+- **The queue binding accepted an unsigned payload.** `signQueueMessage` writes
+  the payload twice: into `envelope.body.content`, which the signature covers,
+  and into a sibling `payload` field, which it does not. `verifyQueueMessage`
+  verified the envelope and then returned the **sibling** field.
+
+  An attacker could therefore take any validly signed queue message, replace
+  `payload` with anything at all, and the signature would still verify while the
+  consumer acted on attacker-controlled data. Demonstrated end to end: a message
+  signed as `{"job":"reindex","amount":10}` was accepted returning
+  `{"job":"DROP TABLE users","amount":1000000000}`.
+
+  A complete integrity bypass on a transport whose entire purpose is integrity.
+  Present in TypeScript, Python and Rust — every SDK that ships a queue binding.
+  Go has none and is unaffected. The returned payload is now required to
+  serialize exactly to the signed content, using the same serialization the
+  signing side uses, so honest messages are unaffected.
+
+  `consumeWebhook` was audited for the same shape and is safe: it parses the
+  verified payload itself rather than a sibling field.
+
+### Added
+
+- Regression tests in all three SDKs covering a swapped payload, a removed
+  payload, a subtly altered numeric field, string-payload round-trips, and
+  `verifyQueueBatch` inheriting the check.
+
 ## v0.6.5 — `@7h3/protocol-threshold` 0.6.1
 
 ### Security

@@ -199,3 +199,40 @@ fn queue_fails_on_tampered_message() {
     let result = verify_queue_message(&tampered, TEST_PUBLIC_KEY);
     assert!(result.is_err(), "tampered message should fail verification");
 }
+
+/// The signature covers `envelope.body.content`, not the sibling `payload`
+/// field. Returning that field unchecked let an attacker take any validly
+/// signed message, swap the payload, and have it accepted — a complete
+/// integrity bypass. Parity with the TypeScript and Python SDKs.
+#[test]
+fn queue_rejects_payload_swapped_under_a_valid_signature() {
+    let message = protocol_7h3::queue::sign_queue_message(
+        &serde_json::json!({ "job": "reindex", "amount": 10 }),
+        TEST_PRIVATE_KEY,
+        "key-1",
+        TEST_SENDER,
+        None,
+        Some(60_000),
+    )
+    .expect("sign");
+
+    let parsed: serde_json::Value = serde_json::from_str(&message).expect("parse");
+
+    // Envelope untouched, so the signature still verifies.
+    let forged = serde_json::json!({
+        "envelope": parsed["envelope"],
+        "payload": { "job": "DROP TABLE users", "amount": 1_000_000_000i64 }
+    })
+    .to_string();
+
+    let result = protocol_7h3::queue::verify_queue_message(&forged, TEST_PUBLIC_KEY);
+    assert!(result.is_err(), "a swapped payload must be rejected");
+    assert!(
+        result.unwrap_err().to_string().contains("does not match the signed content"),
+        "rejection should name the cause"
+    );
+
+    // An untouched message still round-trips.
+    let (payload, _) = protocol_7h3::queue::verify_queue_message(&message, TEST_PUBLIC_KEY).expect("honest message");
+    assert_eq!(payload["job"], "reindex");
+}
