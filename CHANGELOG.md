@@ -6,6 +6,51 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.3 — `@7h3/protocol-browser` 0.6.1
+
+`@7h3/protocol-browser` had been stuck at 0.4.0 with no build tooling and no
+publish job. It is a self-contained reimplementation of the wire format — it
+shares no code with `src/` — and it had drifted badly.
+
+### Security
+
+- **The browser SDK performed no validation at all.** It exposed only
+  `isEnvelopeExpired`, and accepted every malformed envelope the other SDKs
+  reject: a `ttlMs` of a year, a `timestampMs` a year in the future, `NaN` or
+  `Infinity` in either field, an empty nonce, and a foreign wire version.
+  Publishing it version-matched with the hardened SDKs would have shipped a
+  package with none of the hardening.
+
+  It now exports `validateEnvelope` enforcing exactly the same rules, with
+  identical diagnostic messages, plus `MAX_TTL_MS` and `MAX_CLOCK_SKEW_MS`.
+
+- **`isEnvelopeExpired` failed open on non-finite input.** `NaN + NaN < now` is
+  false, so an envelope with a `NaN` timestamp or TTL was reported as *not*
+  expired. It now fails closed.
+
+### Added
+
+- Build tooling: the package had no `tsconfig.json` and no build script, yet
+  `package.json` pointed at `index.js` and `index.d.ts` that did not exist in
+  the repository. It now builds to `dist/`, matching the other SDKs.
+- `npm run smoke` — packs, installs and imports the tarball under plain Node,
+  asserting sign/verify, tamper detection, and each validation rule. Wired into
+  CI and the publish job.
+- `src/browserParity.test.ts` — since this SDK shares no code with the core,
+  only a test keeps them in step. It compares canonical bytes, round-trips
+  signatures core↔browser in both directions, and asserts both SDKs emit
+  identical diagnostics for twelve malformed envelopes.
+- `publish-browser` job, and a package `README.md` (which `files` already
+  referenced but did not exist).
+
+### Fixed
+
+- `docs/install/browser.md` documented the core's flattened
+  `createEnvelope({ sender, intent, content })`. This SDK takes a nested
+  `body`. The smoke test caught it.
+
+Only `@7h3/protocol-browser` changes version, to 0.6.1.
+
 ## v0.6.2 — `@7h3/protocol-webmcp` 0.6.1
 
 ### Fixed

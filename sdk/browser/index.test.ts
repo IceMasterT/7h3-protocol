@@ -7,8 +7,11 @@ import {
   verifyEnvelope,
   signRequest,
   isEnvelopeExpired,
+  validateEnvelope,
   ENVELOPE_HEADER,
   WIRE_VERSION,
+  MAX_TTL_MS,
+  MAX_CLOCK_SKEW_MS,
   type BrowserEnvelopeHeader,
   type BrowserEnvelopeBody,
 } from './index.ts'
@@ -158,5 +161,75 @@ describe('Browser SDK', () => {
       body: { intent: 'PING' as const, content: 'old' },
     }
     expect(isEnvelopeExpired(env)).toBe(true)
+  })
+})
+
+describe('validateEnvelope — parity with the TypeScript, Python, Rust and Go SDKs', () => {
+  const now = 1_700_000_000_000
+  const envelope = (over: Record<string, unknown> = {}) =>
+    ({
+      header: {
+        version: '7h3/0.1', messageId: 'm1', timestampMs: now,
+        ttlMs: 60_000, sender: 'a@b.test', nonce: 'abc123', ...over,
+      },
+      body: { intent: 'TASK', content: 'x' },
+    }) as never
+
+  const errors = (over: Record<string, unknown> = {}) =>
+    validateEnvelope(envelope(over), now).filter((d) => d.level === 'error').map((d) => d.message)
+
+  it('accepts a well-formed envelope', () => {
+    expect(errors()).toEqual([])
+  })
+
+  it('rejects a ttl above the 24h ceiling', () => {
+    expect(errors({ ttlMs: MAX_TTL_MS + 1 })).toContain(`ttlMs exceeds maximum allowed ${MAX_TTL_MS} ms`)
+  })
+
+  it('rejects a post-dated timestamp, so the ttl ceiling actually bounds something', () => {
+    // A year ahead plus a legal 24h ttl would otherwise stay valid for a year.
+    expect(errors({ timestampMs: now + 31_536_000_000 }).some((m) => m.includes('in the future'))).toBe(true)
+    expect(errors({ timestampMs: now + MAX_CLOCK_SKEW_MS - 1_000 })).toEqual([])
+  })
+
+  it('rejects non-finite numbers rather than letting them defeat every check', () => {
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      expect(errors({ ttlMs: bad })).toContain('ttlMs must be a finite number')
+      expect(errors({ timestampMs: bad })).toContain('timestampMs must be a finite number')
+    }
+  })
+
+  it('rejects a missing or non-string nonce, sender or messageId', () => {
+    for (const bad of ['', '   ', undefined, null, 0, false, {}]) {
+      expect(errors({ nonce: bad }).some((m) => m.includes('Missing nonce'))).toBe(true)
+      expect(errors({ sender: bad })).toContain('Missing sender identity')
+      expect(errors({ messageId: bad })).toContain('Missing messageId')
+    }
+  })
+
+  it('rejects a foreign wire version', () => {
+    expect(errors({ version: '7h3/9.9' })).toContain("Unsupported protocol version '7h3/9.9'")
+  })
+
+  it('rejects an expired envelope', () => {
+    expect(errors({ timestampMs: now - 120_000, ttlMs: 60_000 })).toContain('Message TTL expired')
+  })
+})
+
+describe('isEnvelopeExpired — fails closed', () => {
+  const now = 1_700_000_000_000
+  const env = (over: Record<string, unknown>) =>
+    ({ header: { version: '7h3/0.1', messageId: 'm', sender: 's', nonce: 'n', timestampMs: now, ttlMs: 60_000, ...over }, body: { intent: 'TASK', content: 'x' } }) as never
+
+  it('treats a non-finite timestamp or ttl as expired', () => {
+    // NaN + NaN < now is false, so naive arithmetic would report "not expired".
+    expect(isEnvelopeExpired(env({ ttlMs: NaN }), now)).toBe(true)
+    expect(isEnvelopeExpired(env({ timestampMs: NaN }), now)).toBe(true)
+    expect(isEnvelopeExpired(env({ ttlMs: Infinity }), now)).toBe(true)
+  })
+
+  it('still reports live and expired envelopes correctly', () => {
+    expect(isEnvelopeExpired(env({}), now)).toBe(false)
+    expect(isEnvelopeExpired(env({ timestampMs: now - 120_000 }), now)).toBe(true)
   })
 })

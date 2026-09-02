@@ -252,6 +252,119 @@ export async function verifyResponseHeader(
   return verifyEnvelope(parsed, publicKey)
 }
 
-export function isEnvelopeExpired(envelope: BrowserEnvelope): boolean {
-  return envelope.header.timestampMs + envelope.header.ttlMs < Date.now()
+/**
+ * Ceiling on `ttlMs`. A huge TTL keeps an envelope replayable long after any
+ * replay store has forgotten its nonce.
+ */
+export const MAX_TTL_MS = 86_400_000 // 24 hours
+
+/**
+ * How far into the future a timestamp may sit before it is rejected.
+ *
+ * Without this ceiling `MAX_TTL_MS` bounds nothing: a sender can post-date
+ * `timestampMs` by a year and still pass a legal 24h `ttlMs`, keeping the
+ * envelope valid — and replayable — for a year.
+ */
+export const MAX_CLOCK_SKEW_MS = 30_000
+
+export interface BrowserDiagnostic {
+  level: 'error' | 'warning'
+  message: string
+}
+
+/** A header string field, or "" when absent or not actually a string. */
+function headerString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+/**
+ * A finite numeric header field, or null when absent, non-numeric or non-finite.
+ *
+ * `typeof NaN === 'number'` is true, so a plain typeof check lets NaN and
+ * ±Infinity through as if they were ordinary numbers — and every comparison
+ * against NaN is false, which silently defeats the TTL ceiling, the clock-skew
+ * ceiling and expiry all at once. Booleans are excluded too, so `ttlMs: true`
+ * cannot be read as 1.
+ */
+function headerNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  return value
+}
+
+/**
+ * Validate an envelope, returning diagnostics rather than throwing.
+ *
+ * Deliberately byte-for-byte the same checks and messages as the TypeScript,
+ * Python, Rust and Go SDKs, so a browser peer accepts exactly what they accept.
+ * Pass `nowMs` to control the clock in tests.
+ */
+export function validateEnvelope(envelope: BrowserEnvelope, nowMs: number = Date.now()): BrowserDiagnostic[] {
+  const diagnostics: BrowserDiagnostic[] = []
+  const header = (envelope?.header ?? {}) as Partial<BrowserEnvelopeHeader>
+  const body = (envelope?.body ?? {}) as Partial<BrowserEnvelopeBody>
+
+  if (header.version !== WIRE_VERSION) {
+    diagnostics.push({ level: 'error', message: `Unsupported protocol version '${String(header.version)}'` })
+  }
+  if (!headerString(header.messageId)) {
+    diagnostics.push({ level: 'error', message: 'Missing messageId' })
+  }
+  if (!headerString(header.sender)) {
+    diagnostics.push({ level: 'error', message: 'Missing sender identity' })
+  }
+  if (!headerString(header.nonce)) {
+    diagnostics.push({
+      level: 'error',
+      message: 'Missing nonce — replay protection requires a unique nonce per message',
+    })
+  }
+
+  const timestampMs = headerNumber(header.timestampMs)
+  const ttlMs = headerNumber(header.ttlMs)
+
+  if (timestampMs === null) {
+    diagnostics.push({ level: 'error', message: 'timestampMs must be a finite number' })
+  }
+  if (ttlMs === null) {
+    diagnostics.push({ level: 'error', message: 'ttlMs must be a finite number' })
+  } else {
+    if (ttlMs <= 0) {
+      diagnostics.push({ level: 'error', message: 'ttlMs must be greater than zero' })
+    }
+    if (ttlMs > MAX_TTL_MS) {
+      diagnostics.push({ level: 'error', message: `ttlMs exceeds maximum allowed ${MAX_TTL_MS} ms` })
+    }
+  }
+
+  if (timestampMs !== null) {
+    if (timestampMs > nowMs + MAX_CLOCK_SKEW_MS) {
+      diagnostics.push({
+        level: 'error',
+        message: `timestampMs is more than ${MAX_CLOCK_SKEW_MS} ms in the future`,
+      })
+    }
+    if (ttlMs !== null && timestampMs + ttlMs < nowMs) {
+      diagnostics.push({ level: 'error', message: 'Message TTL expired' })
+    }
+  }
+
+  if (!headerString(body.content)) {
+    diagnostics.push({ level: 'warning', message: 'Empty content payload' })
+  }
+
+  return diagnostics
+}
+
+/**
+ * Whether an envelope has expired.
+ *
+ * Fails closed on a non-finite timestamp or TTL: `NaN + NaN < now` is false, so
+ * a naive arithmetic check would report such an envelope as *not* expired and
+ * wave it through.
+ */
+export function isEnvelopeExpired(envelope: BrowserEnvelope, nowMs: number = Date.now()): boolean {
+  const timestampMs = headerNumber(envelope?.header?.timestampMs)
+  const ttlMs = headerNumber(envelope?.header?.ttlMs)
+  if (timestampMs === null || ttlMs === null) return true
+  return timestampMs + ttlMs < nowMs
 }

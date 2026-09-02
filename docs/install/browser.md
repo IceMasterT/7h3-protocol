@@ -6,25 +6,47 @@ npm install @7h3/protocol-browser
 
 Pure Web Crypto, zero dependencies, `sideEffects: false` so it tree-shakes.
 
-> **Note:** the npm release currently lags this repository (published `0.4.0`,
-> repo `0.5.0`). For the newest surface, use `@7h3/protocol` directly — it is
-> also pure Web Crypto and runs unchanged in the browser.
-
 ## Use
+
+> **This SDK's API differs from the core's.** It is a self-contained
+> implementation, so the names are shorter and `createEnvelope` takes a nested
+> `body` rather than flattened `intent`/`content`. The wire format is identical:
+> an envelope signed here verifies in every other SDK, and vice versa — enforced
+> by a parity test that compares canonical bytes and every validation
+> diagnostic.
 
 ```ts
 import {
+  generateKeypair,
   createEnvelope,
-  signEnvelopeEd25519,
-  verifyEnvelopeEd25519,
-  generateEd25519KeypairBase64Url,
+  signEnvelope,
+  verifyEnvelope,
+  validateEnvelope,
 } from '@7h3/protocol-browser'
 
-const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
-const envelope = createEnvelope({ sender: 'browser@example.com', intent: 'TASK', content: 'hello' })
-const signed = await signEnvelopeEd25519(envelope, privateKey, 'k1')
-await verifyEnvelopeEd25519(signed, publicKey)   // → true
+const { publicKey, privateKey } = await generateKeypair()
+
+const envelope = createEnvelope({
+  sender: 'browser@example.com',
+  body: { intent: 'TASK', content: 'hello' },   // nested, unlike the core
+  ttlMs: 60_000,
+})
+
+const signed = await signEnvelope(envelope, privateKey, 'k1')
+await verifyEnvelope(signed, publicKey)   // → true (a plain boolean)
 ```
+
+## Validation
+
+```ts
+const diagnostics = validateEnvelope(signed)
+// → [{ level: 'error', message: 'ttlMs exceeds maximum allowed 86400000 ms' }]
+```
+
+Enforces exactly what the other SDKs enforce: the wire version, presence of
+`messageId` / `sender` / `nonce`, finite `timestampMs` / `ttlMs`, the 24h
+`MAX_TTL_MS` ceiling, the 30s `MAX_CLOCK_SKEW_MS` future-timestamp ceiling, and
+expiry. `isEnvelopeExpired` fails closed on a non-finite timestamp or TTL.
 
 ## Requirements
 

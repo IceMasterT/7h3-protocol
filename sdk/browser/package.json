@@ -1,15 +1,15 @@
 {
   "name": "@7h3/protocol-browser",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "7h3 Protocol - Browser/Edge SDK. Pure Web Crypto API. Zero dependencies.",
   "type": "module",
-  "main": "./index.js",
-  "module": "./index.js",
-  "types": "./index.d.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "keywords": [
@@ -22,5 +22,23 @@
     "mcp"
   ],
   "license": "Apache-2.0",
-  "sideEffects": false
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "smoke": "node scripts/smoke-test-package.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IceMasterT/7h3-protocol.git"
+  }
 }

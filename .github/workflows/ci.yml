@@ -39,6 +39,13 @@ jobs:
           npm run smoke
         working-directory: sdk/webmcp
 
+      - name: Smoke test @7h3/protocol-browser package
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          npm run smoke
+        working-directory: sdk/browser
+
       - name: Fuzz smoke (decode + verify harnesses)
         run: npm run fuzz:ts
         env:

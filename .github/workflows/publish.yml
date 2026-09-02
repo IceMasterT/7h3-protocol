@@ -143,6 +143,63 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  publish-browser:
+    name: publish @7h3/protocol-browser
+    needs: publish-protocol
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: sdk/browser
+
+      # smoke packs the real tarball, installs it and imports it under plain
+      # Node — the only check that exercises the resolver the way a consumer
+      # does. See the note in the webmcp job.
+      - name: Build and smoke @7h3/protocol-browser
+        run: |
+          npm run build
+          npm run smoke
+        working-directory: sdk/browser
+
+      - name: Check if already published
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: sdk/browser
+
+      - name: Publish @7h3/protocol-browser
+        if: steps.check.outputs.exists == 'false'
+        # See the note on the other publish steps: a newly created package's
+        # document can lag the publish endpoint, so treat npm's own
+        # "cannot publish over" as success rather than a false failure.
+        run: |
+          set +e
+          output=$(npm publish --provenance --access public 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q 'cannot publish over'; then
+            echo 'Version is already on the registry; treating as published.'
+            exit 0
+          fi
+          exit $status
+        working-directory: sdk/browser
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   publish-webmcp:
     name: publish @7h3/protocol-webmcp
     needs: publish-protocol
