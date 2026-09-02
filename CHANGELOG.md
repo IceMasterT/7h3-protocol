@@ -6,6 +6,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.5 — `@7h3/protocol-threshold` 0.6.1
+
+### Security
+
+- **`splitPrivateKey` silently corrupted any key that was not a 32-byte BLS
+  scalar.** Shares carry a 32-byte field element, but nothing checked the input.
+  Splitting a 48-byte Ed25519 PKCS8 key produced shares that "reconstructed"
+  into a *different* 32-byte key, with **no error thrown**. A 32-byte value at
+  or above the BLS field order was likewise reduced by `fieldMod` and
+  reconstructed to a different value.
+
+  For a key-recovery primitive this is the worst possible failure mode: it only
+  surfaces when the backup is finally needed. Both cases now throw, naming the
+  likely mistake.
+
+  Found by exercising the published tarballs rather than the working tree.
+
+### Added
+
+- `scripts/verify-published-packages.mjs` — installs every 7h3 package fresh
+  from the registry and asserts 47 properties against the real artifacts:
+  signing and tamper detection, every validation rule, CBOR depth and prototype
+  pollution limits, delegation containment, the full WebMCP authorization model
+  (grants, spend ceilings, replay, receipt tampering and deletion, manifest
+  verification, tool-surface poisoning), and cross-SDK interop in both
+  directions. A green unit suite says the source is correct; this says the
+  artifact a user installs is.
+
+Only `@7h3/protocol-threshold` changes version, to 0.6.1.
+
 ## v0.6.4 — `@7h3/protocol-mcp` 0.6.2
 
 ### Fixed

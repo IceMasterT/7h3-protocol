@@ -289,7 +289,26 @@ export function splitPrivateKey(
   if (m < 2 || m > n) throw new Error(`Invalid threshold: m=${m}, n=${n}`)
 
   const secretBytes = fromBase64Url(privateKeyBase64Url)
-  const secret = fieldMod(bytes32ToBigint(secretBytes))
+
+  // Shares carry a 32-byte field element, so anything else silently loses data:
+  // a 48-byte Ed25519 PKCS8 key used to split and then "reconstruct" into a
+  // different 32-byte key with no error at all — the worst possible failure for
+  // a key-recovery primitive, since it only surfaces when the backup is needed.
+  if (secretBytes.length !== 32) {
+    throw new Error(
+      `splitPrivateKey expects a 32-byte BLS private key, got ${secretBytes.length} bytes. ` +
+        'An Ed25519 PKCS8 key (48 bytes) cannot be split by this scheme — use generateBlsKeyPair().',
+    )
+  }
+
+  // A 32-byte value at or above the field order would be reduced by fieldMod and
+  // reconstruct to a different key. Reject rather than corrupt.
+  const secret = bytes32ToBigint(secretBytes)
+  if (secret >= FIELD_ORDER) {
+    throw new Error(
+      'splitPrivateKey: key is not a valid BLS scalar (>= field order); it would not reconstruct to the same value.',
+    )
+  }
 
   // Build polynomial: f(x) = secret + a1*x + a2*x^2 + ... + a_{m-1}*x^{m-1}
   const coefficients: bigint[] = [secret]
