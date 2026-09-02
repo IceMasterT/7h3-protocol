@@ -297,3 +297,30 @@ describe('guard — manifest', () => {
     expect(manifest.tools.find((t) => t.name === 'pay_invoice')!.method).toBe('WRITE')
   })
 })
+
+describe('guard — direct invocation', () => {
+  it('runs the identical guarded wrapper, refusing without a grant', async () => {
+    const { g, calls } = await harness()
+    const res = (await g.invoke('delete_invoice', { id: 'inv-1' })) as { ok: boolean; reason: string }
+    expect(res.ok).toBe(false)
+    expect(res.reason).toBe('no-active-grant')
+    expect(calls).toEqual([])
+  })
+
+  it('allows an invoked call once a grant covers it, and receipts it', async () => {
+    const { g, calls } = await harness()
+    await g.grant({ subject: 'agent', scopes: ['invoices/*'], ttlMs: 600_000 })
+    const res = (await g.invoke('delete_invoice', { id: 'inv-1' })) as { ok: boolean }
+    expect(res.ok).toBe(true)
+    expect(calls).toEqual(['delete_invoice'])
+    expect(g.receipts.all().at(-1)).toMatchObject({ tool: 'delete_invoice', outcome: 'allowed' })
+  })
+
+  it('receipts an unknown tool rather than throwing', async () => {
+    const { g } = await harness()
+    const res = (await g.invoke('no_such_tool')) as { ok: boolean; reason: string }
+    expect(res.ok).toBe(false)
+    expect(res.reason).toBe('unknown-tool')
+    expect(g.receipts.all().at(-1)).toMatchObject({ outcome: 'refused', reason: 'unknown-tool' })
+  })
+})

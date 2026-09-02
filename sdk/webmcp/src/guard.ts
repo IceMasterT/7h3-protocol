@@ -30,6 +30,7 @@ import type {
   GuardEventListener,
   GuardedTool,
   ModelContextLike,
+  ModelContextTool,
   RegisterToolOptions,
   SignedManifest,
 } from './types'
@@ -108,6 +109,7 @@ export class ToolGuard {
   private readonly now: () => number
   private readonly replay: ReplayChecker
   private readonly tools = new Map<string, GuardedTool>()
+  private readonly wrapped = new Map<string, ModelContextTool>()
   private readonly grants = new Map<string, CapabilityToken>()
   private readonly revoked = new Set<string>()
   private readonly listeners = new Set<GuardEventListener>()
@@ -192,6 +194,8 @@ export class ToolGuard {
         return { ok: true, result, receiptId: receipt.id }
       },
     }
+
+    this.wrapped.set(tool.name, wrapped)
 
     const mc = this.mc ?? resolveModelContext()
     if (mc) await mc.registerTool(wrapped, options)
@@ -367,6 +371,33 @@ export class ToolGuard {
 
   registeredTools(): GuardedTool[] {
     return [...this.tools.values()]
+  }
+
+  /**
+   * Invoke a registered tool through the guard directly.
+   *
+   * Runs the exact wrapper `document.modelContext` would call — same
+   * authorization, same receipt — so it is useful for tests, and for exercising
+   * a tool surface in a browser that has no WebMCP agent attached. It is not a
+   * bypass: there is no path here that skips `decide`.
+   */
+  async invoke(name: string, input: Record<string, unknown> = {}): Promise<unknown> {
+    const tool = this.wrapped.get(name)
+    if (!tool) {
+      const receipt = await this.receipts.append({
+        tool: name,
+        scope: 'unknown',
+        method: 'WRITE',
+        outcome: 'refused',
+        reason: 'unknown-tool',
+        detail: `no tool registered as ${name}`,
+        grantId: null,
+        inputHash: await sha256Hex('{}'),
+      })
+      this.emit({ type: 'call', receipt })
+      return { ok: false, refused: true, reason: 'unknown-tool', detail: `no tool registered as ${name}`, receiptId: receipt.id }
+    }
+    return tool.execute(input)
   }
 
   /** Sign the current tool surface. Serve this at a well-known path for auditors. */
