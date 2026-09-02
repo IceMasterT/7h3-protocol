@@ -8,7 +8,7 @@
   [![npm threshold](https://img.shields.io/npm/v/@7h3/protocol-threshold?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-threshold)](https://www.npmjs.com/package/@7h3/protocol-threshold)
   [![PyPI](https://img.shields.io/pypi/v/7h3-protocol?style=flat-square&color=818cf8&logo=python&logoColor=white)](https://pypi.org/project/7h3-protocol/)
   [![Crates.io](https://img.shields.io/crates/v/protocol-7h3?style=flat-square&color=a5b4fc&logo=rust&logoColor=white)](https://crates.io/crates/protocol-7h3)
-  [![Tests](https://img.shields.io/badge/tests-478%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
+  [![Tests](https://img.shields.io/badge/tests-552%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
   [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
   [![Wire](https://img.shields.io/badge/wire-7h3%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
   [![License](https://img.shields.io/badge/license-Apache--2.0-94a3b8?style=flat-square)](./LICENSE)
@@ -23,8 +23,40 @@
 
 ---
 
+## 🆕 WebMCP — signed tools for browser agents
+
+**[`@7h3/protocol-webmcp`](./sdk/webmcp)** brings this protocol to
+[WebMCP](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`):
+capability-scoped, replay-protected, cryptographically receipted tool calls.
+
+> **Live demo → [7h3-webmcp-ledger.tech-b1a.workers.dev](https://7h3-webmcp-ledger.tech-b1a.workers.dev)**
+> An agent-operable business console. Grant an agent `pay ≤ $50 for 10 minutes`,
+> then watch it get refused — cryptographically — when it tries to exceed that.
+
+Chrome's [agent security guidance](https://developer.chrome.com/docs/agents/security)
+is entirely probabilistic (classifiers, spotlighting, critic LLMs) and silent on
+authorization. OpenAI's site-tools docs state that *"a tool's name or claim that
+it only reads data isn't proof of what it does"*, then tell sites to use their
+**existing** authorization — which, for delegated agent action, no site has.
+
+This is that missing layer, and it is deterministic. **A refusal is a failed
+signature or an uncovered scope, not a judgement call.**
+
+| | |
+|---|---|
+| **Signed tool manifests** | The origin signs its tool surface at deploy time and serves it at `/.well-known/7h3-webmcp-manifest.json`. Injected lookalike tools and silently reworded descriptions become detectable. |
+| **Capability-scoped execution** | Scoped, expiring, revocable grants. Held page-side, so the token never passes through the agent. Spend ceilings are bound *inside* the signed token. |
+| **Hash-chained receipts** | Every call recorded — allowed and refused. Deleting or reordering history breaks verification. |
+
+Adoption is an import, a constructor, and one field per tool — see
+[`sdk/webmcp/README.md`](./sdk/webmcp/README.md), which also documents the
+threat model and what this explicitly does **not** protect against.
+
+---
+
 ## Table of Contents
 
+- [WebMCP — signed tools for browser agents](#-webmcp--signed-tools-for-browser-agents)
 - [The Problem](#the-problem)
 - [What 7h3 Protocol Does](#what-7h3-protocol-does)
 - [How It Works](#how-it-works)

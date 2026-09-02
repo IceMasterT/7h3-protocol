@@ -100,6 +100,7 @@
     "cli:help": "npm run build:protocol && tsx bin/7h3.ts help",
     "cli:keygen": "npm run build:protocol && tsx bin/7h3.ts keygen",
     "lint": "eslint .",
+    "pretest": "npm run build:protocol",
     "test": "vitest run",
     "build:protocol": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
     "build:cli": "tsx scripts/build-cli.ts",
