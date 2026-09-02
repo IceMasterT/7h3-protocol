@@ -11,6 +11,7 @@ from protocol_7h3.protocol import (
     sign_envelope_ed25519,
     sign_envelope_hmac,
     validate_envelope,
+    MAX_CLOCK_SKEW_MS,
     verify_canonical_payload_ed25519,
     verify_canonical_payload_hmac,
     verify_envelope_ed25519,
@@ -139,3 +140,33 @@ class ConformanceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClockSkewCeilingTest(unittest.TestCase):
+    """Parity with the TypeScript, Rust and Go SDKs: a post-dated timestamp is
+    rejected, because MAX_TTL_MS alone cannot bound how long an envelope lives."""
+
+    def _envelope(self, timestamp_ms: int):
+        return {
+            "header": {
+                "version": "7h3/0.1",
+                "messageId": "msg-1",
+                "timestampMs": timestamp_ms,
+                "ttlMs": 60_000,
+                "sender": "a@b.test",
+                "nonce": "abc123",
+            },
+            "body": {"intent": "TASK", "content": "x"},
+        }
+
+    def test_rejects_post_dated_timestamp(self):
+        now = 1_700_000_000_000
+        diags = validate_envelope(self._envelope(now + 31_536_000_000), now)
+        self.assertTrue(
+            any(d.level == "error" and "in the future" in d.message for d in diags)
+        )
+
+    def test_tolerates_timestamp_within_skew(self):
+        now = 1_700_000_000_000
+        diags = validate_envelope(self._envelope(now + MAX_CLOCK_SKEW_MS - 1_000), now)
+        self.assertEqual([d for d in diags if d.level == "error"], [])

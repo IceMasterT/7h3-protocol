@@ -362,6 +362,17 @@ export async function verifyCanonicalPayloadSignature(
 // pinned in every replay store) far beyond any legitimate messaging window.
 export const MAX_TTL_MS = 86_400_000 // 24 hours
 
+/**
+ * How far into the future a timestamp may sit before it is rejected.
+ *
+ * Matches the transport binding's default so every entry point agrees. Without
+ * this ceiling, MAX_TTL_MS bounds nothing: a sender can post-date `timestampMs`
+ * by a year and still pass a 24h `ttlMs`, producing an envelope that validates
+ * for a year and stays replayable long after any replay store has forgotten its
+ * nonce.
+ */
+export const MAX_CLOCK_SKEW_MS = 30_000
+
 export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now()): ProtocolDiagnostic[] {
   const diagnostics: ProtocolDiagnostic[] = []
   const header = (envelope as Partial<ProtocolEnvelope>).header ?? ({} as Partial<ProtocolHeader>)
@@ -406,6 +417,13 @@ export function validateEnvelope(envelope: ProtocolEnvelope, nowMs = Date.now())
       diagnostics.push({ level: 'error', message: `ttlMs exceeds maximum allowed ${MAX_TTL_MS} ms` })
     }
   }
+  if (Number.isFinite(timestampMs) && timestampMs > nowMs + MAX_CLOCK_SKEW_MS) {
+    diagnostics.push({
+      level: 'error',
+      message: `timestampMs is more than ${MAX_CLOCK_SKEW_MS} ms in the future`,
+    })
+  }
+
   if (Number.isFinite(timestampMs) && Number.isFinite(ttlMs) && timestampMs + ttlMs < nowMs) {
     diagnostics.push({ level: 'error', message: 'Message TTL expired' })
   }

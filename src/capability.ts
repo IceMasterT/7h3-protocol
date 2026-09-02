@@ -159,7 +159,11 @@ function pathGlobIsSubset(childGlob: string, parentGlob: string): boolean {
   const parentSegs = parentGlob.split('/')
   let ci = 0
   for (const parentSeg of parentSegs) {
-    if (parentSeg === '**') return true
+    // A parent `**` covers everything from this position onward — but only
+    // where something remains. `a/**` matches `a/x`, never bare `a`, so a child
+    // that ends exactly at the prefix (child `a`) can match a path the parent
+    // cannot and is therefore NOT a subset.
+    if (parentSeg === '**') return ci < childSegs.length
     if (ci >= childSegs.length) return false
     const childSeg = childSegs[ci]
     if (childSeg === '**') return false

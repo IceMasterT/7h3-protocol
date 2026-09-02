@@ -11,6 +11,12 @@ from typing import Any, Dict, Optional, TypedDict
 # pinned in every replay store) far beyond any legitimate messaging window.
 MAX_TTL_MS = 86_400_000  # 24 hours
 
+# How far into the future a timestamp may sit before it is rejected. Without
+# this ceiling MAX_TTL_MS bounds nothing: a sender can post-date timestampMs by
+# a year and still pass a 24h ttlMs, keeping the envelope valid — and
+# replayable — long after any replay store has forgotten its nonce.
+MAX_CLOCK_SKEW_MS = 30_000
+
 # ---------------------------------------------------------------------------
 # Optional native Ed25519 backend — try cryptography, then PyNaCl
 # ---------------------------------------------------------------------------
@@ -530,6 +536,13 @@ def validate_envelope(
         )
 
     if now_ms is not None:
+        if int(header.get("timestampMs", 0)) > current + MAX_CLOCK_SKEW_MS:
+            diagnostics.append(
+                ProtocolDiagnostic(
+                    level="error",
+                    message=f"timestampMs is more than {MAX_CLOCK_SKEW_MS} ms in the future",
+                )
+            )
         if int(header.get("timestampMs", 0)) + int(header.get("ttlMs", 0)) < current:
             diagnostics.append(
                 ProtocolDiagnostic(level="error", message="Message TTL expired")

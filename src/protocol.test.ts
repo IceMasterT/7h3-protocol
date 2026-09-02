@@ -8,6 +8,7 @@ import {
   signEnvelopeHmac,
   verifyCanonicalPayloadEd25519,
   validateEnvelope,
+  MAX_CLOCK_SKEW_MS,
   MAX_TTL_MS,
   verifyCanonicalPayloadHmac,
   verifyEnvelopeEd25519,
@@ -217,5 +218,29 @@ describe('GLUV AIP protocol', () => {
       const diagnostics = validateEnvelope(tampered, 0)
       expect(diagnostics.some((d) => d.level === 'error' && d.message.includes('timestampMs'))).toBe(true)
     }
+  })
+})
+
+
+describe('validateEnvelope — clock skew ceiling', () => {
+  const base = createEnvelope({ sender: 'a@b.test', intent: 'TASK', content: 'x', ttlMs: 60_000 })
+  const now = Date.now()
+
+  it('rejects a post-dated timestamp that would outlive the TTL ceiling', () => {
+    // MAX_TTL_MS bounds nothing on its own: a year in the future plus a legal
+    // 24h ttlMs keeps the envelope valid — and replayable — for a year.
+    const envelope = { ...base, header: { ...base.header, timestampMs: now + 31_536_000_000 } }
+    const diagnostics = validateEnvelope(envelope, now)
+    expect(diagnostics.some((d) => d.level === 'error' && d.message.includes('in the future'))).toBe(true)
+  })
+
+  it('tolerates timestamps inside the allowed skew', () => {
+    const envelope = { ...base, header: { ...base.header, timestampMs: now + MAX_CLOCK_SKEW_MS - 1_000 } }
+    expect(validateEnvelope(envelope, now).filter((d) => d.level === 'error')).toEqual([])
+  })
+
+  it('rejects just beyond the allowed skew', () => {
+    const envelope = { ...base, header: { ...base.header, timestampMs: now + MAX_CLOCK_SKEW_MS + 1_000 } }
+    expect(validateEnvelope(envelope, now).some((d) => d.level === 'error')).toBe(true)
   })
 })

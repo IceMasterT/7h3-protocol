@@ -12,7 +12,7 @@ Key properties:
 - ML-DSA (NIST FIPS 204) post-quantum signatures
 - BLS12-381 M-of-N threshold signatures
 - Cloudflare Workers native (Web Crypto only, zero deps)
-- 542 tests across TypeScript, Python, Rust, Go, Browser
+- 561 tests across TypeScript, Python, Rust, Go, Browser
 - WebMCP: capability-scoped, receipted `document.modelContext` tools (`sdk/webmcp/`)
 
 ## MCP Tools (install once, use in every session)
@@ -103,7 +103,7 @@ const ok = await verifyEnvelopeEd25519(signed, publicKey)
 ## Running tests
 
 ```bash
-npm test                    # all 542 tests
+npm test                    # all 561 tests
 npm run conformance:python  # cross-SDK conformance
 npm run conformance:rust    # Rust SDK
 ```

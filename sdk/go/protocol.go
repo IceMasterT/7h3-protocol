@@ -24,6 +24,12 @@ const WireVersion = "7h3/0.1"
 // messaging window.
 const MaxTTLMs int64 = 86_400_000 // 24 hours
 
+// MaxClockSkewMs is how far into the future a timestamp may sit before it is
+// rejected. Without this ceiling MaxTTLMs bounds nothing: a sender can post-date
+// TimestampMs by a year and still pass a 24h TTLMs, keeping the envelope valid —
+// and replayable — long after any replay store has forgotten its nonce.
+const MaxClockSkewMs int64 = 30_000
+
 // ProtocolHeader contains routing and metadata for a message.
 type ProtocolHeader struct {
 	Version     string `json:"version"`
@@ -202,6 +208,9 @@ func ValidateEnvelope(env ProtocolEnvelope) []Diagnostic {
 		diags = append(diags, Diagnostic{Level: "error", Message: fmt.Sprintf("ttlMs exceeds maximum allowed %d ms", MaxTTLMs)})
 	}
 	nowMs := time.Now().UnixMilli()
+	if h.TimestampMs > nowMs+MaxClockSkewMs {
+		diags = append(diags, Diagnostic{Level: "error", Message: fmt.Sprintf("timestampMs is more than %d ms in the future", MaxClockSkewMs)})
+	}
 	if h.TimestampMs+h.TTLMs < nowMs {
 		diags = append(diags, Diagnostic{Level: "error", Message: "Message TTL expired"})
 	}

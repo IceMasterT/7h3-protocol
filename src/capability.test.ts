@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { matchGlob } from './routePolicy'
 import {
   generateEd25519KeypairBase64Url,
   issueCapabilityToken,
@@ -702,5 +703,55 @@ describe('canonicalizeCapabilityToken', () => {
     const c1 = canonicalizeCapabilityToken(unsigned)
     const c2 = canonicalizeCapabilityToken(unsigned)
     expect(c1).toBe(c2)
+  })
+})
+
+describe('delegation scope containment — soundness', () => {
+  async function tryDelegate(childGlob: string, parentGlob: string): Promise<boolean> {
+    const keys = await generateEd25519KeypairBase64Url()
+    const root = await issueCapabilityToken({
+      issuerPrivateKey: keys.privateKey,
+      issuerId: 'origin',
+      subject: 'agent-a',
+      scopes: [{ pathGlob: parentGlob }],
+      ttlMs: 60_000,
+      maxDelegations: 2,
+      keyId: 'k1',
+    })
+    try {
+      await delegateCapabilityToken({
+        parentToken: root,
+        delegatorPrivateKey: keys.privateKey,
+        delegatorId: 'agent-a',
+        newSubject: 'agent-b',
+        scopes: [{ pathGlob: childGlob }],
+        ttlMs: 30_000,
+      })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  it('refuses a child that ends where the parent requires a further segment', async () => {
+    // `a/**` matches `a/x` but never bare `a`, so a child of `a` reaches a path
+    // the parent cannot — it is not a subset, however much it looks like one.
+    expect(matchGlob('a/**', 'a')).toBe(false)
+    expect(matchGlob('a', 'a')).toBe(true)
+    expect(await tryDelegate('a', 'a/**')).toBe(false)
+    expect(await tryDelegate('money', 'money/**')).toBe(false)
+  })
+
+  it('still allows genuinely narrower children under a recursive parent', async () => {
+    expect(await tryDelegate('a/*', 'a/**')).toBe(true)
+    expect(await tryDelegate('a/b/c', 'a/**')).toBe(true)
+    expect(await tryDelegate('a/', 'a/**')).toBe(true)
+    expect(await tryDelegate('a', '**')).toBe(true)
+    expect(await tryDelegate('a/**', '**')).toBe(true)
+  })
+
+  it('keeps refusing children broader than their parent', async () => {
+    expect(await tryDelegate('**', '*')).toBe(false)
+    expect(await tryDelegate('a/**', 'a/*')).toBe(false)
   })
 })

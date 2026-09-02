@@ -90,6 +90,26 @@ export interface GrantRequest {
   maxDelegations?: number
 }
 
+/**
+ * Effective ceilings for a whole delegation chain: the minimum of every cap
+ * bound anywhere along it.
+ *
+ * Delegation may only ever narrow authority. Reading caps from the leaf token
+ * alone let a sub-agent re-delegate itself a larger ceiling than its parent
+ * held — a privilege escalation whenever the root grant carried a broad enough
+ * glob (`**`) for the containment check to accept the new `caps/` scope. Taking
+ * the minimum makes a child's larger number a no-op, and a smaller one binding.
+ */
+export function effectiveCaps(chain: CapabilityToken[]): Record<string, number> {
+  const caps: Record<string, number> = {}
+  for (const token of chain) {
+    for (const [field, max] of Object.entries(parseCaps(token))) {
+      caps[field] = caps[field] === undefined ? max : Math.min(caps[field], max)
+    }
+  }
+  return caps
+}
+
 /** Parse reserved `caps/<field>/<max>` scopes out of a verified token. */
 export function parseCaps(token: CapabilityToken): Record<string, number> {
   const caps: Record<string, number> = {}
@@ -145,6 +165,12 @@ export class ToolGuard {
    * outcomes are appended to the signed receipt chain before returning.
    */
   async registerTool(tool: GuardedTool, options?: RegisterToolOptions): Promise<void> {
+    // `caps/` is reserved for ceilings bound inside grants. A tool sitting in
+    // that namespace could be authorized by a ceiling declaration rather than a
+    // real scope grant, so refuse it outright rather than resolve it silently.
+    if (tool.scope?.startsWith(CAPS_PREFIX)) {
+      throw new Error(`tool scope may not use the reserved '${CAPS_PREFIX}' namespace: ${tool.scope}`)
+    }
     this.tools.set(tool.name, tool)
 
     const wrapped = {
@@ -230,7 +256,9 @@ export class ToolGuard {
     const method = toolMethod(tool)
     const bearer = input[GRANT_FIELD]
 
-    let candidates: CapabilityToken[]
+    // Each candidate carries the chain it was verified as part of, so ceilings
+    // can be intersected across the whole chain rather than read off the leaf.
+    let candidates: { token: CapabilityToken; chain: CapabilityToken[] }[]
     // A bearer chain has already been verified end to end by verifyBearer,
     // including issuers other than this origin. Re-checking it against this
     // origin's key alone would reject every legitimately delegated chain.
@@ -239,10 +267,10 @@ export class ToolGuard {
     if (typeof bearer === 'string' && bearer.length > 0) {
       const chainResult = await this.verifyBearer(bearer, tool.scope, method)
       if (!chainResult.ok) return chainResult.decision
-      candidates = [chainResult.token]
+      candidates = [{ token: chainResult.token, chain: chainResult.chain }]
       preVerified = true
     } else {
-      candidates = [...this.grants.values()]
+      candidates = [...this.grants.values()].map((token) => ({ token, chain: [token] }))
     }
 
     if (candidates.length === 0) {
@@ -257,7 +285,7 @@ export class ToolGuard {
 
     let authorizing: CapabilityToken | null = null
 
-    for (const token of candidates) {
+    for (const { token, chain } of candidates) {
       if (this.revoked.has(token.id)) {
         note({ allowed: false, reason: 'grant-revoked', detail: `grant ${token.id} was revoked` })
         continue
@@ -272,7 +300,7 @@ export class ToolGuard {
       }
       if (!tokenMatchesScope(token, tool.scope, method)) continue
 
-      const limit = evaluateLimit(tool, input, parseCaps(token))
+      const limit = evaluateLimit(tool, input, effectiveCaps(chain))
       if (!limit.ok) {
         // Keep the most permissive ceiling seen: if the caller holds a $50 and a
         // $1,000 grant, the constraint they are actually up against is $1,000.
@@ -314,7 +342,7 @@ export class ToolGuard {
     serialized: string,
     scope: string,
     method: 'READ' | 'WRITE',
-  ): Promise<{ ok: true; token: CapabilityToken } | { ok: false; decision: GuardDecision }> {
+  ): Promise<{ ok: true; token: CapabilityToken; chain: CapabilityToken[] } | { ok: false; decision: GuardDecision }> {
     let chain: CapabilityToken[]
     try {
       chain = parseCapabilityChain(serialized)
@@ -351,7 +379,7 @@ export class ToolGuard {
     if (this.revoked.has(result.token.id)) {
       return { ok: false, decision: { allowed: false, reason: 'grant-revoked', detail: `grant ${result.token.id} was revoked` } }
     }
-    return { ok: true, token: result.token }
+    return { ok: true, token: result.token, chain: result.chain }
   }
 
   private async checkReplay(

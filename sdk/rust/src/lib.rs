@@ -19,6 +19,12 @@ type HmacSha256 = Hmac<Sha256>;
 /// pinned in every replay store) far beyond any legitimate messaging window.
 pub const MAX_TTL_MS: i64 = 86_400_000; // 24 hours
 
+/// How far into the future a timestamp may sit before it is rejected. Without
+/// this ceiling `MAX_TTL_MS` bounds nothing: a sender can post-date
+/// `timestamp_ms` by a year and still pass a 24h `ttl_ms`, keeping the envelope
+/// valid — and replayable — long after any replay store has forgotten its nonce.
+pub const MAX_CLOCK_SKEW_MS: i64 = 30_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProtocolHeader {
     pub version: String,
@@ -370,6 +376,12 @@ pub fn validate_envelope(
         });
     }
     if let Some(now) = now_ms {
+        if envelope.header.timestamp_ms > now + MAX_CLOCK_SKEW_MS {
+            diagnostics.push(ProtocolDiagnostic {
+                level: "error".to_string(),
+                message: format!("timestampMs is more than {MAX_CLOCK_SKEW_MS} ms in the future"),
+            });
+        }
         if envelope.header.timestamp_ms + envelope.header.ttl_ms < now {
             diagnostics.push(ProtocolDiagnostic {
                 level: "error".to_string(),

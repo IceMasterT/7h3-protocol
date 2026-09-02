@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1080px; height: 1080px; overflow: hidden;
+    background: #070710;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(99,102,241,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .blob-tl {
+    position: absolute; width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(99,102,241,.2) 0%, transparent 65%);
+    top: -120px; left: -80px;
+  }
+  .blob-br {
+    position: absolute; width: 440px; height: 440px;
+    background: radial-gradient(circle, rgba(16,185,129,.15) 0%, transparent 65%);
+    bottom: -80px; right: -60px;
+  }
+
+  .wrap {
+    position: relative; z-index: 2;
+    height: 100%; padding: 64px 72px;
+    display: flex; flex-direction: column;
+  }
+
+  /* Header */
+  .top-badge {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 36px;
+  }
+  .pkg-pill {
+    font-family: monospace; font-size: 13px; font-weight: 700;
+    color: #a5b4fc;
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+    border-radius: 8px; padding: 5px 14px;
+  }
+  .ver-pill {
+    font-size: 12px; color: #64748b;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px; padding: 5px 12px;
+  }
+
+  h1 {
+    font-size: 42px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 .line1 { color: #f1f5f9; display: block; }
+  h1 .accent {
+    background: linear-gradient(90deg, #818cf8, #34d399);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    color: #64748b; font-size: 16px; margin-bottom: 48px;
+  }
+
+  /* Binding table */
+  .bindings {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 18px; margin-bottom: 40px; flex: 1;
+  }
+
+  .binding-card {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 16px; padding: 26px 28px;
+    position: relative; overflow: hidden;
+    transition: border-color .2s;
+  }
+  .binding-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .b-recipient::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+  .b-sender::before    { background: linear-gradient(90deg, #06b6d4, #67e8f9); }
+  .b-corr::before      { background: linear-gradient(90deg, #10b981, #34d399); }
+  .b-replay::before    { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+  .binding-icon {
+    font-size: 28px; margin-bottom: 12px; display: block;
+  }
+  .binding-name {
+    font-size: 19px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;
+  }
+  .binding-threat {
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+    margin-bottom: 10px;
+    opacity: .7;
+  }
+  .b-recipient .binding-threat { color: #818cf8; }
+  .b-sender .binding-threat    { color: #67e8f9; }
+  .b-corr .binding-threat      { color: #34d399; }
+  .b-replay .binding-threat    { color: #fbbf24; }
+
+  .binding-desc {
+    color: #94a3b8; font-size: 13.5px; line-height: 1.55;
+  }
+
+  /* Code snippet */
+  .code-block {
+    background: rgba(0,0,0,.4); border: 1px solid rgba(99,102,241,.2);
+    border-radius: 12px; padding: 20px 24px; margin-bottom: 32px;
+    font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+    font-size: 14px; line-height: 1.7;
+  }
+  .code-line { display: block; }
+  .c-dim    { color: #475569; }
+  .c-kw     { color: #818cf8; }
+  .c-fn     { color: #67e8f9; }
+  .c-str    { color: #34d399; }
+  .c-var    { color: #e2e8f0; }
+  .c-comment{ color: #475569; font-style: italic; }
+
+  /* Bottom */
+  .bottom-row {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .stat-cluster { display: flex; gap: 28px; }
+  .stat { text-align: center; }
+  .stat-num {
+    font-size: 28px; font-weight: 800; letter-spacing: -.02em;
+    background: linear-gradient(135deg, #a5b4fc, #67e8f9);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .stat-lbl { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+
+  .cta {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  }
+  .cta-main {
+    font-size: 13px; color: #94a3b8;
+  }
+  .cta code {
+    font-family: monospace; color: #a5b4fc; font-size: 15px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="blob-tl"></div>
+<div class="blob-br"></div>
+
+<div class="wrap">
+  <div class="top-badge">
+    <span class="pkg-pill">@7h3/protocol</span>
+    <span class="ver-pill">aip/0.1 · Apache-2.0</span>
+  </div>
+
+  <h1>
+    <span class="line1">4 threat bindings.</span>
+    <span class="accent">One drop-in wrapper.</span>
+  </h1>
+  <p class="subtitle">Wrap your MCP server. Four attack vectors closed. Zero handler changes.</p>
+
+  <div class="bindings">
+    <div class="binding-card b-recipient">
+      <span class="binding-icon">🎯</span>
+      <div class="binding-name">Recipient</div>
+      <div class="binding-threat">Blocks → cross-server replay</div>
+      <div class="binding-desc">Envelope is bound to a specific recipient. A captured message cannot be relayed to a different server and accepted.</div>
+    </div>
+
+    <div class="binding-card b-sender">
+      <span class="binding-icon">🕵️</span>
+      <div class="binding-name">Sender</div>
+      <div class="binding-threat">Blocks → response spoofing</div>
+      <div class="binding-desc">Response must be signed by the same identity that received the request. Forged responses from rogue nodes are rejected.</div>
+    </div>
+
+    <div class="binding-card b-corr">
+      <span class="binding-icon">🔗</span>
+      <div class="binding-name">Correlation</div>
+      <div class="binding-threat">Blocks → response substitution</div>
+      <div class="binding-desc">Response carries the request's <code style="color:#34d399;background:rgba(16,185,129,.1);padding:1px 5px;border-radius:3px;font-family:monospace">correlationId</code>. Swapping a legitimate response with a forged one is detectable.</div>
+    </div>
+
+    <div class="binding-card b-replay">
+      <span class="binding-icon">⏱️</span>
+      <div class="binding-name">Replay</div>
+      <div class="binding-threat">Blocks → duplicate execution</div>
+      <div class="binding-desc">Redis-atomic <code style="color:#fbbf24;background:rgba(245,158,11,.1);padding:1px 5px;border-radius:3px;font-family:monospace">SET NX PX</code> per (sender, messageId, nonce). On by default. Fleet-wide when Redis is wired.</div>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <span class="code-line c-comment">// before: unsigned handler</span>
+    <span class="code-line"><span class="c-kw">const</span> <span class="c-var">server</span> <span class="c-dim">=</span> <span class="c-fn">createMcpServer</span><span class="c-dim">(</span><span class="c-var">myHandlers</span><span class="c-dim">);</span></span>
+    <span class="code-line"> </span>
+    <span class="code-line c-comment">// after: 4 threats closed, no handler changes</span>
+    <span class="code-line"><span class="c-kw">const</span> <span class="c-var">secure</span> <span class="c-dim">=</span> <span class="c-fn">wrapMcpServer</span><span class="c-dim">(</span><span class="c-var">server</span><span class="c-dim">,</span> <span class="c-dim">{</span> <span class="c-var">secretResolver</span><span class="c-dim">,</span> <span class="c-var">replayStore</span> <span class="c-dim">});</span></span>
+  </div>
+
+  <div class="bottom-row">
+    <div class="stat-cluster">
+      <div class="stat">
+        <div class="stat-num">3</div>
+        <div class="stat-lbl">SDKs<br>TS · Py · Rust</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">5</div>
+        <div class="stat-lbl">Safety<br>invariants</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">0</div>
+        <div class="stat-lbl">Handler<br>changes</div>
+      </div>
+    </div>
+    <div class="cta">
+      <span class="cta-main">Start in 60 seconds</span>
+      <code>npm install @7h3/protocol</code>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -370,3 +370,32 @@ func TestWebhookTamperedBody(t *testing.T) {
 		t.Error("expected tampered webhook body to return false")
 	}
 }
+
+// TestValidateEnvelopeClockSkew mirrors the TypeScript, Python and Rust SDKs:
+// MaxTTLMs bounds nothing unless a post-dated timestamp is also rejected.
+func TestValidateEnvelopeClockSkew(t *testing.T) {
+	env := ProtocolEnvelope{
+		Header: ProtocolHeader{
+			Version: WireVersion, MessageID: "msg-1", Sender: "a@b.test",
+			Nonce: "abc123", TTLMs: 60_000,
+			TimestampMs: time.Now().UnixMilli() + 31_536_000_000,
+		},
+		Body: ProtocolBody{Intent: "TASK", Content: "x"},
+	}
+	found := false
+	for _, d := range ValidateEnvelope(env) {
+		if d.Level == "error" && strings.Contains(d.Message, "in the future") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected a future-timestamp error for a post-dated envelope")
+	}
+
+	env.Header.TimestampMs = time.Now().UnixMilli() + MaxClockSkewMs - 5_000
+	for _, d := range ValidateEnvelope(env) {
+		if d.Level == "error" {
+			t.Fatalf("timestamp within skew should not error, got %q", d.Message)
+		}
+	}
+}

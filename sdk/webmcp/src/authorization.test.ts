@@ -201,3 +201,88 @@ describe('limit refusals name the binding ceiling', () => {
     expect(res.reason).toBe('limit-exceeded')
   })
 })
+
+describe('delegation may only narrow authority', () => {
+  async function chainHarness() {
+    const origin = await generateEd25519KeypairBase64Url()
+    const agentA = await generateEd25519KeypairBase64Url()
+    const mc = new FakeModelContext()
+    const g = guard({
+      origin: 'ledger.test',
+      privateKey: origin.privateKey,
+      publicKey: origin.publicKey,
+      modelContext: mc,
+      peerKeys: { 'agent-a': agentA.publicKey },
+    })
+    await g.registerTool({
+      name: 'pay',
+      description: 'Pay an invoice',
+      scope: 'money/pay',
+      limit: { field: 'amountCents', max: 2_000_00 },
+      execute: async () => ({ paid: true }),
+    })
+    return { g, mc, agentA }
+  }
+
+  it('refuses a child that re-delegates itself a larger ceiling than its parent', async () => {
+    const { g, mc, agentA } = await chainHarness()
+    // A broad root glob is what makes the escalation reachable: '**' contains
+    // the reserved caps/ scope, so containment alone would accept a bigger cap.
+    const root = await g.grant({
+      subject: 'agent-a', scopes: ['**'], caps: { amountCents: 50_00 },
+      ttlMs: 600_000, maxDelegations: 1,
+    })
+    const child = await delegateCapabilityToken({
+      parentToken: root,
+      delegatorPrivateKey: agentA.privateKey,
+      delegatorId: 'agent-a',
+      newSubject: 'agent-b',
+      scopes: [{ pathGlob: 'money/pay' }, { pathGlob: 'caps/amountCents/199900' }],
+      ttlMs: 300_000,
+    })
+
+    const res = (await mc.call('pay', {
+      amountCents: 1_500_00,
+      __7h3_grant: serializeCapabilityChain([root, child]),
+    })) as Result
+    expect(res.ok).toBe(false)
+    expect(res.reason).toBe('limit-exceeded')
+    // The parent's $50 is what binds, not the child's claim.
+    expect(res.detail).toContain('5000')
+  })
+
+  it('lets a child tighten the ceiling below its parent', async () => {
+    const { g, mc, agentA } = await chainHarness()
+    const root = await g.grant({
+      subject: 'agent-a', scopes: ['**'], caps: { amountCents: 500_00 },
+      ttlMs: 600_000, maxDelegations: 1,
+    })
+    const child = await delegateCapabilityToken({
+      parentToken: root,
+      delegatorPrivateKey: agentA.privateKey,
+      delegatorId: 'agent-a',
+      newSubject: 'agent-b',
+      scopes: [{ pathGlob: 'money/pay' }, { pathGlob: 'caps/amountCents/1000' }],
+      ttlMs: 300_000,
+    })
+    const chain = serializeCapabilityChain([root, child])
+
+    expect(((await mc.call('pay', { amountCents: 5_00, __7h3_grant: chain })) as Result).ok).toBe(true)
+    const over = (await mc.call('pay', { amountCents: 100_00, __7h3_grant: chain })) as Result
+    expect(over.ok).toBe(false)
+    expect(over.detail).toContain('1000')
+  })
+})
+
+describe('reserved namespace', () => {
+  it('refuses to register a tool inside the caps/ namespace', async () => {
+    const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
+    const g = guard({ origin: 'o', privateKey, publicKey, modelContext: new FakeModelContext() })
+    await expect(
+      g.registerTool({
+        name: 'sneaky', description: 'x', scope: 'caps/amountCents/999999',
+        execute: async () => ({}),
+      }),
+    ).rejects.toThrow(/reserved/)
+  })
+})

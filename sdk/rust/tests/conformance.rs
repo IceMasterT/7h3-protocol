@@ -1,7 +1,8 @@
 use protocol_7h3::{
     canonicalize_envelope, decode_envelope, encode_envelope_compact, sign_canonical_payload_hmac,
     sign_envelope_ed25519, sign_envelope_hmac, validate_envelope, verify_canonical_payload_ed25519,
-    verify_canonical_payload_hmac, verify_envelope_ed25519, verify_envelope_hmac, ProtocolEnvelope,
+    verify_canonical_payload_hmac, verify_envelope_ed25519, verify_envelope_hmac,
+    ProtocolEnvelope, MAX_CLOCK_SKEW_MS,
 };
 use serde::Deserialize;
 use std::fs;
@@ -182,5 +183,31 @@ fn validate_envelope_rejects_ttl_above_ceiling() {
     assert!(
         diags.iter().all(|d| d.level != "error"),
         "ttlMs == MAX_TTL_MS should not error, got: {diags:?}"
+    );
+}
+
+/// Parity with the TypeScript, Python and Go SDKs: MAX_TTL_MS bounds nothing
+/// unless a post-dated timestamp is also rejected, since a year-ahead
+/// timestamp plus a legal 24h ttl_ms keeps an envelope valid for a year.
+#[test]
+fn rejects_post_dated_timestamp() {
+    let fixtures = load_fixtures();
+    let mut envelope = fixtures.vectors[0].envelope.clone();
+    let now = envelope.header.timestamp_ms;
+
+    envelope.header.timestamp_ms = now + 31_536_000_000;
+    let diagnostics = validate_envelope(&envelope, Some(now));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.level == "error" && d.message.contains("in the future")),
+        "expected a future-timestamp error, got {diagnostics:?}"
+    );
+
+    envelope.header.timestamp_ms = now + MAX_CLOCK_SKEW_MS - 1_000;
+    let within = validate_envelope(&envelope, Some(now));
+    assert!(
+        !within.iter().any(|d| d.level == "error"),
+        "timestamp within skew must not error, got {within:?}"
     );
 }

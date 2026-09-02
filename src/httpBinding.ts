@@ -83,6 +83,14 @@ export async function verifyHttpEnvelope(
   const sender = envelope.header.sender
   const alg = envelope.signature.alg
 
+  // Both branches below resolve key material through the registry. `alg` comes
+  // off the request, so a caller that configured no registry would otherwise
+  // throw a TypeError on attacker-chosen input — an unhandled exception inside
+  // a request handler rather than a clean 401. Fail closed instead.
+  if (!opts.keyRegistry) {
+    return { ok: false, reason: 'unknown-sender', detail: 'no key registry configured' }
+  }
+
   if (alg === 'ED25519') {
     const publicKey = await opts.keyRegistry.getPublicKey(sender)
     if (!publicKey) return { ok: false, reason: 'unknown-sender', detail: sender }
