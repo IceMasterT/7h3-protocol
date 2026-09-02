@@ -1,0 +1,44 @@
+{
+  "name": "@7h3/protocol-webmcp",
+  "version": "0.6.0",
+  "description": "7h3 Protocol — signed, capability-scoped, receipted WebMCP tools. Deterministic authorization for browser agents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE", "NOTICE"],
+  "peerDependencies": {
+    "@7h3/protocol": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "7h3",
+    "webmcp",
+    "modelcontext",
+    "agent",
+    "capability",
+    "ed25519",
+    "audit",
+    "provenance",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IceMasterT/7h3-protocol.git"
+  }
+}
