@@ -53,10 +53,42 @@ class SlidingWindowRateLimiter {
       // most-recently-used end so eviction below removes the true LRU key.
       this.windows.delete(key)
       this.windows.set(key, timestamps)
-      while (this.windows.size > this.maxKeys) {
-        const oldestKey = this.windows.keys().next().value as string | undefined
-        if (oldestKey === undefined) break
-        this.windows.delete(oldestKey)
+
+      if (this.windows.size > this.maxKeys) {
+        // Reclaim fully-expired windows first. They carry no live state, so
+        // dropping them is free — whereas evicting a key that is currently at
+        // its quota *resets that quota*, which turns memory pressure into a
+        // rate-limit bypass: flood enough distinct keys and a victim's window
+        // is evicted and their allowance starts over.
+        //
+        // This does not make the bound infinite; under genuine pressure from
+        // many simultaneously-active keys, LRU eviction still applies below.
+        // Size `maxKeys` above the number of distinct callers you expect.
+        const cutoffNow = nowMs - policy.windowMs
+        for (const [k, ts] of this.windows) {
+          if (this.windows.size <= this.maxKeys) break
+          if (k === key) continue
+          if (ts.length === 0 || ts[ts.length - 1] <= cutoffNow) this.windows.delete(k)
+        }
+
+        // Then evict least-recently-used keys that are *under* quota. Losing
+        // their state grants nothing: they were not being limited. Keys at or
+        // over quota are evicted only as a last resort, because dropping one is
+        // precisely what hands an attacker a reset.
+        for (const [k, ts] of this.windows) {
+          if (this.windows.size <= this.maxKeys) break
+          if (k === key) continue
+          if (ts.length < policy.requests) this.windows.delete(k)
+        }
+
+        // Last resort: the bound is real, and with more concurrently-active
+        // keys than maxKeys something live has to go. Size maxKeys above the
+        // number of distinct callers you expect to see inside one window.
+        while (this.windows.size > this.maxKeys) {
+          const oldestKey = this.windows.keys().next().value as string | undefined
+          if (oldestKey === undefined) break
+          this.windows.delete(oldestKey)
+        }
       }
     } else {
       // Nothing left worth tracking for this key — drop it instead of

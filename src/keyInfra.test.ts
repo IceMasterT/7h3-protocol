@@ -331,3 +331,39 @@ describe('RevocationRegistry', () => {
     expect(result).toBe('the-shared-secret')
   })
 })
+
+describe('RevocationRegistry — sender vs keyId', () => {
+  const inner = {
+    getPublicKey: async (sender: string) => (sender === 'alice@a.test' ? 'PUBKEY' : null),
+    getSharedSecret: async (_keyId: string, sender: string) => (sender === 'alice@a.test' ? 'SECRET' : null),
+  }
+
+  it('revoking a sender blocks both credential types', async () => {
+    const r = new RevocationRegistry()
+    r.revoke('alice@a.test', 'compromised')
+    const w = r.wrapRegistry(inner as never)
+    expect(await w.getPublicKey('alice@a.test')).toBeNull()
+    expect(await w.getSharedSecret!('k1', 'alice@a.test')).toBeNull()
+  })
+
+  it('isEnvelopeRevoked enforces a keyId revocation, which a registry lookup cannot', async () => {
+    const r = new RevocationRegistry()
+    r.revoke('k1', 'key compromised')
+    const w = r.wrapRegistry(inner as never)
+
+    // A registry lookup is keyed by sender and never sees signature.keyId, so
+    // it cannot enforce this — which is exactly why isEnvelopeRevoked exists.
+    expect(await w.getPublicKey('alice@a.test')).toBe('PUBKEY')
+    expect(await w.getSharedSecret!('k1', 'alice@a.test')).toBeNull()
+
+    const envelope = { header: { sender: 'alice@a.test' }, signature: { keyId: 'k1' } }
+    expect(r.isEnvelopeRevoked(envelope)).toBe(true)
+  })
+
+  it('isEnvelopeRevoked also catches a revoked sender', () => {
+    const r = new RevocationRegistry()
+    r.revoke('alice@a.test')
+    expect(r.isEnvelopeRevoked({ header: { sender: 'alice@a.test' }, signature: { keyId: 'k9' } })).toBe(true)
+    expect(r.isEnvelopeRevoked({ header: { sender: 'bob@a.test' }, signature: { keyId: 'k9' } })).toBe(false)
+  })
+})

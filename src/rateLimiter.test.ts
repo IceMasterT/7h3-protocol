@@ -145,3 +145,38 @@ describe('SlidingWindowRateLimiter — bounded key growth', () => {
     expect(earlyKeyFresh.allowed).toBe(true)
   })
 })
+
+describe('eviction must not become a rate-limit bypass', () => {
+  const policy = { requests: 3, windowMs: 60_000 }
+  const windowsOf = (rl: SlidingWindowRateLimiter) =>
+    (rl as unknown as { windows: Map<string, number[]> }).windows
+
+  it('keeps limiting a victim through a flood of distinct keys', () => {
+    const rl = new SlidingWindowRateLimiter({ maxKeys: 50 })
+    for (let i = 0; i < 3; i++) rl.consume('victim@a.test', policy)
+    expect(rl.consume('victim@a.test', policy).allowed).toBe(false)
+
+    // Evicting an at-quota key resets its allowance, so an attacker who can
+    // push enough distinct keys through a bounded store would otherwise clear
+    // a victim's limit for them.
+    for (let i = 0; i < 500; i++) rl.consume(`flood-${i}@evil.test`, policy)
+
+    expect(rl.consume('victim@a.test', policy).allowed).toBe(false)
+  })
+
+  it('reclaims expired windows before evicting live ones', () => {
+    const rl = new SlidingWindowRateLimiter({ maxKeys: 100 })
+    let now = 1_000_000
+    for (let i = 0; i < 95; i++) rl.consume(`stale-${i}@x.test`, policy, now)
+    now += 120_000 // every window above is now outside the policy window
+    for (let i = 0; i < 3; i++) rl.consume('victim@a.test', policy, now)
+    for (let i = 0; i < 40; i++) rl.consume(`new-${i}@x.test`, policy, now)
+    expect(rl.consume('victim@a.test', policy, now).allowed).toBe(false)
+  })
+
+  it('still bounds memory under genuine pressure', () => {
+    const rl = new SlidingWindowRateLimiter({ maxKeys: 50 })
+    for (let i = 0; i < 1_000; i++) rl.consume(`k-${i}@x.test`, policy)
+    expect(windowsOf(rl).size).toBeLessThanOrEqual(50)
+  })
+})

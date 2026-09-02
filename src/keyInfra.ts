@@ -196,8 +196,40 @@ export interface RevocationList {
 export class RevocationRegistry {
   private revoked = new Map<string, RevocationEntry>()
 
-  revoke(keyId: string, reason?: string): void {
-    this.revoked.set(keyId, { id: keyId, revokedAt: Date.now(), reason })
+  /**
+   * Revoke an identifier — either a sender identity or a keyId.
+   *
+   * Which one you pass matters, and the difference used to be silent. A
+   * registry lookup is keyed by *sender*, so `wrapRegistry().getPublicKey()`
+   * can only ever compare against a sender id. Revoking a bare keyId therefore
+   * blocked the HMAC path (which receives both identifiers) while leaving the
+   * Ed25519 path fully open — a revoked, compromised key kept authenticating.
+   *
+   * Use {@link isEnvelopeRevoked} on the verification path to enforce a keyId
+   * revocation for Ed25519, or revoke the sender identity as well. For
+   * fleet-wide `(sender, keyId)` revocation, use `RevocationStore` from
+   * `./revocation` instead.
+   */
+  revoke(senderOrKeyId: string, reason?: string): void {
+    this.revoked.set(senderOrKeyId, { id: senderOrKeyId, revokedAt: Date.now(), reason })
+  }
+
+  /**
+   * True if either the envelope's sender or the keyId it was signed under has
+   * been revoked.
+   *
+   * This is the check that actually enforces a keyId revocation for Ed25519,
+   * because unlike a registry lookup it can see `signature.keyId`. Call it on
+   * the verification path alongside signature checking.
+   */
+  isEnvelopeRevoked(envelope: {
+    header?: { sender?: string }
+    signature?: { keyId?: string }
+  }): boolean {
+    const sender = envelope?.header?.sender
+    const keyId = envelope?.signature?.keyId
+    return (sender !== undefined && this.isRevoked(sender)) ||
+      (keyId !== undefined && this.isRevoked(keyId))
   }
 
   isRevoked(keyId: string): boolean {
@@ -221,6 +253,10 @@ export class RevocationRegistry {
   // Returns a KeyRegistry wrapper that rejects revoked keys
   wrapRegistry(inner: KeyRegistry): KeyRegistry {
     return {
+      // Only the sender id is available here — the KeyRegistry interface gives
+      // this method nothing else — so a keyId-only revocation cannot be
+      // enforced at this point. isEnvelopeRevoked() covers that case on the
+      // verification path, where signature.keyId is in scope.
       getPublicKey: async (senderId: string) => {
         if (this.isRevoked(senderId)) return null
         return inner.getPublicKey(senderId)
