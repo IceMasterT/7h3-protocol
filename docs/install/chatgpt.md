@@ -17,6 +17,12 @@ You can use either or both.
 ChatGPT's built-in browser implements the proposed WebMCP standard as **site
 tools**. Your page offers actions; the agent discovers and calls them.
 
+> **See it working first:** open
+> <https://7h3-webmcp-ledger.tech-b1a.workers.dev> in the app's built-in browser
+> and check **Site tools** — the landing page registers 3, `/ledger` registers
+> 10. Step-by-step walkthrough, including what each prompt should return:
+> [docs/TESTING.md](../TESTING.md).
+
 ### Requirements
 
 - **ChatGPT desktop app**, updated to the latest version

@@ -132,9 +132,21 @@ The agent calls `request_access`, and you approve or deny it in the page.
 
 ### Without a WebMCP browser
 
-The right-hand **Simulated agent** panel drives the same tools through
-`guard.invoke`, which runs the *identical* guarded wrapper — there is no code
-path that skips `decide()`. Judging works on any browser.
+Nothing here requires one. Two of the three demos are built for exactly this
+case, and both work in any browser:
+
+- **[`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare)** — one
+  click runs the same four hostile actions against two identical copies of the
+  books. **4 of 4 succeed unguarded; 0 of 4 guarded** — $2,750 moved versus
+  nothing, an invoice destroyed, 4 customer records exfiltrated versus 0, and
+  0 receipts versus 4, meaning the unguarded side keeps no record it happened.
+- **[`/verify`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify)** — the
+  real grant, receipt chain and manifest, editable by hand. Break any byte and
+  verification names the exact receipt that failed.
+
+On `/ledger`, the right-hand **Simulated agent** panel drives the same tools
+through `guard.invoke`, which runs the *identical* guarded wrapper — there is no
+code path that skips `decide()`. Judging works on any browser.
 
 ### The security claims, end to end
 

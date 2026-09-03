@@ -10,7 +10,7 @@
   [![npm threshold](https://img.shields.io/npm/v/@7h3/protocol-threshold?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-threshold)](https://www.npmjs.com/package/@7h3/protocol-threshold)
   [![PyPI](https://img.shields.io/pypi/v/7h3-protocol?style=flat-square&color=818cf8&logo=python&logoColor=white)](https://pypi.org/project/7h3-protocol/)
   [![Crates.io](https://img.shields.io/crates/v/protocol-7h3?style=flat-square&color=a5b4fc&logo=rust&logoColor=white)](https://crates.io/crates/protocol-7h3)
-  [![Tests](https://img.shields.io/badge/tests-581%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
+  [![Tests](https://img.shields.io/badge/tests-776%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
   [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
   [![Wire](https://img.shields.io/badge/wire-7h3%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
   [![License](https://img.shields.io/badge/license-Apache--2.0-94a3b8?style=flat-square)](./LICENSE)
@@ -33,8 +33,17 @@ capability-scoped, replay-protected, cryptographically receipted tool calls.
 
 > **Live demos → [7h3-webmcp-ledger.tech-b1a.workers.dev](https://7h3-webmcp-ledger.tech-b1a.workers.dev)**
 > — [how to test it in ChatGPT or Chrome](./docs/TESTING.md)
-> An agent-operable business console. Grant an agent `pay ≤ $50 for 10 minutes`,
-> then watch it get refused — cryptographically — when it tries to exceed that.
+>
+> Three of them, none requiring WebMCP or any setup:
+>
+> | | |
+> |---|---|
+> | [`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | One compromised agent, four hostile actions, run against two identical copies of the books — one guarded, one not. **4 of 4 succeed unguarded; 0 of 4 guarded.** |
+> | [`/verify`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | The real signed grant, receipt chain and manifest. Edit any of them by hand and watch verification fail at the byte you changed. |
+> | [`/ledger`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | The full console. Grant an agent `pay ≤ $50 for 10 minutes`, then watch it get refused — cryptographically — when it exceeds that. |
+>
+> All four routes (the hub included) register tools on `document.modelContext` —
+> **19 in total** — so an agent has something to call wherever it lands.
 
 Chrome's [agent security guidance](https://developer.chrome.com/docs/agents/security)
 is entirely probabilistic (classifiers, spotlighting, critic LLMs) and silent on

@@ -141,8 +141,18 @@ or Terra — Luna has WebMCP disabled), or Chrome 149+ with
 Refused — no grant. Click **Bookkeeper · pay ≤ $50**, ask again — it works. Then
 ask it to pay INV-1042 ($1,850) and watch the cap refuse it.
 
-No WebMCP browser? The **Simulated agent** panel drives the same tools through
-the identical guarded wrapper.
+**No WebMCP browser? Nothing here needs one.** Two of the three demos exist for
+exactly that case:
+
+| | |
+|---|---|
+| [`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | One click. The same four hostile actions against two identical copies of the books — **4 of 4 succeed unguarded, 0 of 4 guarded.** $2,750 moved versus nothing, and 0 receipts versus 4. |
+| [`/verify`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | The real grant, receipt chain and manifest, editable by hand. Break a byte, and verification names the exact receipt that failed. |
+
+On `/ledger`, the **Simulated agent** panel drives the same tools through the
+identical guarded wrapper — there is no code path that skips `decide()`.
+
+Full walkthrough with the exact expected strings: [`docs/TESTING.md`](./docs/TESTING.md).
 
 ---
 

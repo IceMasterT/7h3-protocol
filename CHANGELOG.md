@@ -6,6 +6,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## Unreleased — demo
+
+### Added
+
+- **The landing hub is now a WebMCP surface.** Splitting the single-page demo
+  into a hub plus three demos left `/` registering no tools, so an agent opening
+  the site's front door found an empty `document.modelContext`. The hub now
+  registers three read-only tools — `list_demos`, `explain_7h3`, `open_demo` —
+  wrapped by the same guard as every other tool, so an agent can tour the site
+  without being told where to go. All four routes now register tools: 19 total.
+
+  `open_demo` accepts only a path that is literally one of the three published
+  demos; any other value throws rather than navigating.
+
+### Documentation
+
+- `docs/TESTING.md` rewritten around the three demos, with per-route tool
+  counts, the exact strings each step should produce, and a verified command for
+  checking the published manifest signature against the npm package rather than
+  this repo.
+- Test counts corrected across `README.md`, `CLAUDE.md` and `AGENTS.md`: the
+  stale "581" is now **776** — TypeScript 604, Python 106, Go 35, Rust 31.
+
+---
+
 ## v0.6.8 — `@7h3/protocol` 0.6.3
 
 Final adversarial pass, over the last four unattacked subsystems.

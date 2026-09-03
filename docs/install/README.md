@@ -3,6 +3,12 @@
 Pick the surface you're integrating. Every command and code sample in these
 guides was executed against this repository before being written down.
 
+> **Want to see it before installing anything?**
+> <https://7h3-webmcp-ledger.tech-b1a.workers.dev> runs three live demos — the
+> guard's effect side by side with its absence, the raw signatures to check
+> yourself, and the full product. None need WebMCP or any setup.
+> [Testing walkthrough →](../TESTING.md)
+
 ## Agent-facing
 
 | Guide | For |
