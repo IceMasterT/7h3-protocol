@@ -47,7 +47,7 @@ const DEMOS: Demo[] = [
       'Identical tools, identical inputs, one difference',
       '$2,750 moved and 4 customer records exfiltrated on one side',
       'Nothing moved, and every attempt recorded, on the other',
-      'One click, no setup, works in any browser',
+      'Four guarded tools an agent can call directly',
     ],
     cta: 'Run the attack',
   },
@@ -63,6 +63,7 @@ const DEMOS: Demo[] = [
       'prevHash links between receipts, and what breaks them',
       'Tamper with anything and see the exact index that fails',
       'The manifest fetched live and checked against the published key',
+      'Two WebMCP tools produce the receipts you then break',
     ],
     cta: 'Inspect the crypto',
   },
@@ -79,7 +80,7 @@ root.innerHTML = `
   <div class="brand">7h3<span> × </span>WebMCP</div>
   <div class="tagline">signed, capability-scoped, receipted tools for browser agents</div>
   <div class="spacer"></div>
-  <span class="pill ${supported ? 'ok' : 'off'}">${supported ? 'WebMCP detected' : 'no WebMCP agent here — every demo still works'}</span>
+  <span class="pill ${supported ? 'ok' : 'off'}">${supported ? 'WebMCP detected — 3 tools registered here' : '19 WebMCP tools registered across this site'}</span>
 </header>
 
 <div class="layout" style="grid-template-columns: minmax(0,1fr)">
@@ -98,6 +99,26 @@ root.innerHTML = `
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <h2>Driving it with a real agent <span class="count">start here</span></h2>
+      <div class="card-body">
+        <div class="hint" style="padding:0 0 10px">
+          WebMCP is <strong>built into the browser</strong> — there is no extension to install. Point either of
+          these at this page and the agent discovers the tools on its own:
+        </div>
+        <div class="receipt allowed"><div class="dot"></div><div><div class="tool">ChatGPT desktop app</div><div class="why">GPT-5.6 Sol or Terra — Luna has WebMCP disabled. Open the page in the app’s built-in browser, then check <strong>Site tools</strong> in the address bar.</div></div></div>
+        <div class="receipt allowed"><div class="dot"></div><div><div class="tool">Chrome 149+</div><div class="why">Enable <code>chrome://flags/#enable-webmcp-testing</code> and relaunch. There is no extension to install — it is built in.</div></div></div>
+        <div class="hint" style="padding-top:10px">
+          No luck with either? Every page's own controls call the identical guarded wrapper
+          (<code>guard.invoke</code>) that an agent's tool call reaches — there is no code path that skips
+          the check. You are never blocked.
+        </div>
+        <div class="hint">
+          Full walkthrough, including what each step should return:
+          <a href="https://github.com/IceMasterT/7h3-protocol/blob/main/docs/TESTING.md">docs/TESTING.md</a>
+        </div>
+      </div>
 
     <div class="card">
       <h2>This page is itself a WebMCP surface <span class="count">3 tools</span></h2>
@@ -127,20 +148,7 @@ root.innerHTML = `
       </div>`,
     ).join('')}
 
-    <div class="card">
-      <h2>Driving it with a real agent</h2>
-      <div class="card-body">
-        <div class="hint" style="padding:0 0 10px">
-          Every demo above runs in any browser. To drive the tools with an actual agent you need one of:
-        </div>
-        <div class="receipt allowed"><div class="dot"></div><div><div class="tool">ChatGPT desktop app</div><div class="why">GPT-5.6 Sol or Terra — Luna has WebMCP disabled. Open the page in the app’s built-in browser, then check <strong>Site tools</strong> in the address bar.</div></div></div>
-        <div class="receipt allowed"><div class="dot"></div><div><div class="tool">Chrome 149+</div><div class="why">Enable <code>chrome://flags/#enable-webmcp-testing</code> and relaunch. There is no extension to install — it is built in.</div></div></div>
-        <div class="hint">
-          Full walkthrough, including what each step should return:
-          <a href="https://github.com/IceMasterT/7h3-protocol/blob/main/docs/TESTING.md">docs/TESTING.md</a>
-        </div>
-      </div>
-    </div>
+</div>
   </div>
 </div>`
 

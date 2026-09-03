@@ -130,10 +130,11 @@ Refused — `scope-not-covered`. Finally:
 
 The agent calls `request_access`, and you approve or deny it in the page.
 
-### Without a WebMCP browser
+### If you can't get a WebMCP browser
 
-Nothing here requires one. Two of the three demos are built for exactly this
-case, and both work in any browser:
+No judge should be blocked on a browser flag. These pages register the same
+WebMCP tools; the in-page controls call the identical guarded wrapper, so what
+you see is what the agent's tool call reaches:
 
 - **[`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare)** — one
   click runs the same four hostile actions against two identical copies of the

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "npm run sign && vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy --config ./wrangler.toml",
     "sign": "tsx scripts/sign-manifest.ts"
   },
   "devDependencies": {

@@ -141,8 +141,11 @@ or Terra — Luna has WebMCP disabled), or Chrome 149+ with
 Refused — no grant. Click **Bookkeeper · pay ≤ $50**, ask again — it works. Then
 ask it to pay INV-1042 ($1,850) and watch the cap refuse it.
 
-**No WebMCP browser? Nothing here needs one.** Two of the three demos exist for
-exactly that case:
+Then navigate to `/compare` (4 more registered tools) and ask the agent to run
+the whole attack — every action refused, each naming its own reason.
+
+**If your browser won't cooperate**, no judge is blocked. These pages register
+the same WebMCP tools; the in-page controls call the identical guarded wrapper:
 
 | | |
 |---|---|

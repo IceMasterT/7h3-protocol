@@ -4,9 +4,9 @@ Pick the surface you're integrating. Every command and code sample in these
 guides was executed against this repository before being written down.
 
 > **Want to see it before installing anything?**
-> <https://7h3-webmcp-ledger.tech-b1a.workers.dev> runs three live demos — the
-> guard's effect side by side with its absence, the raw signatures to check
-> yourself, and the full product. None need WebMCP or any setup.
+> <https://7h3-webmcp-ledger.tech-b1a.workers.dev> is a live WebMCP app —
+> **19 tools across four routes** on `document.modelContext`, drivable from
+> ChatGPT's built-in browser or Chrome 149+.
 > [Testing walkthrough →](../TESTING.md)
 
 ## Agent-facing

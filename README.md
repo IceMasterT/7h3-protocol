@@ -34,16 +34,17 @@ capability-scoped, replay-protected, cryptographically receipted tool calls.
 > **Live demos → [7h3-webmcp-ledger.tech-b1a.workers.dev](https://7h3-webmcp-ledger.tech-b1a.workers.dev)**
 > — [how to test it in ChatGPT or Chrome](./docs/TESTING.md)
 >
-> Three of them, none requiring WebMCP or any setup:
+> **All four routes register tools on `document.modelContext` — 19 in total** —
+> so an agent has real work to do wherever it lands. Drive them from the ChatGPT
+> desktop browser's **site tools** or Chrome 149+; each page also has in-page
+> controls hitting the identical guarded wrapper, so nobody is ever blocked:
 >
-> | | |
-> |---|---|
-> | [`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | One compromised agent, four hostile actions, run against two identical copies of the books — one guarded, one not. **4 of 4 succeed unguarded; 0 of 4 guarded.** |
-> | [`/verify`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | The real signed grant, receipt chain and manifest. Edit any of them by hand and watch verification fail at the byte you changed. |
-> | [`/ledger`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | The full console. Grant an agent `pay ≤ $50 for 10 minutes`, then watch it get refused — cryptographically — when it exceeds that. |
->
-> All four routes (the hub included) register tools on `document.modelContext` —
-> **19 in total** — so an agent has something to call wherever it lands.
+> | Route | Tools | |
+> |---|---|---|
+> | [`/`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/) | **3** | The hub itself is a WebMCP surface, so an agent can discover and navigate the site unaided. |
+> | [`/ledger`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | **10** | The full console. Grant an agent `pay ≤ $50 for 10 minutes`, then watch it get refused — cryptographically — when it exceeds that. |
+> | [`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | **4** | One compromised agent, four hostile actions, run against two identical copies of the books — one guarded, one not. **4 of 4 succeed unguarded; 0 of 4 guarded.** |
+> | [`/verify`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | **2** | The real signed grant, receipt chain and manifest. Edit any of them by hand and watch verification fail at the byte you changed. |
 
 Chrome's [agent security guidance](https://developer.chrome.com/docs/agents/security)
 is entirely probabilistic (classifiers, spotlighting, critic LLMs) and silent on
