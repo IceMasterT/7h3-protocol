@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1200px; height: 800px; overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #05070F; -webkit-font-smoothing: antialiased;
+  }
+  .stage { position: relative; width: 1200px; height: 800px; overflow: hidden; }
+
+  .bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(980px 700px at 10% -12%, #1B2A6B 0%, transparent 62%),
+      radial-gradient(860px 620px at 98% 112%, #16326B 0%, transparent 60%),
+      radial-gradient(700px 560px at 72% -6%, #3B1E6E 0%, transparent 66%),
+      linear-gradient(155deg, #0A1024 0%, #05070F 48%, #070B18 100%);
+  }
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(129,140,248,0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(129,140,248,0.055) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(900px 700px at 32% 42%, #000 26%, transparent 86%);
+    -webkit-mask-image: radial-gradient(900px 700px at 32% 42%, #000 26%, transparent 86%);
+  }
+  .sheen {
+    position: absolute; top: -220px; left: -200px; width: 1000px; height: 1000px;
+    background: linear-gradient(112deg, transparent 34%, rgba(165,180,252,0.10) 47%, rgba(110,231,168,0.07) 53%, transparent 66%);
+    transform: rotate(-8deg);
+  }
+  .orb { position: absolute; border-radius: 50%; filter: blur(2px); }
+  .orb-a { left: -180px; top: -190px; width: 660px; height: 660px;
+           background: radial-gradient(circle, rgba(99,102,241,0.30) 0%, transparent 66%); }
+  .orb-b { right: -170px; bottom: -230px; width: 620px; height: 620px;
+           background: radial-gradient(circle, rgba(45,212,191,0.19) 0%, transparent 68%); }
+  .orb-c { right: -60px; top: -230px; width: 500px; height: 500px;
+           background: radial-gradient(circle, rgba(168,85,247,0.22) 0%, transparent 68%); }
+  .rule-top {
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent 0%, #6366F1 18%, #A78BFA 38%, #6EE7A8 62%, #38BDF8 82%, transparent 100%);
+  }
+
+  .wrap { position: relative; z-index: 3; height: 800px; padding: 66px 56px 0; }
+
+  /* Header */
+  .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 72px; }
+  .brand { display: flex; align-items: center; gap: 15px; }
+  .mark {
+    width: 46px; height: 46px; border-radius: 13px; flex: none;
+    background: linear-gradient(140deg, #818CF8 0%, #6366F1 44%, #4F46E5 100%);
+    box-shadow: 0 0 0 1px rgba(165,180,252,.45), 0 8px 26px rgba(79,70,229,.6);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mark::after { content: ''; width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(255,255,255,.96); }
+  .brand-name { font-size: 21px; font-weight: 800; letter-spacing: .2em; color: #EEF2FF; text-transform: uppercase; }
+  .brand-name b { color: #A5B4FC; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 17px; border-radius: 999px;
+    font-size: 13px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+    color: #052E1B; white-space: nowrap;
+    background: linear-gradient(96deg, #6EE7A8 0%, #34D399 100%);
+    box-shadow: 0 0 30px rgba(52,211,153,.6), 0 0 0 1px rgba(110,231,168,.5);
+  }
+  .pill .d { width: 8px; height: 8px; border-radius: 50%; background: #04361F; }
+
+  /* Headline */
+  h1 {
+    font-size: 76px; line-height: .97; font-weight: 900; letter-spacing: -.035em;
+    color: #fff; text-shadow: 0 4px 44px rgba(99,102,241,.45);
+  }
+  h1 .grad {
+    background: linear-gradient(96deg, #A5B4FC 0%, #818CF8 24%, #C4B5FD 50%, #6EE7A8 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .sub {
+    margin-top: 30px; font-size: 21px; line-height: 1.48; color: #A3B4D4; font-weight: 450; max-width: 900px;
+  }
+  .sub b { color: #E6ECFA; font-weight: 700; }
+
+  /* Proof strip — the counterfactual, which is the whole argument */
+  .proof {
+    margin-top: 62px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .side {
+    border-radius: 16px; padding: 28px 26px 26px;
+    background: linear-gradient(165deg, rgba(15,23,42,.72) 0%, rgba(10,14,28,.6) 100%);
+    border: 1px solid rgba(129,140,248,.26);
+    box-shadow: inset 0 1px 0 rgba(199,210,254,.12), 0 12px 34px rgba(5,7,15,.55);
+  }
+  .side.bad { border-color: rgba(248,113,113,.38); }
+  .side.good { border-color: rgba(110,231,168,.45); box-shadow: inset 0 1px 0 rgba(199,210,254,.12), 0 0 40px rgba(52,211,153,.14), 0 12px 34px rgba(5,7,15,.55); }
+  .side-k {
+    font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+    color: #7C8DB5; margin-bottom: 12px;
+  }
+  .side.bad .side-k { color: #C58A8A; }
+  .side.good .side-k { color: #7FD9AE; }
+  .side-n { font-size: 52px; font-weight: 900; letter-spacing: -.03em; line-height: 1; margin-bottom: 11px; }
+  .side.bad .side-n { color: #F87171; }
+  .side.good .side-n {
+    background: linear-gradient(96deg, #6EE7A8, #34D399);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .side-t { font-size: 14.5px; color: #93A3C4; line-height: 1.45; font-weight: 500; }
+  .side-t b { color: #DCE5F7; font-weight: 700; }
+
+  /* Bottom rail */
+  .foot {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 78px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 56px;
+    background: linear-gradient(90deg, rgba(10,16,36,.94) 0%, rgba(7,11,24,.9) 55%, rgba(10,16,36,.94) 100%);
+    border-top: 1px solid rgba(129,140,248,.22); z-index: 4;
+  }
+  .chips { display: flex; align-items: center; gap: 9px; }
+  .chip {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 700;
+    color: #A5B4FC; background: rgba(99,102,241,.15);
+    border: 1px solid rgba(129,140,248,.4); border-radius: 6px; padding: 5px 10px; white-space: nowrap;
+  }
+  .chip.g { color: #6EE7A8; background: rgba(52,211,153,.13); border-color: rgba(110,231,168,.42); }
+  .foot-r { font-size: 14px; color: #8797BC; font-weight: 550; white-space: nowrap; }
+  .foot-r b { color: #D5DFF3; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bg"></div><div class="bg-grid"></div>
+  <div class="orb orb-a"></div><div class="orb orb-c"></div><div class="orb orb-b"></div>
+  <div class="sheen"></div><div class="rule-top"></div>
+
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="mark"></div>
+        <div class="brand-name"><b>7h3</b> Protocol</div>
+      </div>
+      <div class="pill"><span class="d"></span>WebMCP</div>
+    </div>
+
+    <h1>WebMCP gives agents hands.<br><span class="grad">This gives them a receipt.</span></h1>
+
+    <div class="sub">
+      Signed, capability-scoped, receipted <b>document.modelContext</b> tools.
+      A refusal is a failed signature or an uncovered scope — <b>never a judgement call.</b>
+    </div>
+
+    <div class="proof">
+      <div class="side bad">
+        <div class="side-k">Tools wired the usual way</div>
+        <div class="side-n">4 of 4</div>
+        <div class="side-t">hostile actions <b>succeeded</b> — $2,750 moved, an invoice destroyed, 4 customer records exported, <b>0 receipts written</b></div>
+      </div>
+      <div class="side good">
+        <div class="side-k">Same tools, behind the guard</div>
+        <div class="side-n">0 of 4</div>
+        <div class="side-t">every one <b>refused</b> by signature and scope — nothing moved, <b>4 signed receipts</b> on a hash-chained log</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="chips">
+      <span class="chip">Ed25519</span>
+      <span class="chip">X25519 · ChaCha20</span>
+      <span class="chip">ML-DSA</span>
+      <span class="chip g">19 tools · 4 routes</span>
+    </div>
+    <div class="foot-r">Live demo · <b>7h3-webmcp-ledger.tech-b1a.workers.dev</b></div>
+  </div>
+</div>
+</body>
+</html>
