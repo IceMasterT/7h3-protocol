@@ -9,6 +9,8 @@ underneath it — **a refusal is a failed signature or an uncovered scope, not a
 judgement call.**
 
 > **Live demo:** <https://7h3-webmcp-ledger.tech-b1a.workers.dev>
+>
+> Step-by-step testing in ChatGPT and Chrome: [`docs/TESTING.md`](../TESTING.md)
 
 ---
 
