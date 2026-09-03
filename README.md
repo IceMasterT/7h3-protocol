@@ -31,7 +31,7 @@
 [WebMCP](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`):
 capability-scoped, replay-protected, cryptographically receipted tool calls.
 
-> **Live demo → [7h3-webmcp-ledger.tech-b1a.workers.dev](https://7h3-webmcp-ledger.tech-b1a.workers.dev)**
+> **Live demos → [7h3-webmcp-ledger.tech-b1a.workers.dev](https://7h3-webmcp-ledger.tech-b1a.workers.dev)**
 > — [how to test it in ChatGPT or Chrome](./docs/TESTING.md)
 > An agent-operable business console. Grant an agent `pay ≤ $50 for 10 minutes`,
 > then watch it get refused — cryptographically — when it tries to exceed that.

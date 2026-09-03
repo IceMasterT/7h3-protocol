@@ -1,6 +1,14 @@
 # Testing the live demo
 
-**Live URL:** <https://7h3-webmcp-ledger.tech-b1a.workers.dev>
+**Start here:** <https://7h3-webmcp-ledger.tech-b1a.workers.dev> — a hub linking three demos.
+
+| | What it shows | Needs setup? |
+|---|---|---|
+| [Ledger](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | The full product an agent drives | No — WebMCP optional |
+| [Same attack, twice](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | The same attack with and without the guard | No |
+| [Verify it yourself](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | The real signatures; tamper with them | No |
+
+The agent walkthrough below uses **[the Ledger demo](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger)**.
 
 Two ways to drive it. The **Simulated agent** panel works in any browser and
 needs no setup — it calls the identical guarded wrapper, so judges can evaluate
@@ -27,7 +35,7 @@ without a WebMCP-capable browser. The sections below are for driving it with a
 ### Steps
 
 1. Open the ChatGPT desktop app.
-2. Open the live URL **in the app's built-in browser** (not an external browser).
+2. Open **https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger** in the app's built-in browser (not an external browser).
 3. Click **Site tools** in the address bar → **Available site tools**.
    You should see **10 tools — 3 read, 7 write**.
 
@@ -76,7 +84,7 @@ Click **Inject a poisoned tool** → *UNPUBLISHED TOOL: list_invoices_fast*.
 
 1. Check your version at `chrome://version` — you need **149 or later**.
 2. Go to `chrome://flags/#enable-webmcp-testing`, set **Enabled**, relaunch.
-3. Open the live URL.
+3. Open **https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger**.
 
 ### Confirm the API is present
 

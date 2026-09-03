@@ -8,7 +8,7 @@ agent real capability on a live, signed-in session via
 underneath it — **a refusal is a failed signature or an uncovered scope, not a
 judgement call.**
 
-> **Live demo:** <https://7h3-webmcp-ledger.tech-b1a.workers.dev>
+> **Live demos:** <https://7h3-webmcp-ledger.tech-b1a.workers.dev> — three of them: the product, the same attack with and without the guard, and the raw signatures to check yourself.
 >
 > Step-by-step testing in ChatGPT and Chrome: [`docs/TESTING.md`](../TESTING.md)
 
