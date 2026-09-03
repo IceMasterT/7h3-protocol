@@ -43,11 +43,7 @@ The core is a canonical-JSON envelope signed with Ed25519, keys sorted alphabeti
 
 Around that: X25519 and ChaCha20-Poly1305 for E2E encryption, ML-DSA (FIPS 204) for post-quantum signatures, BLS12-381 for M-of-N threshold signing, and bindings for HTTP, WebSocket, gRPC, message queues and webhooks. TypeScript, Python, Rust and Go SDKs. Web Crypto only, zero runtime dependencies, so it runs natively on Cloudflare Workers.
 
-The WebMCP layer is a thin guard over that foundation. Delegation is the piece I'd call out. A chain's effective ceiling is the minimum across every link, never just the leaf:
-
-$$\text{cap}_{\text{effective}}(f) = \min_{t \in \text{chain}} \text{cap}_t(f)$$
-
-which is the difference between delegation and privilege escalation. I know that because I shipped it wrong first.
+The WebMCP layer is a thin guard over that foundation. Delegation is the piece I'd call out. When a grant is delegated onward, the ceiling that applies is the **lowest one declared anywhere in the chain**, never just the one on the token being presented. Hand an agent a $50 grant, let it delegate, and no descendant can raise that to $500 no matter what it writes into its own token. That's the difference between delegation and privilege escalation, and I know it because I shipped it wrong first: the original version read the ceiling off the leaf token alone.
 
 ## Challenges we ran into
 
