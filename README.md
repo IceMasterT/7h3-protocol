@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./docs/assets/banner-github.png" alt="7h3 Protocol — Sign every message. Reject every replay." width="100%">
+  <img src="./docs/assets/banner-github.png" alt="7h3 Protocol — Sign every message. Trust every agent. Cryptographic identity, replay protection and E2E encryption for AI agents, now including signed WebMCP tools in the browser." width="100%">
 
   <br/><br/>
 

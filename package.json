@@ -136,7 +136,9 @@
     "fuzz:ts:verify": "tsx fuzz/ts/harness-verify.ts",
     "fuzz:rust:setup": "cargo install cargo-fuzz 2>/dev/null || true",
     "fuzz:rust:decode": "cargo +nightly fuzz run fuzz_decode --manifest-path sdk/rust/fuzz/Cargo.toml -- -max_total_time=60",
-    "fuzz:rust:canonicalize": "cargo +nightly fuzz run fuzz_canonicalize --manifest-path sdk/rust/fuzz/Cargo.toml -- -max_total_time=60"
+    "fuzz:rust:canonicalize": "cargo +nightly fuzz run fuzz_canonicalize --manifest-path sdk/rust/fuzz/Cargo.toml -- -max_total_time=60",
+    "banner": "node scripts/render-banner.mjs",
+    "banner:check": "node scripts/render-banner.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
