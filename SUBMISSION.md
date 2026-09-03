@@ -105,7 +105,9 @@ and retry — agent and human negotiating scope, rather than the agent just fail
 - **ChatGPT desktop app** → built-in browser → open the live URL.
   Requires **GPT-5.6 Sol or Terra** (Luna has WebMCP disabled). Not available in
   Enterprise or Edu workspaces. Check **Site tools** in the address bar; you
-  should see 10 tools (3 read, 7 write).
+  should see 3 tools on the landing page (`list_demos`, `explain_7h3`,
+  `open_demo`) and 10 on `/ledger` (3 read, 7 write) — 19 across all four
+  routes.
 - **Chrome 149+** → enable `chrome://flags/#enable-webmcp-testing`, relaunch.
 
 Prompts worth trying:

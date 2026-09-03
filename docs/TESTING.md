@@ -2,11 +2,16 @@
 
 **Start here:** <https://7h3-webmcp-ledger.tech-b1a.workers.dev> — a hub linking three demos.
 
-| | What it shows | Needs setup? |
-|---|---|---|
-| [Ledger](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | The full product an agent drives | No — WebMCP optional |
-| [Same attack, twice](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | The same attack with and without the guard | No |
-| [Verify it yourself](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | The real signatures; tamper with them | No |
+| Page | WebMCP tools | What it shows | Needs setup? |
+|---|---|---|---|
+| [Hub](https://7h3-webmcp-ledger.tech-b1a.workers.dev/) (`/`) | **3** — read-only | An agent can tour the site without being told where to go | No |
+| [Ledger](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | **10** — 3 read, 7 write | The full product an agent drives | No — WebMCP optional |
+| [Same attack, twice](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | **4** — all guarded | The same attack with and without the guard | No |
+| [Verify it yourself](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | **2** | The real signatures; tamper with them | No |
+
+**Every page registers tools on `document.modelContext` — including the landing
+page.** Land anywhere and an agent has something to call: 19 tools across the
+four routes, each wrapped by the same guard.
 
 The agent walkthrough below uses **[the Ledger demo](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger)**.
 
@@ -35,9 +40,14 @@ without a WebMCP-capable browser. The sections below are for driving it with a
 ### Steps
 
 1. Open the ChatGPT desktop app.
-2. Open **https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger** in the app's built-in browser (not an external browser).
+2. Open **https://7h3-webmcp-ledger.tech-b1a.workers.dev/** in the app's built-in browser (not an external browser).
 3. Click **Site tools** in the address bar → **Available site tools**.
-   You should see **10 tools — 3 read, 7 write**.
+   You should see **3 tools**: `list_demos`, `explain_7h3`, `open_demo`.
+4. Ask: *"What demos are on this page, and open the one that shows the attack."*
+   The agent calls `list_demos`, then `open_demo` — and you land on `/compare`
+   without having typed a URL.
+5. Navigate to **/ledger** and re-open **Site tools**.
+   You should now see **10 tools — 3 read, 7 write**.
 
 ### The demo script
 
@@ -84,7 +94,9 @@ Click **Inject a poisoned tool** → *UNPUBLISHED TOOL: list_invoices_fast*.
 
 1. Check your version at `chrome://version` — you need **149 or later**.
 2. Go to `chrome://flags/#enable-webmcp-testing`, set **Enabled**, relaunch.
-3. Open **https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger**.
+3. Open **https://7h3-webmcp-ledger.tech-b1a.workers.dev/** — the hub registers
+   3 tools of its own, so you can confirm the API is live before going deeper.
+   Then open **/ledger** for the full 10-tool surface.
 
 ### Confirm the API is present
 

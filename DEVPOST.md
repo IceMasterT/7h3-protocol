@@ -80,7 +80,10 @@ actually do on my behalf, and can I prove it?"
 
 ## How we implemented WebMCP
 
-Ten tools registered on the top-level page via `document.modelContext.registerTool`
+Nineteen tools across four routes, all registered via
+`document.modelContext.registerTool` on the top-level page — including the
+landing page, so an agent has something to call wherever it lands. The Ledger
+carries ten of them
 — 3 read, 7 write — each wrapped by `guard.registerTool`, which keeps the exact
 WebMCP signature and adds three optional fields: `scope`, `limit`, `confirm`.
 
@@ -153,7 +156,8 @@ only reads data isn't proof of what it does".
 > guessing at intent. Nobody's shipped the deterministic half."
 
 **0:20–0:40 — The app.**
-Show Ledger. Open **Site tools** in the address bar: 10 tools, 3 read, 7 write.
+Open **Site tools** on the landing page first: 3 tools, so the agent can tour
+the site itself. Then Ledger — **Site tools** now shows 10, 3 read / 7 write.
 > "This is Ledger. Real invoices, real money. Ten WebMCP tools. And a trust panel
 > showing exactly what the agent is allowed to do right now: nothing."
 
