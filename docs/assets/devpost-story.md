@@ -45,6 +45,12 @@ Around that: X25519 and ChaCha20-Poly1305 for E2E encryption, ML-DSA (FIPS 204) 
 
 The WebMCP layer is a thin guard over that foundation. Delegation is the piece I'd call out. When a grant is delegated onward, the ceiling that applies is the **lowest one declared anywhere in the chain**, never just the one on the token being presented. Hand an agent a $50 grant, let it delegate, and no descendant can raise that to $500 no matter what it writes into its own token. That's the difference between delegation and privilege escalation, and I know it because I shipped it wrong first: the original version read the ceiling off the leaf token alone.
 
+```tex
+\text{cap}_{\text{eff}}(f) = \min \{\, \text{cap}_t(f) \;:\; t \in \text{chain}, \; f \in \text{caps}(t) \,\}
+```
+
+The condition under the minimum matters: a token that says nothing about a field doesn't relax it, it simply doesn't constrain it, and if no token in the chain declares a ceiling then the tool's own limit applies. Fail closed, never open.
+
 ## Challenges we ran into
 
 I ran five adversarial passes over my own code and found **13 real defects**. Three are worth telling you about.
