@@ -6,6 +6,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## v0.6.8 — `@7h3/protocol` 0.6.3
+
+Final adversarial pass, over the last four unattacked subsystems.
+
+### Security
+
+- **The audit log was not chained, though the README said it was.** The
+  Security Guarantees table claimed "`InMemoryAuditLog` entries are
+  Ed25519-signed and chained". They were signed independently, which detects
+  modification but **not deletion**: an attacker who can write to the log
+  removes the entries covering their activity and every remaining entry still
+  verifies. Demonstrated by pruning one entry from a four-entry log — all three
+  survivors verified.
+
+  Rather than retract the claim, entries now carry `prevHash` (inside the
+  signed payload, so a rewritten link invalidates the entry) and
+  `verifyAuditChain` reports the first index where the chain fails. Deletion,
+  modification, reordering and forgery under another key are all detected.
+  `log()` is unchanged for callers — `prevHash` is derived, never supplied.
+
+### Verified clean under attack
+
+`RollingKeyring` blocked verification after revocation, including with
+duplicate records for the same `(sender, keyId)`. `validateRuntimePolicy`
+rejected every malformed policy — `null`, a string, a number, an array, an
+empty object, and partial policies. `policyEnforcer` and the MCP gateway/
+transports build on those and inherit their checks.
+
+Unknown fields in a runtime policy are passed through rather than stripped,
+which is deliberate — it keeps the format extensible — and is safe because
+consumers read named fields.
+
 ## v0.6.7 — `@7h3/protocol` 0.6.2
 
 Findings from a fourth adversarial pass, this time over security controls that

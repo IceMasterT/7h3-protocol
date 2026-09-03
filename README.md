@@ -213,7 +213,7 @@ Every envelope carries `timestampMs`, `ttlMs`, and a random `nonce`. A receiver 
 | Unauthorized access | Per-route `allowedSenders` policy — unlisted senders rejected before upstream |
 | Response spoofing | Signed `x-7h3-response` header; `correlationId` binding |
 | Rate abuse | `SlidingWindowRateLimiter` keyed by verified sender identity, not IP |
-| Audit tampering | `InMemoryAuditLog` entries are Ed25519-signed and chained |
+| Audit tampering | `InMemoryAuditLog` entries are Ed25519-signed and hash-chained; `verifyAuditChain` detects deletion, modification and reordering |
 | Quantum computers | ML-DSA-65/87 via `@7h3/protocol-pq` (NIST FIPS 204) |
 | Cross-instance replay | `RedisReplayStore` — atomic SET NX PX across all instances |
 | Eavesdropping | X25519 + ChaCha20-Poly1305 E2E encryption |

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { createAuditLog, NoopAuditLog, type AuditEntry } from './auditLog'
+import {
+  createAuditLog,
+  NoopAuditLog,
+  verifyAuditChain,
+  AUDIT_GENESIS_HASH,
+  type AuditEntry,
+} from './auditLog'
 import { generateEd25519KeypairBase64Url } from './protocol'
 
 let keys: { publicKey: string; privateKey: string }
@@ -138,8 +144,59 @@ describe('NoopAuditLog', () => {
       id: 'x',
       timestampMs: Date.now(),
       type: 'verify-ok' as const,
+      prevHash: '0'.repeat(64),
       entrySignature: 'fake',
     }
     expect(await log.verify(fakeEntry, 'key')).toBe(false)
+  })
+})
+
+describe('audit chain — deletion must be detectable', () => {
+  async function seeded() {
+    const kp = await generateEd25519KeypairBase64Url()
+    const log = createAuditLog(kp.privateKey)
+    for (const sender of ['a@x', 'b@x', 'ATTACKER@x', 'c@x']) {
+      await log.log({ type: 'verify-ok', sender, path: '/api' })
+    }
+    return { kp, log, entries: await log.query() }
+  }
+
+  it('verifies an intact chain', async () => {
+    const { kp, entries } = await seeded()
+    expect(await verifyAuditChain(entries, kp.publicKey)).toMatchObject({ ok: true, brokenAt: null })
+  })
+
+  it('chains the first entry to the genesis hash', async () => {
+    const { entries } = await seeded()
+    expect(entries[0].prevHash).toBe(AUDIT_GENESIS_HASH)
+    expect(new Set(entries.map((e) => e.prevHash)).size).toBe(entries.length)
+  })
+
+  it('detects a deleted entry — the case independent signatures miss', async () => {
+    const { kp, entries } = await seeded()
+    const pruned = entries.filter((e) => e.sender !== 'ATTACKER@x')
+    // Every surviving entry still verifies on its own; only the chain notices.
+    const result = await verifyAuditChain(pruned, kp.publicKey)
+    expect(result.ok).toBe(false)
+    expect(result.brokenAt).toBe(2)
+  })
+
+  it('detects a modified entry', async () => {
+    const { kp, entries } = await seeded()
+    const tampered = entries.map((e, i) => (i === 1 ? { ...e, sender: 'innocent@x' } : e))
+    expect(await verifyAuditChain(tampered, kp.publicKey)).toMatchObject({ ok: false, brokenAt: 1 })
+  })
+
+  it('detects reordering', async () => {
+    const { kp, entries } = await seeded()
+    const swapped = [...entries]
+    ;[swapped[1], swapped[2]] = [swapped[2], swapped[1]]
+    expect((await verifyAuditChain(swapped, kp.publicKey)).ok).toBe(false)
+  })
+
+  it('rejects an entry forged under a different key', async () => {
+    const { entries } = await seeded()
+    const other = await generateEd25519KeypairBase64Url()
+    expect((await verifyAuditChain(entries, other.publicKey)).ok).toBe(false)
   })
 })
