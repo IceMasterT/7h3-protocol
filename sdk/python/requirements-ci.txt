@@ -2,4 +2,4 @@
 # The SDK itself declares no runtime dependencies (see pyproject.toml);
 # cryptography is needed only to run the Ed25519 conformance tests.
 # Pinned exactly so CI is reproducible — dependabot tracks and bumps it.
-cryptography==50.0.0
+cryptography==50.0.1
