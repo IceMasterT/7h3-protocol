@@ -1,0 +1,15 @@
+# Extend gitleaks' default ruleset; everything not allowlisted below is still scanned.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public test vectors that are published in standards documents, not secrets"
+regexes = [
+  # RFC 9421 Appendix B.1.4 "test-key-ed25519" private key (PKCS#8, base64url).
+  # Published in the RFC and reused by the Web Bot Auth draft; the test suite uses it
+  # to reproduce the RFC's own signatures byte for byte.
+  '''MC4CAQAwBQYDK2VwBCIEIJ-DYvh6SEqVTm50DFtMDoQikTmiCqirVv9mWG9qfSnF''',
+  # The test constants that hold it. The generic-api-key rule can capture the
+  # identifier (`privateKey: RFC_ED25519_PRIVATE`) instead of the value.
+  '''^RFC_(ED25519_)?PRIVATE$''',
+]

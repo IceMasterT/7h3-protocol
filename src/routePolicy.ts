@@ -1,4 +1,11 @@
-export type PolicyRequirement = 'ed25519' | 'hmac' | 'any' | 'none'
+/**
+ * How a route authenticates its caller.
+ *   - `'ed25519'` / `'hmac'` / `'any'`: a signed 7h3 envelope (or capability token).
+ *   - `'http-signature'`: an RFC 9421 HTTP Message Signature (e.g. Web Bot Auth);
+ *     needs `GatewayConfig.httpSignature`.
+ *   - `'none'`: no authentication.
+ */
+export type PolicyRequirement = 'ed25519' | 'hmac' | 'any' | 'http-signature' | 'none'
 
 /**
  * Step-up approval requirement for a route.

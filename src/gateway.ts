@@ -9,6 +9,7 @@ import { CAP_HEADER, parseCapabilityChain, verifyCapabilityChain, tokenMatchesSc
 import { APPROVAL_HEADER, parseApproval, verifyApproval, type ApproverKeyLookup } from './approval'
 import { PROVENANCE_HEADER, effectiveTrust, parseProvenance, verifyProvenance, type TrustLevel } from './provenance'
 import { bindAction } from './actionBinding'
+import { verifyMessage, type HttpMessage, type SignatureParams, type VerificationKey } from './httpMessageSignatures'
 import { MemoryReplayStore } from './replayStores'
 
 export type { KeyRegistry, RoutePolicy }
@@ -47,6 +48,42 @@ export interface GatewayConfig {
    * instances, so give a multi-instance gateway a shared one.
    */
   approvalReplayStore?: ReplayStore
+  /** Required when any policy uses `require: 'http-signature'`. */
+  httpSignature?: HttpSignatureGatewayConfig
+}
+
+/** Configuration for routes with `require: 'http-signature'` (RFC 9421, e.g. Web Bot Auth). */
+export interface HttpSignatureGatewayConfig {
+  /**
+   * Map a signature's `keyid` to verification material AND the identity it stands
+   * for. The identity becomes the request's authenticated sender, so it is what
+   * `allowedSenders`, rate limits and approvals key on. Return `null` to refuse.
+   */
+  resolveKey: (
+    keyId: string | undefined,
+    params: SignatureParams,
+  ) => Promise<{ key: VerificationKey; sender: string } | null> | { key: VerificationKey; sender: string } | null
+  /** Only signatures carrying this `tag` are considered (recommended; e.g. `web-bot-auth`). */
+  tag?: string
+  /** Components every signature must cover. Default `@method`, `@authority`, `@path` (plus `@query` when the request has a query string). */
+  requiredComponents?: string[]
+  /** Maximum signature age in ms (default 5 minutes). */
+  maxAgeMs?: number
+  /** Refuse signatures that carry no `expires`. */
+  requireExpires?: boolean
+  /**
+   * Require `content-digest` to be covered (and to match) whenever a request has a
+   * body. Default true: a signature that ignores the body authenticates the
+   * envelope of a request, not what it does.
+   */
+  requireBodyBinding?: boolean
+  /** Scheme the client used to reach this gateway (default `https`). */
+  scheme?: 'http' | 'https'
+  /** Take the authority from `x-forwarded-host` instead of `host`. Only behind a proxy you control. */
+  trustForwardedHost?: boolean
+  /** Single-use nonce store. Defaults to `replayStore`, then in-memory. */
+  nonceStore?: ReplayStore
+  label?: string
 }
 
 export interface GatewayRequest {
@@ -141,11 +178,17 @@ class Protocol7h3Gateway {
   private config: GatewayConfig
   private rateLimiter: SlidingWindowRateLimiter
   private approvalStore: ReplayStore
+  private httpSigNonceStore: ReplayStore
 
   constructor(config: GatewayConfig) {
     this.config = config
     this.rateLimiter = new SlidingWindowRateLimiter()
     this.approvalStore = config.approvalReplayStore ?? config.replayStore ?? new MemoryReplayStore()
+    this.httpSigNonceStore = config.httpSignature?.nonceStore ?? config.replayStore ?? new MemoryReplayStore()
+
+    if ((config.policies ?? []).some((p) => p.require === 'http-signature') && !config.httpSignature) {
+      throw new Error("createGateway(): a policy uses require:'http-signature' but no httpSignature config is provided")
+    }
 
     // An approval policy that cannot be enforced must fail at construction, not
     // quietly allow the route through (or deny it forever) at request time.
@@ -274,6 +317,64 @@ class Protocol7h3Gateway {
     return { approvedBy: result.grant.approver, trust }
   }
 
+  /**
+   * RFC 9421 authentication for `require: 'http-signature'` routes. The signed
+   * target URI is rebuilt from the Host header and the path exactly as received,
+   * so the verifier and the signer derive the same signature base.
+   */
+  private async verifyHttpSignature(
+    policy: RoutePolicy,
+    req: GatewayRequest,
+    normalizedPath: string,
+    startMs: number,
+  ): Promise<GatewayVerifyOutcome> {
+    const cfg = this.config.httpSignature!
+    const fail = (reason: string): GatewayVerifyOutcome => {
+      globalMetrics.verifications_total.increment({ result: 'fail', alg: 'none', transport: 'http' })
+      globalMetrics.verification_duration_ms.observe(performance.now() - startMs)
+      return { ok: false, status: 401, reason: `http-signature:${reason}` }
+    }
+
+    const authority = getHeader(req.headers, cfg.trustForwardedHost ? 'x-forwarded-host' : 'host')
+    if (!authority) return fail('missing-host')
+    const message: HttpMessage = { method: req.method, url: `${cfg.scheme ?? 'https'}://${authority}${req.path}`, headers: req.headers }
+
+    let resolved: { key: VerificationKey; sender: string } | null = null
+    let result
+    try {
+      result = await verifyMessage(message, {
+        label: cfg.label,
+        tag: cfg.tag,
+        // The query string is user-controlled input too: when there is one, it must be signed.
+        requiredComponents: cfg.requiredComponents ?? ['@method', '@authority', '@path', ...(req.path.includes('?') ? ['@query'] : [])],
+        maxAgeMs: cfg.maxAgeMs,
+        requireExpires: cfg.requireExpires,
+        body: req.body,
+        requireBodyBinding: cfg.requireBodyBinding ?? true,
+        nonceStore: this.httpSigNonceStore,
+        resolveKey: async (keyId, params) => {
+          resolved = await cfg.resolveKey(keyId, params)
+          return resolved?.key ?? null
+        },
+      })
+    } catch {
+      // A derived component the message cannot satisfy, an invalid URL, etc. Never a 500.
+      return fail('unverifiable')
+    }
+    if (!result.ok) return fail(result.reason)
+    const { key, sender } = resolved as unknown as { key: VerificationKey; sender: string }
+    const alg = key.alg === 'ed25519' ? 'ED25519' : 'HS256'
+
+    const denied = await this.checkSenderAndRateLimit(policy, sender, alg, req, startMs)
+    if (denied) return denied
+    const gate = await this.enforceApproval(policy, sender, req, normalizedPath, alg, startMs)
+    if ('denied' in gate) return gate.denied
+
+    globalMetrics.verifications_total.increment({ result: 'ok', alg, transport: 'http' })
+    globalMetrics.verification_duration_ms.observe(performance.now() - startMs)
+    return { ok: true, sender, ...gate }
+  }
+
   async verify(req: GatewayRequest): Promise<GatewayVerifyOutcome> {
     const startMs = performance.now()
     const normalizedPath = normalizeGatewayPath(req.path)
@@ -327,6 +428,11 @@ class Protocol7h3Gateway {
           return { ok: false, status: 401, reason: 'invalid-capability-chain' }
         }
       }
+    }
+
+    // RFC 9421 routes authenticate with the HTTP signature only
+    if (policy?.require === 'http-signature') {
+      return this.verifyHttpSignature(policy, req, normalizedPath, startMs)
     }
 
     // deny if no policy and defaultPolicy is 'deny'
