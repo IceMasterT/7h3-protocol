@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./docs/assets/banner-github.png" alt="7h3 Protocol — Sign every message. Trust every agent. Cryptographic identity, replay protection and E2E encryption for AI agents, now including signed WebMCP tools in the browser." width="100%">
+  <img src="./docs/assets/banner-github.png" alt="7h3 Protocol — Sign every message. Trust every agent. Cryptographic identity, replay protection and E2E encryption for AI agents." width="100%">
 
   <br/><br/>
 
@@ -17,61 +17,15 @@
 
   <br/>
 
-  **Cryptographic signing, replay protection, and E2E encryption for AI agent messages.**
-  **One envelope. Every transport. Quantum-ready.**
+  Cryptographic signing, replay protection, and E2E encryption for AI agent messages.
 
   <br/>
 </div>
 
 ---
 
-## 🆕 WebMCP — signed tools for browser agents
-
-**[`@7h3/protocol-webmcp`](./sdk/webmcp)** brings this protocol to
-[WebMCP](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`):
-capability-scoped, replay-protected, cryptographically receipted tool calls.
-
-> **Live demos → [7h3-webmcp-ledger.tech-b1a.workers.dev](https://7h3-webmcp-ledger.tech-b1a.workers.dev)**
-> — [how to test it in ChatGPT or Chrome](./docs/TESTING.md)
->
-> **All four routes register tools on `document.modelContext` — 19 in total** —
-> so an agent has real work to do wherever it lands. Drive them from the ChatGPT
-> desktop browser's **site tools** or Chrome 149+; each page also has in-page
-> controls hitting the identical guarded wrapper, so nobody is ever blocked:
->
-> | Route | Tools | |
-> |---|---|---|
-> | [`/`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/) | **3** | The hub itself is a WebMCP surface, so an agent can discover and navigate the site unaided. |
-> | [`/ledger`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/ledger) | **10** | The full console. Grant an agent `pay ≤ $50 for 10 minutes`, then watch it get refused — cryptographically — when it exceeds that. |
-> | [`/compare`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/compare) | **4** | One compromised agent, four hostile actions, run against two identical copies of the books — one guarded, one not. **4 of 4 succeed unguarded; 0 of 4 guarded.** |
-> | [`/verify`](https://7h3-webmcp-ledger.tech-b1a.workers.dev/verify) | **2** | The real signed grant, receipt chain and manifest. Edit any of them by hand and watch verification fail at the byte you changed. |
-
-Chrome's [agent security guidance](https://developer.chrome.com/docs/agents/security)
-is entirely probabilistic (classifiers, spotlighting, critic LLMs) and silent on
-authorization. OpenAI's site-tools docs state that *"a tool's name or claim that
-it only reads data isn't proof of what it does"*, then tell sites to use their
-**existing** authorization — which, for delegated agent action, no site has.
-
-This is that missing layer, and it is deterministic. **A refusal is a failed
-signature or an uncovered scope, not a judgement call.**
-
-| | |
-|---|---|
-| **Signed tool manifests** | The origin signs its tool surface at deploy time and serves it at `/.well-known/7h3-webmcp-manifest.json`. Injected lookalike tools and silently reworded descriptions become detectable. |
-| **Capability-scoped execution** | Scoped, expiring, revocable grants. Held page-side, so the token never passes through the agent. Spend ceilings are bound *inside* the signed token. |
-| **Hash-chained receipts** | Every call recorded — allowed and refused. Deleting or reordering history breaks verification. |
-
-Adoption is an import, a constructor, and one field per tool. Start with the
-**[WebMCP install guide](./docs/install/webmcp.md)** (or the
-**[ChatGPT guide](./docs/install/chatgpt.md)** for site tools in the built-in
-browser); [`sdk/webmcp/README.md`](./sdk/webmcp/README.md) has the full API and
-the threat model, including what this explicitly does **not** protect against.
-
----
-
 ## Table of Contents
 
-- [WebMCP — signed tools for browser agents](#-webmcp--signed-tools-for-browser-agents)
 - [The Problem](#the-problem)
 - [What 7h3 Protocol Does](#what-7h3-protocol-does)
 - [How It Works](#how-it-works)
@@ -92,6 +46,7 @@ the threat model, including what this explicitly does **not** protect against.
 - [Observability (Prometheus + OpenTelemetry)](#observability-prometheus--opentelemetry)
 - [Post-Quantum Signatures (ML-DSA)](#post-quantum-signatures-ml-dsa)
 - [Threshold Signatures (M-of-N BLS)](#threshold-signatures-m-of-n-bls)
+- [WebMCP](#webmcp)
 - [Audit Log](#audit-log)
 - [Rate Limiting](#rate-limiting)
 - [Route Policies](#route-policies)
@@ -136,6 +91,7 @@ The gap these protocols share is identical: they authenticate *agents* at the co
 | Post-quantum | ML-DSA-65 / ML-DSA-87 (NIST FIPS 204) — `@7h3/protocol-pq` |
 | Binary encoding | Deterministic CBOR (RFC 8949) — ~40% smaller than JSON |
 | Threshold signing | M-of-N BLS12-381 aggregation — `@7h3/protocol-threshold` |
+| WebMCP tool authorization | Signed tool manifests, capability-scoped grants, hash-chained receipts — `@7h3/protocol-webmcp` |
 | Transport coverage | HTTP, WebSocket, gRPC, Queues, Webhooks |
 | SDK coverage | TypeScript, Python, Rust, Go, Browser |
 
@@ -1468,6 +1424,29 @@ const shares    = splitPrivateKey(masterKey, 3, 5)   // split into 5 shares, nee
 const recovered = reconstructPrivateKey([shares[0], shares[2], shares[4]], 3)
 // recovered === masterKey
 ```
+
+---
+
+## WebMCP
+
+`@7h3/protocol-webmcp` ([`sdk/webmcp`](./sdk/webmcp)) applies the protocol to
+[WebMCP](https://webmachinelearning.github.io/webmcp/) tools registered on
+`document.modelContext`. Tool calls are capability-scoped, replay-protected, and
+recorded with cryptographic receipts. Verification is deterministic: a refusal is
+a failed signature or an uncovered scope.
+
+| Feature | Mechanism |
+|---|---|
+| Signed tool manifests | The origin signs its tool surface at deploy time and serves it at `/.well-known/7h3-webmcp-manifest.json`; injected or reworded tools fail verification |
+| Capability-scoped execution | Scoped, expiring, revocable grants held page-side; spend ceilings are bound inside the signed token |
+| Hash-chained receipts | Every call is recorded, allowed or refused; deleting or reordering history breaks verification |
+
+Integration is an import, a constructor, and one field per tool. See the
+[WebMCP install guide](./docs/install/webmcp.md), the
+[ChatGPT guide](./docs/install/chatgpt.md), and
+[`sdk/webmcp/README.md`](./sdk/webmcp/README.md) for the API and threat model,
+including what it does not protect against. A reference application is in
+[`demo/`](./demo); see [`docs/TESTING.md`](./docs/TESTING.md).
 
 ---
 
