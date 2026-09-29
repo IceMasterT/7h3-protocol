@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@noble/post-quantum": "^0.6.1"
+    "@noble/post-quantum": "^0.7.1"
   },
   "peerDependencies": {
     "@7h3/protocol": ">=0.5.0 <1.0.0"
