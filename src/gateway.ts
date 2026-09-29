@@ -9,6 +9,14 @@ import { CAP_HEADER, parseCapabilityChain, verifyCapabilityChain, tokenMatchesSc
 import { APPROVAL_HEADER, parseApproval, verifyApproval, type ApproverKeyLookup } from './approval'
 import { PROVENANCE_HEADER, effectiveTrust, parseProvenance, verifyProvenance, type TrustLevel } from './provenance'
 import { bindAction } from './actionBinding'
+import {
+  DPOP_HEADER,
+  DPOP_NONCE_HEADER,
+  parseDpopAuthorization,
+  verifyDpopProof,
+  type DpopAlg,
+  type DpopNonceIssuer,
+} from './dpop'
 import { verifyMessage, type HttpMessage, type SignatureParams, type VerificationKey } from './httpMessageSignatures'
 import { MemoryReplayStore } from './replayStores'
 
@@ -50,6 +58,29 @@ export interface GatewayConfig {
   approvalReplayStore?: ReplayStore
   /** Required when any policy uses `require: 'http-signature'`. */
   httpSignature?: HttpSignatureGatewayConfig
+  /** Required when any policy uses `require: 'dpop'`. */
+  dpop?: DpopGatewayConfig
+}
+
+/** Configuration for routes with `require: 'dpop'` (RFC 9449). */
+export interface DpopGatewayConfig {
+  /**
+   * Resolve an access token to the identity it was issued to and the key it is bound
+   * to (`cnf.jkt`). Return `null` for an unknown, expired or unbound token: a token
+   * with no key binding must not be accepted on a DPoP route.
+   */
+  resolveToken: (token: string) => Promise<{ sender: string; jkt: string } | null> | { sender: string; jkt: string } | null
+  /** Issue and require server nonces. Recommended: bounds how long a pre-minted proof stays usable. */
+  nonce?: { issuer: DpopNonceIssuer; required?: boolean }
+  /** Maximum proof age in ms (default 60 s). */
+  maxAgeMs?: number
+  allowedAlgs?: readonly DpopAlg[]
+  /** Scheme the client used to reach this gateway (default `https`). */
+  scheme?: 'http' | 'https'
+  /** Take the authority from `x-forwarded-host` instead of `host`. Only behind a proxy you control. */
+  trustForwardedHost?: boolean
+  /** Single-use `jti` store. Defaults to `replayStore`, then in-memory. */
+  replayStore?: ReplayStore
 }
 
 /** Configuration for routes with `require: 'http-signature'` (RFC 9421, e.g. Web Bot Auth). */
@@ -102,7 +133,7 @@ export interface GatewayResponse {
 
 export type GatewayVerifyOutcome =
   | { ok: true; sender: string; envelopeId?: string; approvedBy?: string; trust?: TrustLevel }
-  | { ok: false; status: 400 | 401 | 403 | 429; reason: string; detail?: Record<string, unknown> }
+  | { ok: false; status: 400 | 401 | 403 | 429; reason: string; detail?: Record<string, unknown>; headers?: Record<string, string> }
 
 /** Case-insensitive single-value header lookup (Node lower-cases; other runtimes may not). */
 function getHeader(headers: Record<string, string | string[]>, name: string): string | undefined {
@@ -124,6 +155,7 @@ const GATEWAY_OWNED_HEADERS = new Set([
   'x-7h3-approved-by',
   'x-7h3-trust',
   APPROVAL_HEADER, // single-use secret between approver and gateway; upstream has no need of it
+  DPOP_HEADER, // single-use proof; the upstream authenticates the gateway, not the client's key
 ])
 
 /**
@@ -179,6 +211,7 @@ class Protocol7h3Gateway {
   private rateLimiter: SlidingWindowRateLimiter
   private approvalStore: ReplayStore
   private httpSigNonceStore: ReplayStore
+  private dpopStore: ReplayStore
 
   constructor(config: GatewayConfig) {
     this.config = config
@@ -186,6 +219,10 @@ class Protocol7h3Gateway {
     this.approvalStore = config.approvalReplayStore ?? config.replayStore ?? new MemoryReplayStore()
     this.httpSigNonceStore = config.httpSignature?.nonceStore ?? config.replayStore ?? new MemoryReplayStore()
 
+    this.dpopStore = config.dpop?.replayStore ?? config.replayStore ?? new MemoryReplayStore()
+    if ((config.policies ?? []).some((p) => p.require === 'dpop') && !config.dpop) {
+      throw new Error("createGateway(): a policy uses require:'dpop' but no dpop config is provided")
+    }
     if ((config.policies ?? []).some((p) => p.require === 'http-signature') && !config.httpSignature) {
       throw new Error("createGateway(): a policy uses require:'http-signature' but no httpSignature config is provided")
     }
@@ -375,6 +412,64 @@ class Protocol7h3Gateway {
     return { ok: true, sender, ...gate }
   }
 
+  /**
+   * RFC 9449 authentication for `require: 'dpop'` routes: `Authorization: DPoP <token>`
+   * plus one `DPoP` proof. The token identifies the caller and names the key it is
+   * bound to; the proof shows the caller holds that key, for this method and URL.
+   */
+  private async verifyDpop(policy: RoutePolicy, req: GatewayRequest, normalizedPath: string, startMs: number): Promise<GatewayVerifyOutcome> {
+    const cfg = this.config.dpop!
+    const fail = async (reason: string, extra: { challengeNonce?: boolean } = {}): Promise<GatewayVerifyOutcome> => {
+      globalMetrics.verifications_total.increment({ result: 'fail', alg: 'none', transport: 'http' })
+      globalMetrics.verification_duration_ms.observe(performance.now() - startMs)
+      const headers: Record<string, string> = { 'www-authenticate': `DPoP error="${extra.challengeNonce ? 'use_dpop_nonce' : 'invalid_dpop_proof'}"` }
+      if (extra.challengeNonce && cfg.nonce) headers[DPOP_NONCE_HEADER] = await cfg.nonce.issuer.issue()
+      return { ok: false, status: 401, reason: `dpop:${reason}`, headers }
+    }
+
+    const token = parseDpopAuthorization(getHeader(req.headers, 'authorization'))
+    if (token === null) return fail('missing-token')
+
+    const bound = await cfg.resolveToken(token)
+    if (!bound || !bound.jkt) return fail('invalid-token')
+
+    const authority = getHeader(req.headers, cfg.trustForwardedHost ? 'x-forwarded-host' : 'host')
+    if (!authority) return fail('missing-host')
+    const pathOnly = req.path.split(/[?#]/, 1)[0]
+
+    const proofs: string[] = []
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (k.toLowerCase() === DPOP_HEADER && v !== undefined) proofs.push(...(Array.isArray(v) ? v : [v]))
+    }
+
+    let result
+    try {
+      result = await verifyDpopProof(proofs, {
+        method: req.method,
+        url: `${cfg.scheme ?? 'https'}://${authority}${pathOnly}`,
+        accessToken: token,
+        expectedJkt: bound.jkt,
+        allowedAlgs: cfg.allowedAlgs,
+        maxAgeMs: cfg.maxAgeMs,
+        replayStore: this.dpopStore,
+        nonce: cfg.nonce ? { required: cfg.nonce.required ?? true, validate: (n) => cfg.nonce!.issuer.validate(n) } : undefined,
+      })
+    } catch {
+      return fail('unverifiable')
+    }
+    if (!result.ok) return fail(result.reason, { challengeNonce: result.reason === 'nonce-required' || result.reason === 'nonce-mismatch' })
+
+    const alg = result.jwk.kty === 'EC' ? 'ES256' : 'ED25519'
+    const denied = await this.checkSenderAndRateLimit(policy, bound.sender, alg, req, startMs)
+    if (denied) return denied
+    const gate = await this.enforceApproval(policy, bound.sender, req, normalizedPath, alg, startMs)
+    if ('denied' in gate) return gate.denied
+
+    globalMetrics.verifications_total.increment({ result: 'ok', alg, transport: 'http' })
+    globalMetrics.verification_duration_ms.observe(performance.now() - startMs)
+    return { ok: true, sender: bound.sender, ...gate }
+  }
+
   async verify(req: GatewayRequest): Promise<GatewayVerifyOutcome> {
     const startMs = performance.now()
     const normalizedPath = normalizeGatewayPath(req.path)
@@ -428,6 +523,10 @@ class Protocol7h3Gateway {
           return { ok: false, status: 401, reason: 'invalid-capability-chain' }
         }
       }
+    }
+
+    if (policy?.require === 'dpop') {
+      return this.verifyDpop(policy, req, normalizedPath, startMs)
     }
 
     // RFC 9421 routes authenticate with the HTTP signature only
@@ -505,7 +604,7 @@ class Protocol7h3Gateway {
     if (!outcome.ok) {
       return {
         status: outcome.status,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...outcome.headers },
         body: JSON.stringify({ error: outcome.reason, ...(outcome.detail ? { detail: outcome.detail } : {}) }),
       }
     }

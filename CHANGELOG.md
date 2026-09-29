@@ -25,6 +25,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Web Bot Auth** (`webBotAuth.ts`): JWK thumbprint key ids, `Signature-Agent`,
   guarded key-directory fetching. The verifier never fetches an agent URL itself.
 - Gateway `require: 'http-signature'` routes (`GatewayConfig.httpSignature`).
+- **DPoP (RFC 9449)** (`dpop.ts`): ES256 and Ed25519 proof creation and full
+  RFC 9449 §4.3 verification (token `ath` + `cnf.jkt` key binding, single-use `jti`,
+  `htm`/`htu`, freshness, private-key-in-jwk refusal), stateless server nonces, and
+  gateway `require: 'dpop'` routes. Verifies the RFC's own example proof.
 - `MemoryReplayStore`: single-process `ReplayStore` that fails closed at capacity.
 
 - **The landing hub is now a WebMCP surface.** Splitting the single-page demo
