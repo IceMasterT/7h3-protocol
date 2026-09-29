@@ -1,11 +1,27 @@
 export type PolicyRequirement = 'ed25519' | 'hmac' | 'any' | 'none'
 
+/**
+ * Step-up approval requirement for a route.
+ *
+ *   - `'always'`    every request needs a valid approval grant.
+ *   - `'untrusted'` a grant is needed only when the request's provenance claim is
+ *                   missing, invalid, or labels its inputs untrusted. A request
+ *                   whose signed claim says everything came from trusted sources
+ *                   passes without a human in the loop.
+ */
+export interface ApprovalPolicy {
+  require: 'always' | 'untrusted'
+  /** Identities allowed to approve on this route. Must be non-empty. */
+  approvers: string[]
+}
+
 export interface RoutePolicy {
   path: string
   require: PolicyRequirement
   rateLimit?: { requests: number; windowMs: number }
   allowedSenders?: string[]
   signResponse?: boolean
+  approval?: ApprovalPolicy
 }
 
 /**

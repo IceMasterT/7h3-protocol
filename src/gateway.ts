@@ -6,6 +6,10 @@ import { signResponse } from './signedResponse'
 import { metrics as globalMetrics } from './telemetry'
 import type { ReplayStore } from './replayStores'
 import { CAP_HEADER, parseCapabilityChain, verifyCapabilityChain, tokenMatchesScope } from './capability'
+import { APPROVAL_HEADER, parseApproval, verifyApproval, type ApproverKeyLookup } from './approval'
+import { PROVENANCE_HEADER, effectiveTrust, parseProvenance, verifyProvenance, type TrustLevel } from './provenance'
+import { bindAction } from './actionBinding'
+import { MemoryReplayStore } from './replayStores'
 
 export type { KeyRegistry, RoutePolicy }
 
@@ -31,6 +35,18 @@ export interface GatewayConfig {
   rateLimitStore?: RateLimitStore
   /** Optional capability token registry for capability-based auth. */
   capabilityRegistry?: { getPublicKey(id: string): Promise<string | null> }
+  /**
+   * Public keys of approvers. Required when any policy sets `approval`. Kept
+   * separate from `keyRegistry` on purpose: being a registered agent must never
+   * imply being allowed to approve.
+   */
+  approverRegistry?: ApproverKeyLookup
+  /**
+   * Where consumed approval grants are recorded. Defaults to `replayStore`, then
+   * to a per-instance in-memory store — which does not survive restarts or span
+   * instances, so give a multi-instance gateway a shared one.
+   */
+  approvalReplayStore?: ReplayStore
 }
 
 export interface GatewayRequest {
@@ -48,8 +64,30 @@ export interface GatewayResponse {
 }
 
 export type GatewayVerifyOutcome =
-  | { ok: true; sender: string; envelopeId?: string }
-  | { ok: false; status: 400 | 401 | 403 | 429; reason: string }
+  | { ok: true; sender: string; envelopeId?: string; approvedBy?: string; trust?: TrustLevel }
+  | { ok: false; status: 400 | 401 | 403 | 429; reason: string; detail?: Record<string, unknown> }
+
+/** Case-insensitive single-value header lookup (Node lower-cases; other runtimes may not). */
+function getHeader(headers: Record<string, string | string[]>, name: string): string | undefined {
+  const lower = name.toLowerCase()
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === lower) return Array.isArray(v) ? v[0] : v
+  }
+  return undefined
+}
+
+/**
+ * Headers the gateway alone may set. Anything a client sends under these names is
+ * dropped before forwarding: an upstream that trusts `x-7h3-verified` or
+ * `x-7h3-approved-by` must never be able to be told so by the caller.
+ */
+const GATEWAY_OWNED_HEADERS = new Set([
+  'x-7h3-sender',
+  'x-7h3-verified',
+  'x-7h3-approved-by',
+  'x-7h3-trust',
+  APPROVAL_HEADER, // single-use secret between approver and gateway; upstream has no need of it
+])
 
 /**
  * Normalize a request path before it's used for both policy matching and
@@ -102,10 +140,30 @@ export function normalizeGatewayPath(rawPath: string): string | null {
 class Protocol7h3Gateway {
   private config: GatewayConfig
   private rateLimiter: SlidingWindowRateLimiter
+  private approvalStore: ReplayStore
 
   constructor(config: GatewayConfig) {
     this.config = config
     this.rateLimiter = new SlidingWindowRateLimiter()
+    this.approvalStore = config.approvalReplayStore ?? config.replayStore ?? new MemoryReplayStore()
+
+    // An approval policy that cannot be enforced must fail at construction, not
+    // quietly allow the route through (or deny it forever) at request time.
+    for (const p of config.policies ?? []) {
+      if (!p.approval) continue
+      if (p.require === 'none') {
+        throw new Error(`createGateway(): policy '${p.path}' sets approval but require:'none' authenticates nobody to approve for`)
+      }
+      if (!config.approverRegistry) {
+        throw new Error(`createGateway(): policy '${p.path}' sets approval but no approverRegistry is configured`)
+      }
+      if (!Array.isArray(p.approval.approvers) || p.approval.approvers.length === 0) {
+        throw new Error(`createGateway(): policy '${p.path}' approval.approvers must be a non-empty list`)
+      }
+      if (p.approval.require !== 'always' && p.approval.require !== 'untrusted') {
+        throw new Error(`createGateway(): policy '${p.path}' approval.require must be 'always' or 'untrusted'`)
+      }
+    }
 
     // A gateway with at least one signature-requiring policy but no shared
     // replayStore verifies signatures/TTL but never dedupes nonce reuse, and
@@ -160,6 +218,62 @@ class Protocol7h3Gateway {
     return null
   }
 
+  /**
+   * Step-up approval gate. Runs only after the caller is authenticated, so
+   * `sender` is a verified identity, and only for policies that opt in.
+   * Returns a denial, or the approval facts to forward on success (`null` when
+   * the policy does not apply / no approval was needed).
+   */
+  private async enforceApproval(
+    policy: RoutePolicy | null,
+    sender: string,
+    req: GatewayRequest,
+    normalizedPath: string,
+    alg: string,
+    startMs: number,
+  ): Promise<{ denied: GatewayVerifyOutcome } | { approvedBy?: string; trust?: TrustLevel }> {
+    const rule = policy?.approval
+    if (!rule) return {}
+
+    const deny = (reason: string, detail?: Record<string, unknown>): { denied: GatewayVerifyOutcome } => {
+      globalMetrics.verifications_total.increment({ result: 'fail', alg, transport: 'http' })
+      globalMetrics.verification_duration_ms.observe(performance.now() - startMs)
+      globalMetrics.sender_denials_total.increment({ sender, path: req.path })
+      return { denied: { ok: false, status: 403, reason, ...(detail ? { detail } : {}) } }
+    }
+
+    const action = await bindAction({ method: req.method, path: normalizedPath, body: req.body })
+
+    let trust: TrustLevel = 'untrusted'
+    if (rule.require === 'untrusted') {
+      const rawProv = getHeader(req.headers, PROVENANCE_HEADER)
+      const provenance = await verifyProvenance(parseProvenance(rawProv), {
+        keyRegistry: this.config.keyRegistry,
+        sender,
+        action,
+      })
+      trust = effectiveTrust(provenance)
+      // Trusted inputs: no human needed.
+      if (trust === 'trusted') return { trust }
+    }
+
+    const grant = parseApproval(getHeader(req.headers, APPROVAL_HEADER))
+    if (grant === null) {
+      return deny('approval-required', { action, approvers: rule.approvers, trust })
+    }
+    const result = await verifyApproval(grant, {
+      approverKeys: this.config.approverRegistry!,
+      allowedApprovers: rule.approvers,
+      subject: sender,
+      action,
+      replayStore: this.approvalStore,
+    })
+    if (!result.ok) {
+      return deny(`approval-invalid:${result.reason}`, { action, approvers: rule.approvers, trust })
+    }
+    return { approvedBy: result.grant.approver, trust }
+  }
+
   async verify(req: GatewayRequest): Promise<GatewayVerifyOutcome> {
     const startMs = performance.now()
     const normalizedPath = normalizeGatewayPath(req.path)
@@ -195,10 +309,12 @@ class Protocol7h3Gateway {
             const capSender = result.token.subject
             const denied = await this.checkSenderAndRateLimit(policy, capSender, 'ED25519', req, startMs)
             if (denied) return denied
+            const gate = await this.enforceApproval(policy, capSender, req, normalizedPath, 'ED25519', startMs)
+            if ('denied' in gate) return gate.denied
             const durationMs = performance.now() - startMs
             globalMetrics.verifications_total.increment({ result: 'ok', alg: 'ED25519', transport: 'http' })
             globalMetrics.verification_duration_ms.observe(durationMs)
-            return { ok: true, sender: capSender }
+            return { ok: true, sender: capSender, ...gate }
           }
           const durationMs = performance.now() - startMs
           globalMetrics.verifications_total.increment({ result: 'fail', alg: 'none', transport: 'http' })
@@ -268,10 +384,13 @@ class Protocol7h3Gateway {
     const denied = await this.checkSenderAndRateLimit(policy, sender, alg, req, startMs)
     if (denied) return denied
 
+    const gate = await this.enforceApproval(policy, sender, req, normalizedPath, alg, startMs)
+    if ('denied' in gate) return gate.denied
+
     const durationMs = performance.now() - startMs
     globalMetrics.verifications_total.increment({ result: 'ok', alg, transport: 'http' })
     globalMetrics.verification_duration_ms.observe(durationMs)
-    return { ok: true, sender, envelopeId }
+    return { ok: true, sender, envelopeId, ...gate }
   }
 
   async handle(req: GatewayRequest): Promise<GatewayResponse> {
@@ -281,7 +400,7 @@ class Protocol7h3Gateway {
       return {
         status: outcome.status,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ error: outcome.reason }),
+        body: JSON.stringify({ error: outcome.reason, ...(outcome.detail ? { detail: outcome.detail } : {}) }),
       }
     }
 
@@ -295,6 +414,9 @@ class Protocol7h3Gateway {
     // Build forwarded headers, adding 7h3 metadata
     const forwardHeaders: Record<string, string> = {}
     for (const [k, v] of Object.entries(req.headers)) {
+      // Drop anything a client sent under a gateway-owned name (case-insensitively);
+      // the gateway re-adds only what it actually established below.
+      if (GATEWAY_OWNED_HEADERS.has(k.toLowerCase())) continue
       forwardHeaders[k] = Array.isArray(v) ? v[0] : v
     }
     // outcome.sender is only ever non-empty when a signature or capability
@@ -307,6 +429,8 @@ class Protocol7h3Gateway {
       forwardHeaders['x-7h3-sender'] = outcome.sender
       forwardHeaders['x-7h3-verified'] = 'true'
     }
+    if (outcome.approvedBy) forwardHeaders['x-7h3-approved-by'] = outcome.approvedBy
+    if (outcome.trust) forwardHeaders['x-7h3-trust'] = outcome.trust
 
     // Fetch upstream
     const fetchResponse = await fetch(upstreamUrl, {

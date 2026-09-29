@@ -213,3 +213,60 @@ function _createDistributedReplayStore(
     },
   }
 }
+
+// ---------------------------------------------------------------------------
+// MemoryReplayStore — single-process ReplayStore
+// ---------------------------------------------------------------------------
+
+export interface MemoryReplayStoreOptions {
+  /** Maximum live keys (default 10,000). */
+  maxEntries?: number
+  /** Clock override for tests. */
+  now?: () => number
+}
+
+/**
+ * In-process {@link ReplayStore}. Correct only when every request that must be
+ * deduplicated reaches the same process — use a shared store (Redis, KV, Durable
+ * Object) for anything replicated or restarted.
+ *
+ * It fails closed: when `maxEntries` live keys are held, an unseen key is
+ * reported as a replay instead of evicting an older entry. Evicting would let an
+ * attacker who can cause many insertions push a still-valid key out and reuse it;
+ * refusing costs availability, never safety.
+ */
+export class MemoryReplayStore implements ReplayStore {
+  private readonly entries = new Map<string, number>()
+  private readonly maxEntries: number
+  private readonly now: () => number
+
+  constructor(options: MemoryReplayStoreOptions = {}) {
+    const max = options.maxEntries ?? 10_000
+    if (!Number.isInteger(max) || max < 1) throw new Error('MemoryReplayStore: maxEntries must be a positive integer')
+    this.maxEntries = max
+    this.now = options.now ?? Date.now
+  }
+
+  private prune(now: number): void {
+    for (const [key, expiresAt] of this.entries) {
+      if (expiresAt <= now) this.entries.delete(key)
+    }
+  }
+
+  async check(key: string, ttlMs: number): Promise<boolean> {
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0) throw new Error('MemoryReplayStore: ttlMs must be positive')
+    const now = this.now()
+    const existing = this.entries.get(key)
+    if (existing !== undefined && existing > now) return true
+    if (this.entries.size >= this.maxEntries) this.prune(now)
+    if (this.entries.size >= this.maxEntries) return true // full of live keys: fail closed
+    this.entries.set(key, now + ttlMs)
+    return false
+  }
+
+  /** Live (unexpired) key count. */
+  get size(): number {
+    this.prune(this.now())
+    return this.entries.size
+  }
+}

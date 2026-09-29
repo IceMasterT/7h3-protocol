@@ -10,6 +10,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- **Step-up approval** (`approval.ts`): a named approver countersigns one action,
+  bound to the acting agent, method, normalized path and body hash; max 10 minute
+  lifetime; single use; no self-approval; a failed presentation does not consume
+  the grant. Routes opt in with `approval: { require, approvers }`.
+- **Provenance claims** (`provenance.ts`): signed `trusted`/`untrusted` labels for
+  an action's inputs, bound to that action, with a `ProvenanceContext` taint
+  accumulator for agent runtimes. Fails closed. Does not detect prompt injection;
+  see `docs/APPROVAL_AND_PROVENANCE.md`.
+- `MemoryReplayStore`: single-process `ReplayStore` that fails closed at capacity.
+
 - **The landing hub is now a WebMCP surface.** Splitting the single-page demo
   into a hub plus three demos left `/` registering no tools, so an agent opening
   the site's front door found an empty `document.modelContext`. The hub now
@@ -19,6 +29,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
   `open_demo` accepts only a path that is literally one of the three published
   demos; any other value throws rather than navigating.
+
+### Security
+
+- **Gateway no longer forwards caller-supplied `x-7h3-verified`, `x-7h3-sender`,
+  `x-7h3-approved-by`, `x-7h3-trust` or `x-7h3-approval`.** On a `require: 'none'`
+  route a client could send `x-7h3-verified: true` and have it reach the upstream
+  as if the gateway had verified the request.
 
 ### Changed
 
