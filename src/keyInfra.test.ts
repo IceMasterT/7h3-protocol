@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
+  createHttpKeyRegistry,
+  isFetchableKeyHost,
   parseWellKnownKeys,
   serveWellKnownKeys,
   KeyRotationManager,
@@ -365,5 +367,85 @@ describe('RevocationRegistry — sender vs keyId', () => {
     r.revoke('alice@a.test')
     expect(r.isEnvelopeRevoked({ header: { sender: 'alice@a.test' }, signature: { keyId: 'k9' } })).toBe(true)
     expect(r.isEnvelopeRevoked({ header: { sender: 'bob@a.test' }, signature: { keyId: 'k9' } })).toBe(false)
+  })
+})
+
+describe('HTTP key registry hardening (sender ids are attacker-controlled)', () => {
+  const doc = (keys: Array<{ id: string; publicKey: string }>) =>
+    JSON.stringify({ version: '7h3/0.1', updated: 1, keys: keys.map((k) => ({ ...k, algorithm: 'Ed25519', created: 1 })) })
+
+  const stubFetch = (body: string) => {
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => body })
+    vi.stubGlobal('fetch', f)
+    return f
+  }
+  afterEach(() => vi.unstubAllGlobals())
+
+  it.each([
+    ['example.com', true],
+    ['keys.example.co.uk', true],
+    ['a-b.example.com', true],
+    ['localhost', false],
+    ['foo.localhost', false],
+    ['printer.local', false],
+    ['metadata.internal', false],
+    ['router.lan', false],
+    ['nas.home.arpa', false],
+    ['127.0.0.1', false],
+    ['169.254.169.254', false],
+    ['10.0.0.1', false],
+    ['0x7f.0.0.1', false],
+    ['2130706433', false],
+    ['example.com:8080', false],
+    ['example.com/path', false],
+    ['user@example.com', false],
+    ['[::1]', false],
+    ['EXAMPLE.com', false],
+    ['exa mple.com', false],
+    ['-bad.example.com', false],
+    ['example', false],
+    ['', false],
+    ['a.' + 'b'.repeat(64) + '.com', false],
+  ])('isFetchableKeyHost(%s) = %s', (host, expected) => {
+    expect(isFetchableKeyHost(host)).toBe(expected)
+  })
+
+  it('never contacts a host that is not a plausible public DNS name', async () => {
+    const f = stubFetch(doc([]))
+    const reg = createHttpKeyRegistry()
+    for (const sender of ['agent@127.0.0.1', 'agent@localhost', 'agent@169.254.169.254', 'agent@evil.com:8080', 'agent@evil.com/x?y=1', 'agent@[::1]', 'agent@10.0.0.5']) {
+      expect(await reg.getPublicKey(sender)).toBeNull()
+    }
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('refuses redirects when fetching a key document', async () => {
+    const f = stubFetch(doc([{ id: 'agent', publicKey: 'PK' }]))
+    await createHttpKeyRegistry().getPublicKey('agent@example.com')
+    expect(f.mock.calls[0][1].redirect).toBe('error')
+    expect(f.mock.calls[0][0]).toBe('https://example.com/.well-known/7h3-keys')
+  })
+
+  it('only contacts allowedDomains when configured', async () => {
+    const f = stubFetch(doc([{ id: 'agent', publicKey: 'PK' }]))
+    const reg = createHttpKeyRegistry({ allowedDomains: ['Example.com'] })
+    expect(await reg.getPublicKey('agent@example.com')).toBe('PK')
+    expect(await reg.getPublicKey('agent@other.com')).toBeNull()
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects an oversized key document instead of parsing it', async () => {
+    stubFetch(doc([{ id: 'agent', publicKey: 'x'.repeat(300 * 1024) }]))
+    expect(await createHttpKeyRegistry().getPublicKey('agent@example.com')).toBeNull()
+  })
+
+  it('bounds its cache, since hosts come from unverified input', async () => {
+    const f = stubFetch(doc([{ id: 'agent', publicKey: 'PK' }]))
+    const reg = createHttpKeyRegistry({ maxCacheEntries: 2 })
+    for (const host of ['a.example.com', 'b.example.com', 'c.example.com']) await reg.getPublicKey(`agent@${host}`)
+    expect(f).toHaveBeenCalledTimes(3)
+    await reg.getPublicKey('agent@c.example.com') // still cached
+    await reg.getPublicKey('agent@a.example.com') // evicted: fetched again
+    expect(f).toHaveBeenCalledTimes(4)
   })
 })
