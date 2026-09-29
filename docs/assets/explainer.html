@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<title>7h3 Protocol explainer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #05070F; --ink: #F1F5FF; --dim: #93A3C4; --line: rgba(129,140,248,.35);
+    --ind: #818CF8; --grn: #34D399; --red: #F87171; --amb: #FBBF24;
+  }
+  body { width: 1080px; height: 1080px; overflow: hidden; background: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: relative; width: 1080px; height: 1080px; overflow: hidden;
+    background:
+      radial-gradient(900px 500px at 10% -10%, #1B2A6B 0%, transparent 62%),
+      radial-gradient(800px 460px at 100% 110%, #16326B 0%, transparent 60%),
+      linear-gradient(150deg, #0A1024 0%, #05070F 50%, #070B18 100%); }
+  .abs { position: absolute; }
+
+  #brand { left: 60px; top: 48px; font-size: 26px; font-weight: 800; letter-spacing: .2em; color: #EEF2FF; }
+  #brand b { color: #A5B4FC; }
+  #step { right: 60px; top: 46px; font-size: 22px; font-weight: 800; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+
+  .node { width: 220px; height: 170px; border-radius: 22px; border: 2px solid var(--line);
+    background: linear-gradient(165deg, rgba(129,140,248,.14), rgba(15,23,42,.6)); }
+  .node .t { position: absolute; left: 0; right: 0; top: 24px; text-align: center; font-size: 26px; font-weight: 800; }
+  .node .s { position: absolute; left: 0; right: 0; top: 68px; text-align: center; font-size: 20px; color: var(--dim); font-weight: 500; }
+  .bot { position: absolute; left: 70px; top: 104px; width: 80px; height: 44px; border-radius: 12px;
+    background: rgba(165,180,252,.25); border: 2px solid rgba(165,180,252,.7); }
+  .bot::before, .bot::after { content: ''; position: absolute; top: 13px; width: 12px; height: 12px; border-radius: 50%; background: #E0E7FF; }
+  .bot::before { left: 18px; } .bot::after { right: 18px; }
+  #attacker { border-color: rgba(248,113,113,.7); background: linear-gradient(165deg, rgba(248,113,113,.2), rgba(40,10,15,.6)); }
+  #attacker .bot { background: rgba(248,113,113,.25); border-color: rgba(248,113,113,.8); }
+  #attacker .bot::before, #attacker .bot::after { background: #FEE2E2; }
+
+  #pipe { left: 250px; top: 585px; width: 580px; height: 4px; border-radius: 2px;
+    background: repeating-linear-gradient(90deg, rgba(129,140,248,.5) 0 14px, transparent 14px 26px); }
+
+  #env { width: 240px; height: 150px; border-radius: 16px; background: #F8FAFF; color: #0B1020;
+    box-shadow: 0 14px 40px rgba(0,0,0,.55); }
+  #env .l1 { position: absolute; left: 22px; top: 18px; font-size: 20px; font-weight: 700; color: #5B6B93; letter-spacing: .06em; }
+  #env .l2 { position: absolute; left: 22px; top: 50px; font-size: 26px; font-weight: 800; }
+  #env .amt { position: absolute; left: 22px; top: 88px; font-size: 44px; font-weight: 900; letter-spacing: -.02em; }
+  .sealb { background:#10B981; width: 100px; height: 100px; border-radius: 50%; right: -18px; top: -26px; border: 4px solid #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 900; letter-spacing: .04em; color: #fff; }
+  .sealb .k { width: 26px; height: 20px; border-radius: 4px; background: #fff; margin-bottom: 6px; position: relative; }
+  .sealb .k::before { content: ''; position: absolute; left: 5px; top: -12px; width: 12px; height: 14px; border: 4px solid #fff; border-bottom: none; border-radius: 8px 8px 0 0; }
+  .envid { right: 14px; bottom: 10px; font-size: 16px; font-weight: 700; color: #7C8DB5; font-family: 'JetBrains Mono', monospace; }
+
+  .bubble { width: 330px; padding: 16px 20px; border-radius: 18px; font-size: 24px; font-weight: 700; line-height: 1.25; text-align: center; }
+  #bob-say { left: 700px; top: 385px; }
+  #ledger { left: 700px; top: 800px; width: 320px; padding: 12px 16px; border-radius: 14px; border: 2px dashed var(--line);
+    font-size: 20px; color: var(--dim); font-weight: 600; text-align: center; }
+
+  #cap { left: 60px; right: 60px; top: 850px; height: 150px; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 54px; line-height: 1.12; font-weight: 900; letter-spacing: -.02em; }
+  #cap span { color: var(--grn); } #cap i { color: var(--red); font-style: normal; }
+  #bar { left: 0; bottom: 0; height: 6px; background: linear-gradient(90deg, #6366F1, #6EE7A8); }
+
+  /* intro + outro */
+  #intro, #outro { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 80px; }
+  #intro h1 { font-size: 92px; line-height: 1.02; font-weight: 900; letter-spacing: -.035em; }
+  #intro h1 em { font-style: normal; background: linear-gradient(96deg,#A5B4FC,#818CF8 30%,#6EE7A8); -webkit-background-clip: text; color: transparent; }
+  #intro p { margin-top: 34px; font-size: 34px; color: var(--dim); font-weight: 500; line-height: 1.3; }
+  #outro h2 { font-size: 64px; font-weight: 900; letter-spacing: -.03em; margin-bottom: 44px; }
+  .chk { display: flex; align-items: center; gap: 26px; font-size: 52px; font-weight: 800; margin: 12px 0; width: 720px; text-align: left; }
+  .tick { width: 62px; height: 62px; border-radius: 50%; flex: none; background: rgba(52,211,153,.2); border: 3px solid var(--grn); position: relative; }
+  .tick::after { content: ''; position: absolute; left: 20px; top: 8px; width: 14px; height: 28px; border: solid var(--grn); border-width: 0 6px 6px 0; transform: rotate(42deg); }
+  #tag { margin-top: 48px; font-size: 30px; color: var(--dim); font-weight: 600; line-height: 1.4; }
+  #tag b { color: var(--ink); }
+  #url { margin-top: 18px; font-family: 'JetBrains Mono', monospace; font-size: 30px; color: #A5B4FC; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="intro" class="abs">
+    <h1>Can your AI agent<br><em>trust that message?</em></h1>
+    <p>A 30-second explanation.<br>No jargon.</p>
+  </div>
+
+  <div id="main">
+    <div id="brand" class="abs"><b>7h3</b> PROTOCOL</div>
+    <div id="step" class="abs"></div>
+
+    <div id="pipe" class="abs"></div>
+    <div id="alice" class="node abs" style="left:30px;top:500px"><div class="t">Alice's agent</div><div class="s">the sender</div><div class="bot"></div></div>
+    <div id="bob" class="node abs" style="left:830px;top:500px"><div class="t">Bob's agent</div><div class="s">the receiver</div><div class="bot"></div></div>
+    <div id="attacker" class="node abs" style="left:415px;top:200px"><div class="t">Attacker</div><div class="s">sits in the middle</div><div class="bot"></div></div>
+
+    <div id="env" class="abs">
+      <div class="l1">MESSAGE</div><div class="l2">Pay Sam</div><div class="amt" id="amt">$10</div>
+      <div class="abs envid">#482</div>
+      <div id="seal" class="abs sealb"><div class="k"></div><div id="sealtxt">SIGNED</div></div>
+    </div>
+
+    <div id="bob-say" class="bubble abs"></div>
+    <div id="ledger" class="abs">Bob keeps a list of<br>message IDs already used</div>
+    <div id="cap" class="abs"></div>
+  </div>
+
+  <div id="outro" class="abs">
+    <h2>Three checks on every message</h2>
+    <div class="chk"><div class="tick"></div>Is it really from Alice?</div>
+    <div class="chk"><div class="tick"></div>Was it changed?</div>
+    <div class="chk"><div class="tick"></div>Was it already used?</div>
+    <div id="tag"><b>7h3 Protocol</b> adds all three.<br>Open source. Zero dependencies.</div>
+    <div id="url">github.com/IceMasterT/7h3-protocol</div>
+  </div>
+
+  <div id="bar" class="abs"></div>
+</div>
+
+<script>
+const DURATION = 31
+const $ = id => document.getElementById(id)
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+const seg = (t, a, b) => clamp((t - a) / (b - a))
+const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+const lerp = (a, b, k) => a + (b - a) * k
+const mv = (t, a, b, from, to) => lerp(from, to, ease(seg(t, a, b)))
+const show = (el, v) => { el.style.opacity = v; el.style.visibility = v > 0.01 ? 'visible' : 'hidden' }
+
+// Envelope resting positions (left/top of the 240x150 card)
+const AL = { x: 262, y: 510 }, MID = { x: 420, y: 510 }, BOB = { x: 578, y: 510 }, UP = { x: 420, y: 350 }
+
+function caption(html) { if ($('cap').dataset.h !== html) { $('cap').innerHTML = '<div>' + html + '</div>'; $('cap').dataset.h = html } }
+function step(txt) { $('step').textContent = txt }
+
+function place(el, x, y, s = 1) { el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.transform = `scale(${s})` }
+
+function bubble(text, kind, a) {
+  const b = $('bob-say')
+  if (b.dataset.t !== text + kind) {
+    b.textContent = text; b.dataset.t = text + kind
+    b.style.background = kind === 'ok' ? 'rgba(52,211,153,.18)' : 'rgba(248,113,113,.18)'
+    b.style.border = '3px solid ' + (kind === 'ok' ? '#34D399' : '#F87171')
+    b.style.color = kind === 'ok' ? '#A7F3D0' : '#FECACA'
+  }
+  show(b, a)
+}
+
+function seal(state, k) { // 0 none, 1 signed, 2 broken
+  const s = $('seal')
+  show(s, state ? 1 : 0)
+  s.style.background = state === 2 ? '#EF4444' : '#10B981'
+  $('sealtxt').textContent = state === 2 ? 'BROKEN' : 'SIGNED'
+  const shake = state === 2 ? Math.sin(k * 60) * 6 * (1 - k) : 0
+  s.style.transform = `scale(${state === 1 ? lerp(2.4, 1, ease(clamp(k))) : 1}) translateX(${shake}px) rotate(${state === 2 ? shake : 0}deg)`
+}
+
+function amount(v, bad) { const a = $('amt'); a.textContent = v; a.style.color = bad ? '#DC2626' : '#0B1020' }
+
+let ghost
+function ghostEl() {
+  if (!ghost) { ghost = $('env').cloneNode(true); ghost.id = 'env'; ghost.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); $('main').appendChild(ghost) }
+  return ghost
+}
+
+function setT(t) {
+  const intro = t < 3, outro = t >= 24.5
+  show($('intro'), intro ? 1 - seg(t, 2.5, 3) : 0)
+  show($('main'), !intro && !outro ? 1 : outro ? 1 - seg(t, 24.5, 25.2) : seg(t, 2.8, 3.3))
+  show($('outro'), outro ? seg(t, 24.8, 25.6) : 0)
+  $('bar').style.width = (t / DURATION * 1080) + 'px'
+  const chks = document.querySelectorAll('.chk')
+  chks.forEach((c, i) => { const k = ease(seg(t, 25.8 + i * .7, 26.4 + i * .7)); c.style.opacity = k; c.style.transform = `translateX(${(1 - k) * 40}px)` })
+  $('tag').style.opacity = seg(t, 28.2, 28.9); $('url').style.opacity = seg(t, 28.6, 29.3)
+
+  const env = $('env'), g = ghostEl()
+  show(g, 0)
+  show($('ledger'), 0)
+  // attacker: visible during the problem/fix scenes, otherwise dim
+  $('attacker').style.opacity = t < 3 ? 0 : t < 5 ? seg(t, 4.5, 5.2) * .9 : .9
+  place($('attacker'), 415, 200 + Math.sin(t * 3) * 3)
+
+  if (t < 10) { // ---- scene 1: the problem
+    step('The problem')
+    const x = t < 4.6 ? AL.x : t < 6 ? mv(t, 4.6, 6, AL.x, MID.x) : t < 7 ? MID.x : mv(t, 7.8, 9, MID.x, BOB.x)
+    let y = AL.y
+    if (t >= 6 && t < 7.8) y = mv(t, 6, 6.5, MID.y, UP.y)
+    if (t >= 7.4 && t < 7.8) y = mv(t, 7.4, 7.8, UP.y, MID.y)
+    if (t >= 7.8) y = MID.y
+    place(env, t < 6 ? x : t < 7.8 ? MID.x : x, y)
+    const bad = t >= 6.5
+    amount(bad ? '$10,000' : '$10', bad)
+    seal(0, 0)
+    show(env, seg(t, 3.4, 4))
+    if (t < 5.4) caption('Agents send each other <span>messages.</span>')
+    else if (t < 8.4) caption('Someone in the middle can <i>change</i> them.')
+    else caption('And Bob can\'t <i>tell.</i>')
+    if (t >= 9) bubble('Looks fine. Sending $10,000.', 'bad', seg(t, 9, 9.4)); else show($('bob-say'), 0)
+  } else if (t < 17) { // ---- scene 2: signing
+    step('Fix 1 · Sign it')
+    show(env, 1)
+    const x = t < 12.4 ? AL.x : t < 13.6 ? mv(t, 12.4, 13.6, AL.x, MID.x) : t < 14.6 ? MID.x : mv(t, 14.6, 15.8, MID.x, BOB.x)
+    place(env, x, AL.y)
+    const cut = t >= 13.9
+    amount(cut ? '$10,000' : '$10', cut)
+    const sealAge = seg(t, 11, 11.7)
+    seal(cut ? 2 : sealAge > 0 ? 1 : 0, cut ? seg(t, 13.9, 14.5) : sealAge)
+    if (t < 11) caption('Fix 1: <span>sign</span> it.')
+    else if (t < 13.4) caption('Alice adds a seal only <span>she</span> can make.')
+    else if (t < 15.8) caption('Change one digit and the seal <i>breaks.</i>')
+    else caption('Bob <span>rejects</span> it.')
+    if (t >= 15.8) bubble('Seal broken. Rejected.', 'bad', seg(t, 15.8, 16.2)); else show($('bob-say'), 0)
+  } else { // ---- scene 3: replay
+    step('Fix 2 · One use only')
+    show(env, 1)
+    const x = t < 17.6 ? mv(t, 17, 17.6, AL.x, AL.x) : t < 19 ? mv(t, 17.6, 19, AL.x, BOB.x) : BOB.x
+    place(env, x, AL.y)
+    amount('$10', false); seal(1, 1)
+    env.style.opacity = t < 19.6 ? 1 : lerp(1, .3, seg(t, 19.6, 20))
+    show($('ledger'), seg(t, 19.2, 19.6))
+    $('ledger').innerHTML = t < 19.6 ? 'Bob keeps a list of<br>message IDs already used' : t < 21.6 ? 'Used IDs: <b style="color:#A7F3D0">#482</b>' : 'Used IDs: <b style="color:#A7F3D0">#482</b>'
+    if (t < 19) { show($('bob-say'), 0) }
+    else if (t < 21.2) bubble('Seal good. Paid $10.', 'ok', seg(t, 19, 19.4))
+    else bubble('#482 was already used. Rejected.', 'bad', seg(t, 21.2, 21.6))
+    if (t >= 19.6) { // attacker copy
+      show(g, seg(t, 19.6, 20))
+      place(g, mv(t, 20, 21.2, MID.x, BOB.x + 14), mv(t, 20, 21.2, 330, 524), 1)
+      g.style.opacity = t < 21.4 ? seg(t, 19.6, 20) : 1 - seg(t, 21.4, 21.9)
+      g.style.visibility = 'visible'
+    }
+    if (t < 19) caption('Fix 2: every message works <span>once.</span>')
+    else if (t < 20.4) caption('Attacker saves a <i>copy.</i>')
+    else if (t < 21.6) caption('...and sends it <i>again.</i>')
+    else caption('Bob has seen it. <span>Rejected.</span>')
+  }
+}
+window.setT = setT
+window.DURATION = DURATION
+const q = new URLSearchParams(location.search)
+setT(q.has('t') ? parseFloat(q.get('t')) : 0)
+if (!q.has('t') && !q.has('manual')) { const t0 = performance.now(); (function loop() { const t = ((performance.now() - t0) / 1000) % DURATION; setT(t); requestAnimationFrame(loop) })() }
+</script>
+</body>
+</html>
