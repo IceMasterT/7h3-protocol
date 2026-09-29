@@ -48,6 +48,7 @@
 - [Post-Quantum Signatures (ML-DSA)](#post-quantum-signatures-ml-dsa)
 - [Threshold Signatures (M-of-N BLS)](#threshold-signatures-m-of-n-bls)
 - [WebMCP](#webmcp)
+- [Step-Up Approval and Provenance](#step-up-approval-and-provenance)
 - [Audit Log](#audit-log)
 - [Rate Limiting](#rate-limiting)
 - [Route Policies](#route-policies)
@@ -1461,6 +1462,26 @@ Integration is an import, a constructor, and one field per tool. See the
 [`sdk/webmcp/README.md`](./sdk/webmcp/README.md) for the API and threat model,
 including what it does not protect against. A reference application is in
 [`demo/`](./demo); see [`docs/TESTING.md`](./docs/TESTING.md).
+
+---
+
+## Step-Up Approval and Provenance
+
+Capability tokens bound what an agent may do; they do not stop a tricked agent from doing something within those bounds. Two features add a check for that case:
+
+- **Approval grants** — a named approver countersigns one specific action (bound to the acting agent, method, path and body hash; short-lived; single use). Agents can never approve themselves.
+- **Provenance claims** — the sender's runtime signs where an action's inputs came from (`trusted` / `untrusted`). Verification fails closed.
+
+A route can require approval `always`, or only when a request's inputs were untrusted:
+
+```ts
+policies: [
+  { path: '/api/payments', require: 'ed25519',
+    approval: { require: 'untrusted', approvers: ['alice'] } },
+]
+```
+
+7h3 does not detect prompt injection. The provenance label is asserted by the agent runtime's own taint tracking, and is only as good as that tracking. See [`docs/APPROVAL_AND_PROVENANCE.md`](./docs/APPROVAL_AND_PROVENANCE.md).
 
 ---
 
