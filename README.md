@@ -27,6 +27,7 @@
 ## Table of Contents
 
 - [The Problem](#the-problem)
+- [Common Attacks](#common-attacks)
 - [What 7h3 Protocol Does](#what-7h3-protocol-does)
 - [How It Works](#how-it-works)
 - [Security Guarantees](#security-guarantees)
@@ -71,6 +72,19 @@ AI agent systems are moving fast, and the protocols underpinning them were not b
 **HTTP APIs** default to IP-based rate limiting. IP addresses are trivially spoofed or shared. The same valid signed request can often be submitted multiple times, triggering duplicate writes, payments, or tool executions.
 
 The gap these protocols share is identical: they authenticate *agents* at the connection or identity level, but they do not authenticate *individual messages* at the content level. 7h3 Protocol fills that gap without replacing anything.
+
+---
+
+## Common Attacks
+
+Three attacks against agent traffic, and what the protocol does about each. Animated walkthroughs:
+
+| Tampering and replay | Fake sender | Tricked agent |
+|:---:|:---:|:---:|
+| <img src="./docs/assets/explainer.gif" width="300" alt="Animation: an attacker changes a payment amount and replays a message; signing and nonce checks reject both"> | <img src="./docs/assets/explainer-impersonation.gif" width="300" alt="Animation: an attacker forges a From: Admin message; the signature check rejects it"> | <img src="./docs/assets/explainer-scope.gif" width="300" alt="Animation: a poisoned email makes an agent request a payment; a scoped, expiring capability token refuses it"> |
+| A changed message fails signature verification. A copied message fails nonce and TTL checks. | A claimed sender name is not trusted; only a valid signature from that sender's key is. | The agent can still be deceived, but it can only perform actions its capability token allows, and the token expires. |
+
+MP4 versions for slides and social posts are in [`docs/assets/`](./docs/assets).
 
 ---
 
