@@ -100,7 +100,7 @@ pub fn verify_http_envelope(
                 .get_public_key(sender)
                 .ok_or_else(|| VerifyFailReason::UnknownSender(sender.clone()))?;
             let valid = verify_envelope_ed25519(&envelope, pub_key)
-                .map_err(|e| VerifyFailReason::MalformedEnvelope(e))?;
+                .map_err(VerifyFailReason::MalformedEnvelope)?;
             if !valid {
                 return Err(VerifyFailReason::InvalidSignature);
             }

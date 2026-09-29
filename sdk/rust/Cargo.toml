@@ -2,6 +2,7 @@
 name = "protocol-7h3"
 version = "0.6.1"
 edition = "2021"
+rust-version = "1.82"
 description = "7h3 Protocol — Rust SDK. Deterministic, signed, replay-safe AI-to-AI messaging with TypeScript/Python parity. Wire version 7h3/0.1."
 license = "Apache-2.0"
 repository = "https://github.com/IceMasterT/7h3-protocol"

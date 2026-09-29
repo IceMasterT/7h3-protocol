@@ -477,6 +477,7 @@ impl Default for JsonRpcBridgeConfig {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_envelope(
     sender: &str,
     recipient: Option<&str>,
@@ -507,6 +508,7 @@ pub fn create_envelope(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_task_from_jsonrpc<F, G>(
     request: &JsonRpcRequestLike,
     sender: &str,

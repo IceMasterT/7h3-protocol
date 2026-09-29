@@ -56,7 +56,7 @@ impl WellKnownKeysDocument {
         self.keys.iter().find(|k| {
             k.id == key_id
                 && !k.revoked.unwrap_or(false)
-                && k.expires.map_or(true, |e| e > now)
+                && k.expires.is_none_or(|e| e > now)
         })
     }
 }
@@ -115,7 +115,7 @@ impl KeyRotationManager {
         let now = now_ms();
         let keys = self.keys.lock().unwrap();
         keys.iter()
-            .filter(|k| k.expires_at.map_or(true, |e| e > now))
+            .filter(|k| k.expires_at.is_none_or(|e| e > now))
             .max_by_key(|k| k.created)
             .cloned()
     }
@@ -130,7 +130,7 @@ impl KeyRotationManager {
             public_key: k.public_key.clone(),
             created: k.created,
             expires: k.expires_at,
-            revoked: if k.expires_at.map_or(false, |e| e < now) { Some(true) } else { None },
+            revoked: if k.expires_at.is_some_and(|e| e < now) { Some(true) } else { None },
             revoked_at: None,
         }).collect();
         WellKnownKeysDocument::new(entries)
