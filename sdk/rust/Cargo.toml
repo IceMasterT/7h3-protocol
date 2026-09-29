@@ -17,7 +17,7 @@ name = "protocol_7h3"
 path = "src/lib.rs"
 
 [dependencies]
-base64 = "0.22"
+base64 = "0.23"
 ed25519-dalek = { version = "3", features = ["pkcs8"] }
 getrandom = "0.4"
 hmac = "0.13"
