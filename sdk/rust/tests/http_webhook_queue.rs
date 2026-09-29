@@ -1,5 +1,4 @@
 use protocol_7h3::{
-    create_envelope,
     http::{sign_http_request, verify_http_envelope, EnvelopeInput, StaticKeyRegistry, VerifyFailReason, DEFAULT_HEADER},
     queue::{sign_queue_message, verify_queue_message},
     webhook::{sign_webhook, sign_webhook_hmac, verify_webhook, verify_webhook_hmac},

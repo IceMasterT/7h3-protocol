@@ -2,7 +2,7 @@
 
 use crate::{
     create_envelope, sign_envelope_ed25519, validate_envelope, verify_envelope_ed25519,
-    ProtocolBody, ProtocolEnvelope,
+    ProtocolEnvelope,
 };
 use serde::{Deserialize, Serialize};
 
