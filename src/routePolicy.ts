@@ -3,9 +3,11 @@
  *   - `'ed25519'` / `'hmac'` / `'any'`: a signed 7h3 envelope (or capability token).
  *   - `'http-signature'`: an RFC 9421 HTTP Message Signature (e.g. Web Bot Auth);
  *     needs `GatewayConfig.httpSignature`.
+ *   - `'dpop'`: an OAuth access token bound to a client key with a DPoP proof
+ *     (RFC 9449); needs `GatewayConfig.dpop`.
  *   - `'none'`: no authentication.
  */
-export type PolicyRequirement = 'ed25519' | 'hmac' | 'any' | 'http-signature' | 'none'
+export type PolicyRequirement = 'ed25519' | 'hmac' | 'any' | 'http-signature' | 'dpop' | 'none'
 
 /**
  * Step-up approval requirement for a route.
