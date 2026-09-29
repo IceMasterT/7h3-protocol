@@ -9,4 +9,7 @@ regexes = [
   # Published in the RFC and reused by the Web Bot Auth draft; the test suite uses it
   # to reproduce the RFC's own signatures byte for byte.
   '''MC4CAQAwBQYDK2VwBCIEIJ-DYvh6SEqVTm50DFtMDoQikTmiCqirVv9mWG9qfSnF''',
+  # The test constants that hold it. The generic-api-key rule can capture the
+  # identifier (`privateKey: RFC_ED25519_PRIVATE`) instead of the value.
+  '''^RFC_(ED25519_)?PRIVATE$''',
 ]
