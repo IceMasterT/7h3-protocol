@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## Unreleased — demo
+## Unreleased
 
 ### Added
 
@@ -19,6 +19,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
   `open_demo` accepts only a path that is literally one of the three published
   demos; any other value throws rather than navigating.
+
+### Changed
+
+- **Dependencies refreshed across every package**, each verified against its own
+  tests and build. Notable: `@noble/post-quantum` 0.7.1 (ML-DSA hardening),
+  `@noble/curves` 2.4, `golang.org/x/crypto` 0.57, `cryptography` 50.0.1,
+  `base64` 0.23 (Rust), wrangler 4.143, and vitest 5 everywhere.
+- `src/protocol.bench.ts` migrated to the vitest 5 benchmarking API
+  (`bench.compare()` inside a test); `npm run bench:protocol` is unchanged.
+- CI action pins refreshed and unified (`setup-node` v7.0.0 in every job).
+
+### Fixed
+
+- **Rust:** `cargo clippy --all-targets -- -D warnings` failed with 7 errors.
+  Fixed with no behavior or signature change; the crate now declares
+  `rust-version = "1.82"` (needed for `Option::is_none_or`).
+- `demo/package-lock.json` was out of sync with `package.json` (`npm ci` failed
+  on a missing `tsx`); regenerated.
 
 ### Documentation
 

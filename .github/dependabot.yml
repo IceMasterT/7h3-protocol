@@ -19,11 +19,6 @@ updates:
       # typescript-eslint ships stable TypeScript 7 support.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # vitest 5 removed the `bench` export that src/protocol.bench.ts (and
-      # `npm run bench:protocol`) uses, so `tsc` fails. Migrate the benchmarks to
-      # the new benchmarking API first, then remove this entry.
-      - dependency-name: "vitest"
-        update-types: ["version-update:semver-major"]
 
   # mcp-server sub-package (npm)
   - package-ecosystem: "npm"
@@ -63,10 +58,6 @@ updates:
     ignore:
       # Keep typescript on one major across every package -- see the root entry.
       - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
-      # Stay on vitest 4 until the root package's benchmarks are migrated to the
-      # vitest 5 API -- see the root entry.
-      - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
 
   # Cloudflare worker (npm): wrangler, @cloudflare/workers-types. Isolated from
