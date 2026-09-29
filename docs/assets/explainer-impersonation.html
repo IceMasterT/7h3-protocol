@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<title>7h3 Protocol: fake sender</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #05070F; --ink: #F1F5FF; --dim: #93A3C4; --line: rgba(129,140,248,.35);
+    --ind: #818CF8; --grn: #34D399; --red: #F87171; --amb: #FBBF24;
+  }
+  body { width: 1080px; height: 1080px; overflow: hidden; background: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: relative; width: 1080px; height: 1080px; overflow: hidden;
+    background:
+      radial-gradient(900px 500px at 10% -10%, #1B2A6B 0%, transparent 62%),
+      radial-gradient(800px 460px at 100% 110%, #16326B 0%, transparent 60%),
+      linear-gradient(150deg, #0A1024 0%, #05070F 50%, #070B18 100%); }
+  .abs { position: absolute; }
+
+  #brand { left: 60px; top: 48px; font-size: 26px; font-weight: 800; letter-spacing: .2em; color: #EEF2FF; }
+  #brand b { color: #A5B4FC; }
+  #step { right: 60px; top: 46px; font-size: 22px; font-weight: 800; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+
+  .node { width: 220px; height: 170px; border-radius: 22px; border: 2px solid var(--line);
+    background: linear-gradient(165deg, rgba(129,140,248,.14), rgba(15,23,42,.6)); }
+  .node .t { position: absolute; left: 0; right: 0; top: 24px; text-align: center; font-size: 26px; font-weight: 800; }
+  .node .s { position: absolute; left: 0; right: 0; top: 68px; text-align: center; font-size: 20px; color: var(--dim); font-weight: 500; }
+  .bot { position: absolute; left: 70px; top: 104px; width: 80px; height: 44px; border-radius: 12px;
+    background: rgba(165,180,252,.25); border: 2px solid rgba(165,180,252,.7); }
+  .bot::before, .bot::after { content: ''; position: absolute; top: 13px; width: 12px; height: 12px; border-radius: 50%; background: #E0E7FF; }
+  .bot::before { left: 18px; } .bot::after { right: 18px; }
+  #attacker { border-color: rgba(248,113,113,.7); background: linear-gradient(165deg, rgba(248,113,113,.2), rgba(40,10,15,.6)); }
+  #attacker .bot { background: rgba(248,113,113,.25); border-color: rgba(248,113,113,.8); }
+  #attacker .bot::before, #attacker .bot::after { background: #FEE2E2; }
+
+  #pipe { left: 250px; top: 585px; width: 580px; height: 4px; border-radius: 2px;
+    background: repeating-linear-gradient(90deg, rgba(129,140,248,.5) 0 14px, transparent 14px 26px); }
+
+  #env { width: 240px; height: 150px; border-radius: 16px; background: #F8FAFF; color: #0B1020;
+    box-shadow: 0 14px 40px rgba(0,0,0,.55); }
+  #env .l1 { position: absolute; left: 22px; top: 18px; font-size: 20px; font-weight: 700; color: #5B6B93; letter-spacing: .06em; }
+  #env .l2 { position: absolute; left: 22px; top: 50px; font-size: 26px; font-weight: 800; }
+  #env .amt { position: absolute; left: 22px; top: 88px; font-size: 44px; font-weight: 900; letter-spacing: -.02em; }
+  .sealb { background:#10B981; width: 100px; height: 100px; border-radius: 50%; right: -18px; top: -26px; border: 4px solid #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 900; letter-spacing: .04em; color: #fff; }
+  .sealb .k { width: 26px; height: 20px; border-radius: 4px; background: #fff; margin-bottom: 6px; position: relative; }
+  .sealb .k::before { content: ''; position: absolute; left: 5px; top: -12px; width: 12px; height: 14px; border: 4px solid #fff; border-bottom: none; border-radius: 8px 8px 0 0; }
+  .envid { right: 14px; bottom: 10px; font-size: 16px; font-weight: 700; color: #7C8DB5; font-family: 'JetBrains Mono', monospace; }
+
+  .bubble { width: 330px; padding: 16px 20px; border-radius: 18px; font-size: 24px; font-weight: 700; line-height: 1.25; text-align: center; }
+  #bob-say { left: 700px; top: 385px; }
+  #ledger { left: 700px; top: 800px; width: 320px; padding: 12px 16px; border-radius: 14px; border: 2px dashed var(--line);
+    font-size: 20px; color: var(--dim); font-weight: 600; text-align: center; }
+
+  #cap { left: 60px; right: 60px; top: 850px; height: 150px; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 54px; line-height: 1.12; font-weight: 900; letter-spacing: -.02em; }
+  #cap span { color: var(--grn); } #cap i { color: var(--red); font-style: normal; }
+  #bar { left: 0; bottom: 0; height: 6px; background: linear-gradient(90deg, #6366F1, #6EE7A8); }
+
+  /* intro + outro */
+  #intro, #outro { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 80px; }
+  #intro h1 { font-size: 92px; line-height: 1.02; font-weight: 900; letter-spacing: -.035em; }
+  #intro h1 em { font-style: normal; background: linear-gradient(96deg,#A5B4FC,#818CF8 30%,#6EE7A8); -webkit-background-clip: text; color: transparent; }
+  #intro p { margin-top: 34px; font-size: 34px; color: var(--dim); font-weight: 500; line-height: 1.3; }
+  #outro h2 { font-size: 64px; font-weight: 900; letter-spacing: -.03em; margin-bottom: 44px; }
+  .chk { display: flex; align-items: center; gap: 26px; font-size: 52px; font-weight: 800; margin: 12px 0; width: 720px; text-align: left; }
+  .tick { width: 62px; height: 62px; border-radius: 50%; flex: none; background: rgba(52,211,153,.2); border: 3px solid var(--grn); position: relative; }
+  .tick::after { content: ''; position: absolute; left: 20px; top: 8px; width: 14px; height: 28px; border: solid var(--grn); border-width: 0 6px 6px 0; transform: rotate(42deg); }
+  #tag { margin-top: 48px; font-size: 30px; color: var(--dim); font-weight: 600; line-height: 1.4; }
+  #tag b { color: var(--ink); }
+  #url { margin-top: 18px; font-family: 'JetBrains Mono', monospace; font-size: 30px; color: #A5B4FC; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="intro" class="abs">
+    <h1>Anyone can type<br><em>“From: Admin.”</em></h1>
+    <p>Here’s how that goes wrong.<br>And the fix.</p>
+  </div>
+
+  <div id="main">
+    <div id="brand" class="abs"><b>7h3</b> PROTOCOL</div>
+    <div id="step" class="abs"></div>
+
+    <div id="pipe" class="abs"></div>
+    <div id="alice" class="node abs" style="left:30px;top:500px"><div class="t">Admin's agent</div><div class="s">the real sender</div><div class="bot"></div></div>
+    <div id="bob" class="node abs" style="left:830px;top:500px"><div class="t">Database agent</div><div class="s">the receiver</div><div class="bot"></div></div>
+    <div id="attacker" class="node abs" style="left:415px;top:200px"><div class="t">Attacker</div><div class="s">pretends to be Admin</div><div class="bot"></div></div>
+
+    <div id="env" class="abs">
+      <div class="l1" id="l1">FROM: ADMIN</div><div class="l2" id="l2">Send me all</div><div class="amt" id="amt">customers</div>
+      <div class="abs envid">#482</div>
+      <div id="seal" class="abs sealb"><div class="k"></div><div id="sealtxt">SIGNED</div></div>
+    </div>
+
+    <div id="bob-say" class="bubble abs"></div>
+    <div id="ledger" class="abs">Bob keeps a list of<br>message IDs already used</div>
+    <div id="cap" class="abs"></div>
+  </div>
+
+  <div id="outro" class="abs"><h2>A name is not proof</h2><div class="chk"><div class="tick"></div>Sender proven by key</div><div class="chk"><div class="tick"></div>Names alone never trusted</div><div class="chk"><div class="tick"></div>Fakes rejected on arrival</div><div id="tag"><b>7h3 Protocol</b> checks the signature first.<br>Open source. Zero dependencies.</div>
+    <div id="url">github.com/IceMasterT/7h3-protocol</div>
+  </div>
+
+  <div id="bar" class="abs"></div>
+</div>
+
+<script>
+const DURATION = 27
+const $ = id => document.getElementById(id)
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+const seg = (t, a, b) => clamp((t - a) / (b - a))
+const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+const lerp = (a, b, k) => a + (b - a) * k
+const mv = (t, a, b, from, to) => lerp(from, to, ease(seg(t, a, b)))
+const show = (el, v) => { el.style.opacity = v; el.style.visibility = v > 0.01 ? 'visible' : 'hidden' }
+
+// Envelope resting positions (left/top of the 240x150 card)
+const AL = { x: 262, y: 510 }, MID = { x: 420, y: 510 }, BOB = { x: 578, y: 510 }, UP = { x: 420, y: 350 }
+
+function caption(html) { if ($('cap').dataset.h !== html) { $('cap').innerHTML = '<div>' + html + '</div>'; $('cap').dataset.h = html } }
+function step(txt) { $('step').textContent = txt }
+
+function place(el, x, y, s = 1) { el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.transform = `scale(${s})` }
+
+function bubble(text, kind, a) {
+  const b = $('bob-say')
+  if (b.dataset.t !== text + kind) {
+    b.textContent = text; b.dataset.t = text + kind
+    b.style.background = kind === 'ok' ? 'rgba(52,211,153,.18)' : 'rgba(248,113,113,.18)'
+    b.style.border = '3px solid ' + (kind === 'ok' ? '#34D399' : '#F87171')
+    b.style.color = kind === 'ok' ? '#A7F3D0' : '#FECACA'
+  }
+  show(b, a)
+}
+
+function seal(state, k) { // 0 none, 1 signed, 2 broken
+  const s = $('seal')
+  show(s, state ? 1 : 0)
+  s.style.background = state === 2 ? '#EF4444' : '#10B981'
+  $('sealtxt').textContent = state === 2 ? 'BROKEN' : 'SIGNED'
+  const shake = state === 2 ? Math.sin(k * 60) * 6 * (1 - k) : 0
+  s.style.transform = `scale(${state === 1 ? lerp(2.4, 1, ease(clamp(k))) : 1}) translateX(${shake}px) rotate(${state === 2 ? shake : 0}deg)`
+}
+
+function amount(v, bad) { const a = $('amt'); a.textContent = v; a.style.color = bad ? '#DC2626' : '#0B1020' }
+
+let ghost
+function ghostEl() {
+  if (!ghost) { ghost = $('env').cloneNode(true); ghost.id = 'env'; ghost.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); $('main').appendChild(ghost) }
+  return ghost
+}
+
+function common(t, OUT, DUR) {
+  const intro = t < 3, outro = t >= OUT
+  show($('intro'), intro ? 1 - seg(t, 2.5, 3) : 0)
+  show($('main'), !intro && !outro ? 1 : outro ? 1 - seg(t, OUT, OUT + .7) : seg(t, 2.8, 3.3))
+  show($('outro'), outro ? seg(t, OUT + .3, OUT + 1.1) : 0)
+  $('bar').style.width = (t / DUR * 1080) + 'px'
+  document.querySelectorAll('.chk').forEach((c, i) => { const k = ease(seg(t, OUT + 1.3 + i * .7, OUT + 1.9 + i * .7)); c.style.opacity = k; c.style.transform = `translateX(${(1 - k) * 40}px)` })
+  $('tag').style.opacity = seg(t, OUT + 3.7, OUT + 4.4); $('url').style.opacity = seg(t, OUT + 4.1, OUT + 4.8)
+  $('attacker').style.opacity = t < 3 ? 0 : t < 5 ? seg(t, 4.5, 5.2) * .9 : .9
+  place($('attacker'), 415, 200 + Math.sin(t * 3) * 3)
+  show(ghostEl(), 0); show($('ledger'), 0); if ($('permit')) show($('permit'), 0)
+}
+
+function setT(t) {
+  common(t, 20, DURATION)
+  const env = $('env')
+  $('amt').style.fontSize = '36px'
+  const say = (tx, k, a) => { if (a > 0) bubble(tx, k, a); else show($('bob-say'), 0) }
+  if (t < 10.5) {
+    step('The problem')
+    show(env, seg(t, 4, 4.6)); amount('customers', true); seal(0, 0)
+    const k = ease(seg(t, 6.6, 8.2))
+    place(env, lerp(UP.x, BOB.x, k), lerp(UP.y, MID.y, k))
+    if (t < 6.4) caption('The attacker types \u201cFrom: <i>Admin</i>.\u201d')
+    else if (t < 8.2) caption('Nothing checks if it\u2019s <i>true.</i>')
+    else caption('The database agent <i>believes</i> it.')
+    say('From Admin. Sending all customers.', 'bad', seg(t, 8.4, 8.8))
+  } else {
+    step('The fix \u00b7 Prove who you are')
+    // real admin message
+    if (t < 14.6) {
+      show(env, 1); amount('customers', false)
+      const k = ease(seg(t, 12, 13.4)); place(env, lerp(AL.x, BOB.x, k), AL.y)
+      seal(t >= 11 ? 1 : 0, seg(t, 11, 11.7))
+      if (t < 11) caption('The fix: real Admin <span>signs</span> its messages.')
+      else if (t < 12) caption('The seal needs a secret key only <span>Admin</span> has.')
+      else caption('The seal matches. <span>Accepted.</span>')
+      say('Seal matches Admin. Accepted.', 'ok', seg(t, 13.4, 13.8))
+    } else { // attacker forgery
+      show(env, seg(t, 14.6, 15.1)); amount('customers', true)
+      $('sealtxt').textContent = 'FAKE'
+      const sl = $('seal'); show(sl, 1); sl.style.background = '#F59E0B'; sl.style.transform = 'scale(1)'
+      const k = ease(seg(t, 16, 17.4)); place(env, lerp(UP.x, BOB.x, k), lerp(UP.y, MID.y, k))
+      if (t < 16) caption('The attacker has the name, not the <i>key.</i>')
+      else if (t < 17.6) caption('So the seal on the message is <i>fake.</i>')
+      else caption('Fake seal. <span>Rejected.</span>')
+      say('Seal does not match Admin. Rejected.', 'bad', seg(t, 17.6, 18))
+    }
+  }
+}
+
+window.setT = setT
+window.DURATION = DURATION
+const q = new URLSearchParams(location.search)
+setT(q.has('t') ? parseFloat(q.get('t')) : 0)
+if (!q.has('t') && !q.has('manual')) { const t0 = performance.now(); (function loop() { const t = ((performance.now() - t0) / 1000) % DURATION; setT(t); requestAnimationFrame(loop) })() }
+</script>
+</body>
+</html>

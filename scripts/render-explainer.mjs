@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Render docs/assets/explainer.html -> explainer.mp4 (+ explainer.gif).
+ * Render docs/assets/<name>.html -> <name>.mp4 (+ <name>.gif). Default name: explainer.
  *
  * The page is a pure function of time (`setT(t)`), so frames are captured
  * deterministically over the Chrome DevTools Protocol rather than screen-recorded.
  * Needs Chrome/Chromium, ffmpeg, and Node >= 22 (global WebSocket).
  *
- *   node scripts/render-explainer.mjs [--fps=24] [--no-gif]
+ *   node scripts/render-explainer.mjs [--name=explainer|explainer-impersonation|explainer-scope] [--fps=24] [--no-gif]
  */
 import { spawn, execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
@@ -15,7 +15,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const html = path.join(root, 'docs/assets/explainer.html')
+const name = (process.argv.find(a => a.startsWith('--name=')) ?? '--name=explainer').slice(7)
+const html = path.join(root, `docs/assets/${name}.html`)
 const out = path.join(root, 'docs/assets')
 const fps = Number((process.argv.find(a => a.startsWith('--fps=')) ?? '--fps=24').slice(6))
 const wantGif = !process.argv.includes('--no-gif')
@@ -61,12 +62,12 @@ try {
   ws.close()
 
   const input = ['-y', '-framerate', String(fps), '-i', path.join(framesDir, 'f%05d.png')]
-  execFileSync('ffmpeg', [...input, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-movflags', '+faststart', path.join(out, 'explainer.mp4')], { stdio: 'ignore' })
-  console.log('wrote docs/assets/explainer.mp4')
+  execFileSync('ffmpeg', [...input, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-movflags', '+faststart', path.join(out, `${name}.mp4`)], { stdio: 'ignore' })
+  console.log(`wrote docs/assets/${name}.mp4`)
   if (wantGif) {
     execFileSync('ffmpeg', ['-y', '-framerate', String(fps), '-i', path.join(framesDir, 'f%05d.png'),
       '-vf', 'fps=15,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4',
-      path.join(out, 'explainer.gif')], { stdio: 'ignore' })
-    console.log('wrote docs/assets/explainer.gif')
+      path.join(out, `${name}.gif`)], { stdio: 'ignore' })
+    console.log(`wrote docs/assets/${name}.gif`)
   }
 } finally { chrome.kill() }
