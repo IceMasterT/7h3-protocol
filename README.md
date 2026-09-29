@@ -820,7 +820,7 @@ Key discovery is served automatically at `GET /.well-known/7h3-keys`.
 
 ## AI Coding Agents
 
-7h3 Protocol ships first-class support for AI coding environments. Each tool reads its config automatically — no plugin installation required.
+7h3 Protocol includes configuration for AI coding environments. Each tool reads its config automatically; no plugin installation is required.
 
 | Tool | Config file | What it gets |
 |---|---|---|
