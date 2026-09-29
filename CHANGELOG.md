@@ -18,6 +18,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   an action's inputs, bound to that action, with a `ProvenanceContext` taint
   accumulator for agent runtimes. Fails closed. Does not detect prompt injection;
   see `docs/APPROVAL_AND_PROVENANCE.md`.
+- **HTTP Message Signatures (RFC 9421)** and **Content-Digest (RFC 9530)**
+  (`httpMessageSignatures.ts`): request and response signing/verification with
+  policy-driven verification (required coverage, freshness, tag, single-use nonce,
+  body binding). Reproduces the RFC's Ed25519 and HMAC vectors byte for byte.
+- **Web Bot Auth** (`webBotAuth.ts`): JWK thumbprint key ids, `Signature-Agent`,
+  guarded key-directory fetching. The verifier never fetches an agent URL itself.
+- Gateway `require: 'http-signature'` routes (`GatewayConfig.httpSignature`).
 - `MemoryReplayStore`: single-process `ReplayStore` that fails closed at capacity.
 
 - **The landing hub is now a WebMCP surface.** Splitting the single-page demo

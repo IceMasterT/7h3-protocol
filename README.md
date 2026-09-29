@@ -49,6 +49,7 @@
 - [Threshold Signatures (M-of-N BLS)](#threshold-signatures-m-of-n-bls)
 - [WebMCP](#webmcp)
 - [Step-Up Approval and Provenance](#step-up-approval-and-provenance)
+- [HTTP Message Signatures (RFC 9421) and Web Bot Auth](#http-message-signatures-rfc-9421-and-web-bot-auth)
 - [Audit Log](#audit-log)
 - [Rate Limiting](#rate-limiting)
 - [Route Policies](#route-policies)
@@ -1482,6 +1483,18 @@ policies: [
 ```
 
 7h3 does not detect prompt injection. The provenance label is asserted by the agent runtime's own taint tracking, and is only as good as that tracking. See [`docs/APPROVAL_AND_PROVENANCE.md`](./docs/APPROVAL_AND_PROVENANCE.md).
+
+---
+
+## HTTP Message Signatures (RFC 9421) and Web Bot Auth
+
+Sign or verify standard HTTP requests and responses without the 7h3 envelope, so a gateway can authenticate any RFC 9421 client and 7h3 agents can call servers that only speak the standard. Includes Content-Digest (RFC 9530) and Web Bot Auth (JWK-thumbprint key ids, `Signature-Agent`, key directories).
+
+```ts
+policies: [{ path: '/crawl/**', require: 'http-signature', allowedSenders: ['bot.example'] }]
+```
+
+Verification is policy-driven: a valid signature that covers too little is refused, signatures are freshness-bounded and single-use, and the algorithm comes from your key, never the message. Checked against the RFC 9421 Appendix B vectors. See [`docs/HTTP_MESSAGE_SIGNATURES.md`](./docs/HTTP_MESSAGE_SIGNATURES.md).
 
 ---
 
