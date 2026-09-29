@@ -12,6 +12,9 @@ regexes = [
   # The test constants that hold it. The generic-api-key rule can capture the
   # identifier (`privateKey: RFC_ED25519_PRIVATE`) instead of the value.
   '''^RFC_(ED25519_)?PRIVATE$''',
+  # did:key identifiers (multibase base58btc `z…`). A did:key is a PUBLIC key identifier by
+  # definition; the test vectors come from the W3C did:key specification.
+  '''^z[1-9A-HJ-NP-Za-km-z]{43,60}$''',
   # RFC 9449 Figure 13 example DPoP proof (a signed JWT with the RFC's example public
   # key in its header). Published in the RFC; the test verifies it as received.
   '''^eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwieCI6Imw4dEZyaHgt''',

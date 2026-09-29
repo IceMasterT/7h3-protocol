@@ -29,7 +29,12 @@ export function parseWellKnownKeys(json: string): WellKnownKeysDocument {
   return d
 }
 
-// Fetch .well-known/7h3-keys from a base URL (uses global fetch)
+/** Largest key document accepted, in characters. A key document is a few hundred bytes per key. */
+const MAX_KEY_DOCUMENT_CHARS = 256 * 1024
+
+// Fetch .well-known/7h3-keys from a base URL (uses global fetch).
+// Redirects are refused (a redirect can move a request from the vetted host to an
+// internal one) and the response size is bounded.
 export async function fetchWellKnownKeys(
   baseUrl: string,
   opts?: { timeout?: number }
@@ -40,12 +45,36 @@ export async function fetchWellKnownKeys(
     ? setTimeout(() => controller.abort(), opts.timeout)
     : undefined
   try {
-    const resp = await fetch(url, { signal: controller.signal })
+    const resp = await fetch(url, { signal: controller.signal, redirect: 'error' })
     if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`)
-    return parseWellKnownKeys(await resp.text())
+    const text = await resp.text()
+    if (text.length > MAX_KEY_DOCUMENT_CHARS) throw new Error(`key document from ${url} is too large`)
+    return parseWellKnownKeys(text)
   } finally {
     if (timer !== undefined) clearTimeout(timer)
   }
+}
+
+/**
+ * True if `host` is a plausible PUBLIC DNS name we are willing to fetch keys from:
+ * lower-case labels only, at least two of them, no port, path, credentials or
+ * brackets, not an IP address, and not a name that resolves internally by convention
+ * (`localhost`, `*.local`, `*.internal`, `*.localhost`, `*.lan`, `*.home.arpa`).
+ *
+ * The host comes from the `sender` field of a message that has NOT been verified yet
+ * (verification needs the key this lookup fetches), so it is attacker-controlled. Without
+ * this check a caller could steer the verifier at `127.0.0.1`, a metadata endpoint or an
+ * arbitrary internal service. DNS can still resolve a public-looking name to a private
+ * address, so deployments that must be robust to that should also set `allowedDomains`.
+ */
+export function isFetchableKeyHost(host: string): boolean {
+  if (host.length === 0 || host.length > 253) return false
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(host)) return false
+  const labels = host.split('.')
+  if (labels.every((l) => /^[0-9]+$/.test(l))) return false // dotted-quad IPv4 (and similar numeric forms)
+  const tld = labels[labels.length - 1]
+  if (/^[0-9]+$/.test(tld) || tld === 'localhost' || tld === 'local' || tld === 'internal' || tld === 'lan' || tld === 'home' || host.endsWith('.home.arpa')) return false
+  return true
 }
 
 // ── HTTP-backed KeyRegistry (auto-discovers from .well-known) ────────────────
@@ -53,16 +82,28 @@ export async function fetchWellKnownKeys(
 export function createHttpKeyRegistry(opts?: {
   timeout?: number
   cacheMs?: number
+  /**
+   * Only look up keys for these hosts (exact match, lower-case). Strongly recommended:
+   * without it any public host named in a sender id is contacted, and any domain can
+   * introduce itself as a sender.
+   */
+  allowedDomains?: string[]
+  /** Maximum cached hosts (default 1000). */
+  maxCacheEntries?: number
 }): KeyRegistry {
   const cache = new Map<string, { doc: WellKnownKeysDocument; expiresAt: number }>()
   const cacheMs = opts?.cacheMs ?? 60_000
   const timeout = opts?.timeout ?? 5_000
+  const maxCache = opts?.maxCacheEntries ?? 1000
+  const allowed = opts?.allowedDomains ? new Set(opts.allowedDomains.map((d) => d.toLowerCase())) : null
 
   async function getDoc(baseUrl: string): Promise<WellKnownKeysDocument> {
     const now = Date.now()
     const hit = cache.get(baseUrl)
     if (hit && hit.expiresAt > now) return hit.doc
     const doc = await fetchWellKnownKeys(baseUrl, { timeout })
+    // Bounded: sender ids are attacker-chosen, so an unbounded cache is a memory-growth vector.
+    if (cache.size >= maxCache) cache.delete(cache.keys().next().value as string)
     cache.set(baseUrl, { doc, expiresAt: now + cacheMs })
     return doc
   }
@@ -74,7 +115,8 @@ export function createHttpKeyRegistry(opts?: {
       const domain = senderId.includes('@')
         ? senderId.split('@')[1]
         : senderId.split('.').slice(-2).join('.')
-      if (!domain) return null
+      if (!domain || !isFetchableKeyHost(domain)) return null
+      if (allowed && !allowed.has(domain)) return null
       try {
         const doc = await getDoc(`https://${domain}`)
         const now = Date.now()

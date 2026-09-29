@@ -21,77 +21,34 @@
  * `cnf.jkt`.
  */
 
+import {
+  algForJwk,
+  b64uToBytes,
+  bytesToB64u,
+  isPublicJwk,
+  jwkThumbprint,
+  jwsSign,
+  jwsVerify,
+  subtle,
+  toBuffer,
+  type JosePublicJwk,
+  type JwsAlg,
+} from './jose'
 import type { ReplayStore } from './replayStores'
 
 export const DPOP_HEADER = 'dpop'
 export const DPOP_NONCE_HEADER = 'dpop-nonce'
 export const DPOP_TYP = 'dpop+jwt'
-export type DpopAlg = 'ES256' | 'EdDSA'
+export type DpopAlg = JwsAlg
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf-8', { fatal: true })
 
-// ---------------------------------------------------------------------------
-// base64url / JOSE helpers
-// ---------------------------------------------------------------------------
-
-function bytesToB64u(bytes: Uint8Array): string {
-  let s = ''
-  for (const b of bytes) s += String.fromCharCode(b)
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function b64uToBytes(s: string): Uint8Array | null {
-  if (!/^[A-Za-z0-9_-]*$/.test(s) || s.length % 4 === 1) return null
-  try {
-    const std = s.replace(/-/g, '+').replace(/_/g, '/')
-    const bin = atob(std + '='.repeat((4 - (std.length % 4)) % 4))
-    return Uint8Array.from(bin, (c) => c.charCodeAt(0))
-  } catch {
-    return null
-  }
-}
-
-const subtle = (): SubtleCrypto => {
-  const s = globalThis.crypto?.subtle
-  if (!s) throw new Error('WebCrypto (crypto.subtle) is required')
-  return s
-}
-const buf = (u: Uint8Array): ArrayBuffer => u.slice().buffer as ArrayBuffer
-
-export interface DpopPublicJwk {
-  kty: 'EC' | 'OKP'
-  crv: 'P-256' | 'Ed25519'
-  x: string
-  y?: string
-}
-
-/** Members that mark a JWK as containing private or symmetric key material. */
-const PRIVATE_MEMBERS = ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth', 'k', 'priv']
-
-function isPublicJwk(value: unknown): value is DpopPublicJwk {
-  if (typeof value !== 'object' || value === null) return false
-  const j = value as Record<string, unknown>
-  if (PRIVATE_MEMBERS.some((m) => m in j)) return false
-  const b64u = (v: unknown, len: number): boolean => typeof v === 'string' && new RegExp(`^[A-Za-z0-9_-]{${len}}$`).test(v)
-  if (j.kty === 'EC') return j.crv === 'P-256' && b64u(j.x, 43) && b64u(j.y, 43)
-  if (j.kty === 'OKP') return j.crv === 'Ed25519' && b64u(j.x, 43) && j.y === undefined
-  return false
-}
-
-function algFor(jwk: DpopPublicJwk): DpopAlg {
-  return jwk.kty === 'EC' ? 'ES256' : 'EdDSA'
-}
+/** A public P-256 or Ed25519 JWK (RFC 7517). */
+export type DpopPublicJwk = JosePublicJwk
 
 /** RFC 7638 JWK SHA-256 thumbprint, base64url: the value of `cnf.jkt`. */
-export async function dpopJwkThumbprint(jwk: DpopPublicJwk): Promise<string> {
-  if (!isPublicJwk(jwk)) throw new Error('dpopJwkThumbprint: not a public P-256 or Ed25519 JWK')
-  const canonical =
-    jwk.kty === 'EC'
-      ? `{"crv":"${jwk.crv}","kty":"EC","x":"${jwk.x}","y":"${jwk.y}"}`
-      : `{"crv":"${jwk.crv}","kty":"OKP","x":"${jwk.x}"}`
-  return bytesToB64u(new Uint8Array(await subtle().digest('SHA-256', encoder.encode(canonical))))
-}
+export const dpopJwkThumbprint = jwkThumbprint
 
 /** `ath` claim value: base64url SHA-256 of the access token. */
 export async function accessTokenHash(accessToken: string): Promise<string> {
@@ -163,10 +120,7 @@ export async function createDpopProof(opts: CreateDpopProofOptions): Promise<str
   if (opts.accessToken !== undefined) payload.ath = await accessTokenHash(opts.accessToken)
 
   const signingInput = `${bytesToB64u(encoder.encode(JSON.stringify(header)))}.${bytesToB64u(encoder.encode(JSON.stringify(payload)))}`
-  const algorithm = key.alg === 'ES256' ? { name: 'ECDSA', namedCurve: 'P-256' } : { name: 'Ed25519' }
-  const privateKey = await subtle().importKey('jwk', key.privateJwk, algorithm, false, ['sign'])
-  const sig = new Uint8Array(await subtle().sign(key.alg === 'ES256' ? { name: 'ECDSA', hash: 'SHA-256' } : { name: 'Ed25519' }, privateKey, buf(encoder.encode(signingInput))))
-  return `${signingInput}.${bytesToB64u(sig)}`
+  return `${signingInput}.${bytesToB64u(await jwsSign(key.alg, key.privateJwk, signingInput))}`
 }
 
 /** `Authorization` header value for a DPoP-bound token. */
@@ -280,20 +234,12 @@ export async function verifyDpopProof(proofs: string | readonly string[] | undef
   if (!isPublicJwk(header.jwk)) return { ok: false, reason: 'bad-jwk' }
   const jwk = header.jwk
   // The key type must agree with the declared algorithm; otherwise a verifier could be steered.
-  if (algFor(jwk) !== header.alg) return { ok: false, reason: 'bad-jwk' }
+  if (algForJwk(jwk) !== header.alg) return { ok: false, reason: 'bad-jwk' }
 
   // Signature over `header.payload` with the key the proof itself carries.
-  const signingInput = encoder.encode(`${parts[0]}.${parts[1]}`)
-  let valid: boolean
-  try {
-    const algorithm = jwk.kty === 'EC' ? { name: 'ECDSA', namedCurve: 'P-256' } : { name: 'Ed25519' }
-    const publicKey = await subtle().importKey('jwk', jwk as JsonWebKey, algorithm, false, ['verify'])
-    if (jwk.kty === 'EC' && sigBytes.length !== 64) return { ok: false, reason: 'invalid-signature' }
-    valid = await subtle().verify(jwk.kty === 'EC' ? { name: 'ECDSA', hash: 'SHA-256' } : { name: 'Ed25519' }, publicKey, buf(sigBytes), buf(signingInput))
-  } catch {
-    return { ok: false, reason: 'bad-jwk' } // e.g. a point not on the curve
-  }
-  if (!valid) return { ok: false, reason: 'invalid-signature' }
+  const outcome = await jwsVerify(jwk, encoder.encode(`${parts[0]}.${parts[1]}`), sigBytes)
+  if (outcome === 'bad-key') return { ok: false, reason: 'bad-jwk' } // e.g. a point not on the curve
+  if (outcome !== 'valid') return { ok: false, reason: 'invalid-signature' }
 
   const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0
   if (!str(payload.jti) || payload.jti.length > 256 || !str(payload.htm) || !str(payload.htu) || typeof payload.iat !== 'number' || !Number.isSafeInteger(payload.iat)) {
@@ -363,7 +309,7 @@ export class DpopNonceIssuer {
   ) {
     const raw = typeof secret === 'string' ? encoder.encode(secret) : secret
     if (raw.length < 16) throw new Error('DpopNonceIssuer: secret must be at least 16 bytes')
-    this.key = subtle().importKey('raw', buf(raw), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+    this.key = subtle().importKey('raw', toBuffer(raw), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   }
 
   private async mac(issued: string): Promise<string> {

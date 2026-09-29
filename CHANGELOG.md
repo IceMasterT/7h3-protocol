@@ -29,6 +29,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   RFC 9449 §4.3 verification (token `ath` + `cnf.jkt` key binding, single-use `jti`,
   `htm`/`htu`, freshness, private-key-in-jwk refusal), stateless server nonces, and
   gateway `require: 'dpop'` routes. Verifies the RFC's own example proof.
+- **Agent identity** (`agentIdentity.ts`): A2A-compatible signed Agent Cards (JWS
+  over RFC 8785 canonical JSON, EdDSA and ES256, origin pinning, rotation),
+  `canonicalizeJcs` (checked against RFC 8785's samples), `did:key` for Ed25519
+  (checked against the did:key spec, incl. the derived X25519 key), and SPIFFE ID
+  parsing and policy.
+- `jose.ts`: shared, strict ES256/EdDSA JWS and JWK primitives (now also used by DPoP).
 - `MemoryReplayStore`: single-process `ReplayStore` that fails closed at capacity.
 
 - **The landing hub is now a WebMCP surface.** Splitting the single-page demo
@@ -47,6 +53,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `x-7h3-approved-by`, `x-7h3-trust` or `x-7h3-approval`.** On a `require: 'none'`
   route a client could send `x-7h3-verified: true` and have it reach the upstream
   as if the gateway had verified the request.
+
+- **`createHttpKeyRegistry` fetched hosts taken from unverified sender ids** (SSRF).
+  It now refuses IP literals, `localhost`, internal-by-convention TLDs, ports, paths
+  and credentials; refuses redirects; bounds the document size and its cache; and
+  accepts `allowedDomains`. `fetchWellKnownKeys` also refuses redirects and bounds the
+  response size.
 
 ### Changed
 
