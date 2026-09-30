@@ -25,6 +25,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Web Bot Auth** (`webBotAuth.ts`): JWK thumbprint key ids, `Signature-Agent`,
   guarded key-directory fetching. The verifier never fetches an agent URL itself.
 - Gateway `require: 'http-signature'` routes (`GatewayConfig.httpSignature`).
+- **MCP tool pinning** (`mcpToolPinning.ts`): digests of everything a model reads
+  about each tool, signed pin sets bound to a server, a scanner for invisible,
+  bidi-override, control and Unicode tag characters, and `guardMcpClient`, which
+  filters `tools/list` and refuses `tools/call` for changed, suspicious, duplicate
+  or unpinned tools (re-verifying when stale, failing closed).
+- **Signed SSE for MCP streamable HTTP** (`mcpSse.ts`): per-event signatures with
+  stream binding, strict sequence numbers, replay protection and a signed end event
+  so truncation is detected.
 - **DPoP (RFC 9449)** (`dpop.ts`): ES256 and Ed25519 proof creation and full
   RFC 9449 §4.3 verification (token `ath` + `cnf.jkt` key binding, single-use `jti`,
   `htm`/`htu`, freshness, private-key-in-jwk refusal), stateless server nonces, and
@@ -72,8 +80,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   accepts `allowedDomains`. `fetchWellKnownKeys` also refuses redirects and bounds the
   response size.
 
+### Documentation
+
+- `docs/THREAT_MODEL.md` rewritten. It still described `aip/0.1`, covered four source
+  files and said no fuzz campaign existed. It now covers every module, states which runtime
+  has what, maps each threat to a control and its limits, lists what is not protected
+  against, and points at the evidence behind each claim.
+- `SECURITY.md` scope and audit status brought up to date.
+- Test counts corrected everywhere: 1,280 (TypeScript 1,108, Python 106, Go 35, Rust 31).
+
 ### Changed
 
+- CycloneDX SBOMs for every npm package are generated in CI (`npm run sbom`) and attached
+  to releases; the generator also fails if the root or browser package lists any runtime
+  dependency, an independent check on the zero-dependency claim.
+- `npm run docs:check` (run in CI) verifies README and CHANGELOG shape, table-of-contents
+  anchors and relative links. It exists because a scripted edit once overwrote README.md
+  with changelog text and every check stayed green.
 - **Dependencies refreshed across every package**, each verified against its own
   tests and build. Notable: `@noble/post-quantum` 0.7.1 (ML-DSA hardening),
   `@noble/curves` 2.4, `golang.org/x/crypto` 0.57, `cryptography` 50.0.1,

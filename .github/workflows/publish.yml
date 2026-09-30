@@ -10,6 +10,45 @@ permissions:
   id-token: write
 
 jobs:
+  # CycloneDX SBOMs for the npm packages, attached to the GitHub release when one exists.
+  # Independent of the publish jobs and non-blocking: a problem here must never stop a release.
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      # Every package's dependencies must be installed, or `npm sbom` would silently omit them
+      # (the generator checks). mcp-server links the repo root, so the root is built first.
+      - run: npm ci
+      - run: npm run build:protocol
+      - run: npm ci --no-audit --no-fund --prefix sdk/pq
+      - run: npm ci --no-audit --no-fund --prefix sdk/threshold
+      - run: npm ci --no-audit --no-fund --prefix sdk/browser
+      - run: npm ci --no-audit --no-fund --prefix sdk/webmcp
+      - run: npm ci --no-audit --no-fund --prefix mcp-server
+      # Also verifies the "zero runtime dependencies" claim: it fails if the root or the
+      # browser package lists any component.
+      - run: npm run sbom
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: dist/sbom/*.cdx.json
+      - name: Attach to the GitHub release (if there is one)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/sbom/*.cdx.json --clobber
+          else
+            echo "No GitHub release for $GITHUB_REF_NAME; the SBOMs are available as a workflow artifact."
+          fi
+
   publish-protocol:
     name: publish @7h3/protocol
     runs-on: ubuntu-latest
