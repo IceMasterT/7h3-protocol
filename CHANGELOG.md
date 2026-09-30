@@ -29,6 +29,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   RFC 9449 §4.3 verification (token `ath` + `cnf.jkt` key binding, single-use `jti`,
   `htm`/`htu`, freshness, private-key-in-jwk refusal), stateless server nonces, and
   gateway `require: 'dpop'` routes. Verifies the RFC's own example proof.
+- **Payment mandates** (`mandate.ts`): payer-signed intent, merchant-signed cart and
+  agent-signed payment; recomputed totals, digest-bound carts, constraint and
+  cumulative-ceiling enforcement through an atomic idempotent `SpendLedger`, and
+  human approval above a threshold. Integer minor units only.
 - **Agent identity** (`agentIdentity.ts`): A2A-compatible signed Agent Cards (JWS
   over RFC 8785 canonical JSON, EdDSA and ES256, origin pinning, rotation),
   `canonicalizeJcs` (checked against RFC 8785's samples), `did:key` for Ed25519
