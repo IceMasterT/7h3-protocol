@@ -24,6 +24,8 @@ jobs:
       - run: npm install --no-audit --no-fund --prefix sdk/pq
       - run: npm install --no-audit --no-fund --prefix sdk/threshold
       - run: npm run lint
+      # README/CHANGELOG shape, table-of-contents anchors and relative links
+      - run: npm run docs:check
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run test
       - run: npm run build:protocol
@@ -100,3 +102,27 @@ jobs:
       - run: npm ci --no-audit --no-fund --prefix mcp-server
       # build runs tsc, so this is both the typecheck and the packaging check
       - run: npm run build --prefix mcp-server
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      # Every package's dependencies must be installed, or `npm sbom` would silently omit them
+      # (the generator checks). mcp-server links the repo root, so the root is built first.
+      - run: npm ci
+      - run: npm run build:protocol
+      - run: npm ci --no-audit --no-fund --prefix sdk/pq
+      - run: npm ci --no-audit --no-fund --prefix sdk/threshold
+      - run: npm ci --no-audit --no-fund --prefix sdk/browser
+      - run: npm ci --no-audit --no-fund --prefix sdk/webmcp
+      - run: npm ci --no-audit --no-fund --prefix mcp-server
+      # Also verifies the "zero runtime dependencies" claim: it fails if the root or the
+      # browser package lists any component.
+      - run: npm run sbom
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: dist/sbom/*.cdx.json
+          retention-days: 90

@@ -139,7 +139,9 @@
     "fuzz:rust:canonicalize": "cargo +nightly fuzz run fuzz_canonicalize --manifest-path sdk/rust/fuzz/Cargo.toml -- -max_total_time=60",
     "banner": "node scripts/render-banner.mjs",
     "banner:check": "node scripts/render-banner.mjs --check",
-    "explainer": "node scripts/render-explainer.mjs"
+    "explainer": "node scripts/render-explainer.mjs",
+    "sbom": "node scripts/generate-sbom.mjs",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

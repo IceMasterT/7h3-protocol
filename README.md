@@ -1,813 +1,1937 @@
-# Changelog
+<div align="center">
+  <img src="./docs/assets/banner-github.png" alt="7h3 Protocol — Sign every message. Trust every agent. Cryptographic identity, replay protection and E2E encryption for AI agents." width="100%">
 
-All notable changes to `@7h3/protocol` are documented here.  
-Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
-This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+  <br/><br/>
 
----
+  [![npm](https://img.shields.io/npm/v/@7h3/protocol?style=flat-square&color=818cf8&logo=npm&logoColor=white&label=%407h3%2Fprotocol)](https://www.npmjs.com/package/@7h3/protocol)
+  [![npm webmcp](https://img.shields.io/npm/v/@7h3/protocol-webmcp?style=flat-square&color=6ee7a8&logo=npm&logoColor=white&label=%407h3%2Fprotocol-webmcp)](https://www.npmjs.com/package/@7h3/protocol-webmcp)
+  [![npm browser](https://img.shields.io/npm/v/@7h3/protocol-browser?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-browser)](https://www.npmjs.com/package/@7h3/protocol-browser)
+  [![npm pq](https://img.shields.io/npm/v/@7h3/protocol-pq?style=flat-square&color=6366f1&logo=npm&logoColor=white&label=%407h3%2Fprotocol-pq)](https://www.npmjs.com/package/@7h3/protocol-pq)
+  [![npm threshold](https://img.shields.io/npm/v/@7h3/protocol-threshold?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-threshold)](https://www.npmjs.com/package/@7h3/protocol-threshold)
+  [![PyPI](https://img.shields.io/pypi/v/7h3-protocol?style=flat-square&color=818cf8&logo=python&logoColor=white)](https://pypi.org/project/7h3-protocol/)
+  [![Crates.io](https://img.shields.io/crates/v/protocol-7h3?style=flat-square&color=a5b4fc&logo=rust&logoColor=white)](https://crates.io/crates/protocol-7h3)
+  [![Tests](https://img.shields.io/badge/tests-1280%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
+  [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
+  [![Wire](https://img.shields.io/badge/wire-7h3%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
+  [![License](https://img.shields.io/badge/license-Apache--2.0-94a3b8?style=flat-square)](./LICENSE)
 
-## Unreleased
+  <br/>
 
-### Added
+  Cryptographic signing, replay protection, and E2E encryption for AI agent messages.
 
-- **Step-up approval** (`approval.ts`): a named approver countersigns one action,
-  bound to the acting agent, method, normalized path and body hash; max 10 minute
-  lifetime; single use; no self-approval; a failed presentation does not consume
-  the grant. Routes opt in with `approval: { require, approvers }`.
-- **Provenance claims** (`provenance.ts`): signed `trusted`/`untrusted` labels for
-  an action's inputs, bound to that action, with a `ProvenanceContext` taint
-  accumulator for agent runtimes. Fails closed. Does not detect prompt injection;
-  see `docs/APPROVAL_AND_PROVENANCE.md`.
-- **HTTP Message Signatures (RFC 9421)** and **Content-Digest (RFC 9530)**
-  (`httpMessageSignatures.ts`): request and response signing/verification with
-  policy-driven verification (required coverage, freshness, tag, single-use nonce,
-  body binding). Reproduces the RFC's Ed25519 and HMAC vectors byte for byte.
-- **Web Bot Auth** (`webBotAuth.ts`): JWK thumbprint key ids, `Signature-Agent`,
-  guarded key-directory fetching. The verifier never fetches an agent URL itself.
-- Gateway `require: 'http-signature'` routes (`GatewayConfig.httpSignature`).
-- **MCP tool pinning** (`mcpToolPinning.ts`): digests of everything a model reads
-  about each tool, signed pin sets bound to a server, a scanner for invisible,
-  bidi-override, control and Unicode tag characters, and `guardMcpClient`, which
-  filters `tools/list` and refuses `tools/call` for changed, suspicious, duplicate
-  or unpinned tools (re-verifying when stale, failing closed).
-- **Signed SSE for MCP streamable HTTP** (`mcpSse.ts`): per-event signatures with
-  stream binding, strict sequence numbers, replay protection and a signed end event
-  so truncation is detected.
-- `MemoryReplayStore`: single-process `ReplayStore` that fails closed at capacity.
-
-- **The landing hub is now a WebMCP surface.** Splitting the single-page demo
-  into a hub plus three demos left `/` registering no tools, so an agent opening
-  the site's front door found an empty `document.modelContext`. The hub now
-  registers three read-only tools — `list_demos`, `explain_7h3`, `open_demo` —
-  wrapped by the same guard as every other tool, so an agent can tour the site
-  without being told where to go. All four routes now register tools: 19 total.
-
-  `open_demo` accepts only a path that is literally one of the three published
-  demos; any other value throws rather than navigating.
-
-### Security
-
-- **Gateway no longer forwards caller-supplied `x-7h3-verified`, `x-7h3-sender`,
-  `x-7h3-approved-by`, `x-7h3-trust` or `x-7h3-approval`.** On a `require: 'none'`
-  route a client could send `x-7h3-verified: true` and have it reach the upstream
-  as if the gateway had verified the request.
-
-### Changed
-
-- **Dependencies refreshed across every package**, each verified against its own
-  tests and build. Notable: `@noble/post-quantum` 0.7.1 (ML-DSA hardening),
-  `@noble/curves` 2.4, `golang.org/x/crypto` 0.57, `cryptography` 50.0.1,
-  `base64` 0.23 (Rust), wrangler 4.143, and vitest 5 everywhere.
-- `src/protocol.bench.ts` migrated to the vitest 5 benchmarking API
-  (`bench.compare()` inside a test); `npm run bench:protocol` is unchanged.
-- CI action pins refreshed and unified (`setup-node` v7.0.0 in every job).
-
-### Fixed
-
-- **Rust:** `cargo clippy --all-targets -- -D warnings` failed with 7 errors.
-  Fixed with no behavior or signature change; the crate now declares
-  `rust-version = "1.82"` (needed for `Option::is_none_or`).
-- `demo/package-lock.json` was out of sync with `package.json` (`npm ci` failed
-  on a missing `tsx`); regenerated.
-
-### Documentation
-
-- `docs/TESTING.md` rewritten around the three demos, with per-route tool
-  counts, the exact strings each step should produce, and a verified command for
-  checking the published manifest signature against the npm package rather than
-  this repo.
-- Test counts corrected across `README.md`, `CLAUDE.md` and `AGENTS.md`: the
-  stale "581" is now **776** — TypeScript 604, Python 106, Go 35, Rust 31.
+  <br/>
+</div>
 
 ---
 
-## v0.6.8 — `@7h3/protocol` 0.6.3
-
-Final adversarial pass, over the last four unattacked subsystems.
-
-### Security
-
-- **The audit log was not chained, though the README said it was.** The
-  Security Guarantees table claimed "`InMemoryAuditLog` entries are
-  Ed25519-signed and chained". They were signed independently, which detects
-  modification but **not deletion**: an attacker who can write to the log
-  removes the entries covering their activity and every remaining entry still
-  verifies. Demonstrated by pruning one entry from a four-entry log — all three
-  survivors verified.
-
-  Rather than retract the claim, entries now carry `prevHash` (inside the
-  signed payload, so a rewritten link invalidates the entry) and
-  `verifyAuditChain` reports the first index where the chain fails. Deletion,
-  modification, reordering and forgery under another key are all detected.
-  `log()` is unchanged for callers — `prevHash` is derived, never supplied.
-
-### Verified clean under attack
-
-`RollingKeyring` blocked verification after revocation, including with
-duplicate records for the same `(sender, keyId)`. `validateRuntimePolicy`
-rejected every malformed policy — `null`, a string, a number, an array, an
-empty object, and partial policies. `policyEnforcer` and the MCP gateway/
-transports build on those and inherit their checks.
-
-Unknown fields in a runtime policy are passed through rather than stripped,
-which is deliberate — it keeps the format extensible — and is safe because
-consumers read named fields.
-
-## v0.6.7 — `@7h3/protocol` 0.6.2
-
-Findings from a fourth adversarial pass, this time over security controls that
-had only ever been read, never attacked.
-
-### Security
-
-- **Revoking a keyId left Ed25519 fully valid.** `RevocationRegistry`'s two
-  credential paths disagreed: `getSharedSecret` receives both a keyId and a
-  sender and checked both, while `getPublicKey` receives only a sender and
-  checked only that. So `revoke('k1')` blocked the HMAC credential and silently
-  did nothing for Ed25519 — a revoked, compromised key kept authenticating.
-
-  A registry lookup is keyed by sender and structurally cannot see
-  `signature.keyId`, so this could not be fixed in place. Added
-  `isEnvelopeRevoked(envelope)`, which checks both the sender and the keyId the
-  envelope was signed under, and documented which identifier `revoke()` affects
-  — and that `RevocationStore` is the right tool for fleet-wide
-  `(sender, keyId)` revocation.
-
-- **Rate-limiter eviction was a rate-limit reset.** The key map is LRU-bounded,
-  and evicting a key sitting at its quota restores its full allowance, so
-  pushing enough distinct keys through the store cleared a victim's limit.
-  Verified: a victim blocked after three requests was allowed again after a
-  500-key flood.
-
-  Eviction now runs in order — fully-expired windows first (they hold no live
-  state), then keys under quota (losing their state grants nothing), and keys at
-  or over quota only as a last resort. The bound is still real and documented:
-  with more concurrently-active keys than `maxKeys`, something live must go.
-
-### Verified clean under attack
-
-The stream binding rejected all seven attacks — dropped chunk, reordered
-chunks, tampered chunk content, removed final frame, cross-stream splice, and
-verification under a foreign key. Signed responses rejected tampered bodies,
-missing headers and foreign keys. The gateway rejected all nine, including a
-capability token attempting to bypass `allowedSenders`, and a post-dated
-envelope. Webhooks rejected all nine malformed and replayed cases. Cloudflare's
-middleware fails closed on any `DEFAULT_POLICY` other than exactly `'allow'`,
-the KV key registry percent-encodes both identifiers, and the KV replay race
-window is documented with a pointer to the Durable Object store. `mcpWrapper`
-pins `requireSignature: true` after the option spread, so it cannot be
-overridden.
-
-## v0.6.6 — queue payload integrity (TypeScript, Python, Rust)
-
-### Security
-
-- **The queue binding accepted an unsigned payload.** `signQueueMessage` writes
-  the payload twice: into `envelope.body.content`, which the signature covers,
-  and into a sibling `payload` field, which it does not. `verifyQueueMessage`
-  verified the envelope and then returned the **sibling** field.
-
-  An attacker could therefore take any validly signed queue message, replace
-  `payload` with anything at all, and the signature would still verify while the
-  consumer acted on attacker-controlled data. Demonstrated end to end: a message
-  signed as `{"job":"reindex","amount":10}` was accepted returning
-  `{"job":"DROP TABLE users","amount":1000000000}`.
-
-  A complete integrity bypass on a transport whose entire purpose is integrity.
-  Present in TypeScript, Python and Rust — every SDK that ships a queue binding.
-  Go has none and is unaffected. The returned payload is now required to
-  serialize exactly to the signed content, using the same serialization the
-  signing side uses, so honest messages are unaffected.
-
-  `consumeWebhook` was audited for the same shape and is safe: it parses the
-  verified payload itself rather than a sibling field.
-
-### Added
-
-- Regression tests in all three SDKs covering a swapped payload, a removed
-  payload, a subtly altered numeric field, string-payload round-trips, and
-  `verifyQueueBatch` inheriting the check.
-
-## v0.6.5 — `@7h3/protocol-threshold` 0.6.1
-
-### Security
-
-- **`splitPrivateKey` silently corrupted any key that was not a 32-byte BLS
-  scalar.** Shares carry a 32-byte field element, but nothing checked the input.
-  Splitting a 48-byte Ed25519 PKCS8 key produced shares that "reconstructed"
-  into a *different* 32-byte key, with **no error thrown**. A 32-byte value at
-  or above the BLS field order was likewise reduced by `fieldMod` and
-  reconstructed to a different value.
-
-  For a key-recovery primitive this is the worst possible failure mode: it only
-  surfaces when the backup is finally needed. Both cases now throw, naming the
-  likely mistake.
-
-  Found by exercising the published tarballs rather than the working tree.
-
-### Added
-
-- `scripts/verify-published-packages.mjs` — installs every 7h3 package fresh
-  from the registry and asserts 47 properties against the real artifacts:
-  signing and tamper detection, every validation rule, CBOR depth and prototype
-  pollution limits, delegation containment, the full WebMCP authorization model
-  (grants, spend ceilings, replay, receipt tampering and deletion, manifest
-  verification, tool-surface poisoning), and cross-SDK interop in both
-  directions. A green unit suite says the source is correct; this says the
-  artifact a user installs is.
-
-Only `@7h3/protocol-threshold` changes version, to 0.6.1.
-
-## v0.6.4 — `@7h3/protocol-mcp` 0.6.2
-
-### Fixed
-
-- **`@7h3/protocol-mcp@0.6.1` could not start.** Running it failed immediately
-  with `ERR_MODULE_NOT_FOUND: Cannot find module '.../dist/scaffold'`. The
-  regression was introduced in this release series by splitting `scaffold.ts`
-  and `version.ts` out of `index.ts`: `tsc` does not rewrite specifiers when
-  emitting ESM, so `from './scaffold'` stays extensionless and Node's resolver
-  rejects it. The package was a single file before that split, which is why it
-  had never been exposed. 0.5.6 is unaffected.
-
-  Every unit test still passed, because they import the modules directly rather
-  than launching the built server.
-
-### Added
-
-- `npm run smoke` in `mcp-server` — packs the tarball, installs it, **launches
-  the built server and drives a real MCP session over stdio**: `initialize`,
-  `tools/list`, then a `tools/call` of `7h3_generate_keypair`, asserting the
-  server identifies itself, lists the expected tools, and returns a keypair.
-  Importing the entry point would not have caught this; only starting the
-  binary does. Verified to fail with `server exited early (code 1)` against the
-  broken build. Wired into CI and the publish job.
-
-Only `@7h3/protocol-mcp` changes version, to 0.6.2.
-
-## v0.6.3 — `@7h3/protocol-browser` 0.6.1
-
-`@7h3/protocol-browser` had been stuck at 0.4.0 with no build tooling and no
-publish job. It is a self-contained reimplementation of the wire format — it
-shares no code with `src/` — and it had drifted badly.
-
-### Security
-
-- **The browser SDK performed no validation at all.** It exposed only
-  `isEnvelopeExpired`, and accepted every malformed envelope the other SDKs
-  reject: a `ttlMs` of a year, a `timestampMs` a year in the future, `NaN` or
-  `Infinity` in either field, an empty nonce, and a foreign wire version.
-  Publishing it version-matched with the hardened SDKs would have shipped a
-  package with none of the hardening.
-
-  It now exports `validateEnvelope` enforcing exactly the same rules, with
-  identical diagnostic messages, plus `MAX_TTL_MS` and `MAX_CLOCK_SKEW_MS`.
-
-- **`isEnvelopeExpired` failed open on non-finite input.** `NaN + NaN < now` is
-  false, so an envelope with a `NaN` timestamp or TTL was reported as *not*
-  expired. It now fails closed.
-
-### Added
-
-- Build tooling: the package had no `tsconfig.json` and no build script, yet
-  `package.json` pointed at `index.js` and `index.d.ts` that did not exist in
-  the repository. It now builds to `dist/`, matching the other SDKs.
-- `npm run smoke` — packs, installs and imports the tarball under plain Node,
-  asserting sign/verify, tamper detection, and each validation rule. Wired into
-  CI and the publish job.
-- `src/browserParity.test.ts` — since this SDK shares no code with the core,
-  only a test keeps them in step. It compares canonical bytes, round-trips
-  signatures core↔browser in both directions, and asserts both SDKs emit
-  identical diagnostics for twelve malformed envelopes.
-- `publish-browser` job, and a package `README.md` (which `files` already
-  referenced but did not exist).
-
-### Fixed
-
-- `docs/install/browser.md` documented the core's flattened
-  `createEnvelope({ sender, intent, content })`. This SDK takes a nested
-  `body`. The smoke test caught it.
-
-Only `@7h3/protocol-browser` changes version, to 0.6.1.
-
-## v0.6.2 — `@7h3/protocol-webmcp` 0.6.1
-
-### Fixed
-
-- **`@7h3/protocol-webmcp@0.6.0` was published broken.** Importing it threw
-  `ERR_MODULE_NOT_FOUND: Cannot find module '.../dist/guard'`. TypeScript does
-  not rewrite module specifiers when emitting ESM, so a source import of
-  `'./guard'` stays `'./guard'` in the output, and Node's ESM resolver requires
-  the explicit `.js`. All relative specifiers now carry it.
-
-  The unit suite could not have caught this: vitest resolves extensionless
-  imports happily, so all 61 tests passed against a build that no consumer
-  could import. Only the bundled core, `-pq` and `-threshold` escaped it — they
-  are single-file packages with no relative imports.
-
-### Added
-
-- `npm run smoke` in `sdk/webmcp` — packs the real tarball, installs it into a
-  scratch project, and imports it under plain Node, exercising a refusal, an
-  allowed call, a bound spend cap, receipt-chain verification and manifest
-  verification. Verified to fail with the exact `ERR_MODULE_NOT_FOUND` against
-  the broken build and pass against the fix. Wired into both CI and the publish
-  job, so this class of defect cannot reach a registry again.
-
-### Changed
-
-- npm publish steps now treat npm's own "cannot publish over the previously
-  published versions" as success. A newly created package's document can lag
-  the publish endpoint, so the pre-existing "check if already published" step
-  reported *not published* for `@7h3/protocol-webmcp@0.6.0` moments after it
-  was published, and the job failed re-publishing it. The intent of that check
-  is idempotency, not novelty.
-
-Only `@7h3/protocol-webmcp` changes version, to 0.6.1. Everything else stays as
-published.
-
-## v0.6.1 — `@7h3/protocol-mcp` only
-
-### Fixed
-
-- `@7h3/protocol-mcp` failed to build during the v0.6.0 publish:
-  `src/scaffold.test.ts(2,38): error TS2307: Cannot find module 'vitest'`. The
-  package's `tsconfig.json` compiled all of `src`, which now includes a test
-  file, but its tests run under the repo-root vitest and `vitest` is not a
-  dependency here. It typechecked locally only because Node resolution walks up
-  into the root `node_modules`; the publish job installs the package in
-  isolation, where there is nothing to walk up to. Test files are now excluded
-  from the build, verified against an isolated `npm ci` that mirrors CI.
-
-Only `@7h3/protocol-mcp` changes version. Every other package remains at 0.6.0,
-which is already published; the workflow's idempotency checks skip them.
-
-## v0.6.0
-
-Security release. Every SDK tightens envelope acceptance, and a new package
-brings the protocol to WebMCP. **Wire format is unchanged (`7h3/0.1`)** — only
-what each SDK is willing to accept has changed, so peers interoperate exactly
-as before.
-
-### Added
-
-- **`@7h3/protocol-webmcp`** — signed, capability-scoped, receipted WebMCP
-  (`document.modelContext`) tools. Three primitives: manifests signed by the
-  origin at deploy time so an injected lookalike tool is detectable; scoped,
-  expiring, revocable grants with spend ceilings bound *inside* the signed
-  token; and a hash-chained receipt log recording every call, allowed and
-  refused. Grants are held page-side by default, so the token never passes
-  through the agent.
-- `webmcp` scaffold target in both `7h3 add` and the MCP server's
-  `7h3_scaffold`.
-- `docs/install/` — a guide per install surface, including WebMCP and ChatGPT.
-- `MAX_CLOCK_SKEW_MS` (TypeScript, Python, Rust, Go) and `MAX_CBOR_DEPTH`
-  (TypeScript).
-
-### Changed
-
-- **`README.md` rewritten to match the shipped API surface.** Many examples were
-  aspirational and had never matched the real code: `createEnvelope` shown with
-  three positional arguments (the real signature takes a single options object),
-  `verifyEnvelopeEd25519` / `verifyEnvelopeHmac` documented as returning
-  `{ ok, error }` (they return a plain boolean), and `createWsBinding`,
-  `grpcSigningInterceptor` / `grpcVerifyingInterceptor`, `createKeyRotator`, and
-  a Python/Rust `generate_keypair()` that exist in no SDK. Replaced with the real
-  `wrapWebSocket`, `signGrpcCall` / `withGrpcVerification`, `KeyRotationManager`,
-  and verified per-SDK keygen patterns. Also corrected `RoutePolicy.pathGlob` to
-  `path`, the reversed argument order on `matchPolicy` / `isAllowedSender`, and
-  the `SlidingWindowRateLimiter`, `createCachingKeyRegistry`, and
-  `createAuditLog` shapes.
-- The README's CLI and Gateway sections assumed a `--config <yaml>` flag that was
-  never implemented — rewritten against the real flag-based CLI. The Docker
-  section claimed a published `ghcr.io` image that no CI job produces — rewritten
-  to build locally from the repo `Dockerfile`.
-- `docs/assets/banner-github.png` regenerated at its real 1280x400 size (478
-  tests, 5 transport bindings, v0.5.6).
-
-### Security
-
-- **`MAX_TTL_MS` bounded nothing.** `validateEnvelope` never rejected a
-  post-dated timestamp, and `verifyHttpEnvelope` calls only `validateEnvelope` —
-  the clock-skew check lived solely in `protocolTransport`. On the primary HTTP
-  path a sender could set `timestampMs` a year ahead with a legal 24h `ttlMs`
-  and keep an envelope valid, and replayable, for a year. Now bounded at 30s
-  across all four SDKs.
-- **Python accepted `null` and non-string identity fields.** Presence checks
-  used `str(value).strip()`, which renders `None` as `"None"`, `False` as
-  `"False"` and `0` as `"0"` — all non-empty. `"nonce": null` passed validation
-  with no replay nonce at all; `"sender": null` passed with no identity.
-- **Python raised instead of rejecting on malformed numbers.** `"ttlMs": "abc"`,
-  `NaN`, `Infinity` or `null` threw out of `validate_envelope` — an unhandled
-  exception in a request handler, on input straight off the wire.
-- **Rust never checked for a missing nonce**, so it accepted an envelope with no
-  replay-protection primitive. TypeScript, Python and Go all rejected it.
-- **Unsound delegation scope containment.** `pathGlobIsSubset` returned true as
-  soon as a parent segment was `**`, even with no child segments left — but
-  `a/**` matches `a/x` and never bare `a`, so a child of `a` reached a path its
-  parent could not.
-- **CBOR had no nesting bound.** `0x81` is "array of 1", so 50 KB of repeated
-  `0x81` nested 50 000 deep and overflowed the decoder's stack — reachable
-  through the HTTP CBOR binding. Bounded at 64 per RFC 8949 §10.
-- **`verifyHttpEnvelope` threw on attacker-chosen input.** Both signature
-  branches dereferenced `opts.keyRegistry` unguarded, so an HMAC envelope sent
-  to a registry-less server raised a `TypeError` inside the handler instead of
-  returning a clean refusal. Now fails closed.
-
-### Fixed
-
-- `bin/gateway-cli.test.ts` spawns `bin/7h3.ts` as a separate process, so it
-  resolves `@7h3/protocol` from disk and needs `dist/` — but `ci.yml` ran tests
-  before the build. CI had been red since 2026-08-08; a `pretest` hook fixes it
-  everywhere, so `npm test` now works on a fresh clone.
-- The open-loop benchmark crashed the whole run at high concurrency: a client
-  destroying a stream first makes `respond()` throw `ERR_HTTP2_INVALID_STREAM`
-  *synchronously*, so the stream `error` listener never saw it and the throw
-  inside a `catch` escaped unhandled. `npm run release:gate` could not complete.
-- `@7h3/protocol-mcp` hardcoded `@7h3/protocol-mcp@0.5.0` in six places while
-  shipping 0.5.6, so every generated install config pinned a stale release. Now
-  derived from `package.json`.
-- Peer ranges widened from `^0.5.0` to `>=0.5.0 <1.0.0`. Under 0.x semver
-  `^0.5.0` means `<0.6.0`, so this release would otherwise have broken every
-  satellite package's peer resolution.
-
-### Note for upgraders
-
-Validation is strictly tighter. An envelope that previously passed will now be
-rejected if it is post-dated by more than 30s, carries a non-string or missing
-nonce or sender, or carries a non-finite `ttlMs`/`timestampMs`. All of those
-were already invalid in principle; they are now enforced consistently in every
-SDK. Wire format unchanged: `7h3/0.1`.
-
-## v0.5.6 — 2026-08-08
-
-### Fixed
-
-- CLI build regression that broke v0.5.5's npm publish. `bin/7h3.ts` passed an
-  `InMemoryRedisLikeClient` straight to `RedisReplayStore`, which takes an
-  options object (`{ client, redisUrl, keyPrefix }`) — and the two interfaces
-  were never compatible in the first place. Replaced with a small
-  `InMemoryCliReplayStore` implementing the gateway's `ReplayStore` interface
-  directly; a single-process CLI store needs no Redis abstraction. Only
-  `tsc -p tsconfig.bin.json` (what `package:protocol` and `publish.yml` run)
-  catches this class of error — the root `tsc --noEmit` does not compile
-  `bin/7h3.ts`'s dynamic imports against built `dist/` output.
-
-### Release note
-
-crates.io and PyPI published `v0.5.5` successfully — neither artifact includes
-`bin/7h3.ts` — and only the npm publish failed. Rather than force-move an
-already-pushed tag, all six targets were bumped to `v0.5.6`.
-
-Wire format unchanged: `7h3/0.1`.
-
-## v0.5.5 — 2026-08-08
-
-### Security
-
-- **Gateway capability-token auth bypassed `allowedSenders` and rate limiting.**
-  The capability path returned `ok: true` immediately; both checks now run on
-  every auth path through a shared post-auth check.
-- **Path-traversal bypass in the gateway.** Request paths are now normalized once
-  and the normalized path is used for both policy matching and upstream
-  forwarding. `x-7h3-verified` is no longer set on requests that skipped
-  verification.
-- **Capability delegation chains accepted escalation** — broader scope, longer
-  TTL, and `maxDelegations: 0` all passed verification. Also fixed a
-  glob-containment bug that treated `**` as narrower than `*`.
-- **Non-finite `timestampMs` / `ttlMs` defeated TTL expiry, clock-skew, and replay
-  checks** in `protocol.ts`, `protocolTransport.ts`, and `protocolReplay.ts`.
-- **CBOR map decoding allowed `__proto__` prototype pollution**; envelope field
-  decoding now validates types instead of blindly casting.
-- **`mcpWrapper`'s `requireSignature` could be silently overridden to `false`**
-  through option spread order.
-- **Key revocation only blocked Ed25519**, not the same key's HMAC shared-secret
-  path; unrecognized sender IDs no longer fall back to the current key.
-- **Webhook and WebSocket bindings had no replay protection** — a captured valid
-  message could be replayed indefinitely inside its TTL window. Both now accept
-  an optional `replayCache` (`InMemoryWebhookReplayCache` included).
-- **`SlidingWindowRateLimiter` grew without bound** while tracking unique senders;
-  its key map is now LRU-evicted.
-- **The CLI refuses to start an unverified passthrough gateway** without
-  `--allow-unverified`. Added `--private-key-file` and env-var alternatives to
-  `--private-key` so keys stop leaking through shell history and process
-  listings; all HTTP servers gained error handlers.
-- **Code-generation injection in `mcp-server`**: user-supplied `sender`,
-  `upstream`, `serverAgentId`, and `clientAgentId` are now escaped before being
-  interpolated into the templates emitted by `7h3_scaffold` and
-  `7h3_wrap_mcp_server`.
-- Cloudflare hardening: `wrangler.toml` was missing KV bindings for the staging
-  and production environments (Wrangler does not inherit them); KV registry keys
-  now percent-encode sender and keyId to prevent delimiter collisions between
-  senders; Durable Object cleanup alarms use each entry's real TTL/window instead
-  of a hardcoded 5-minute sweep; `DEFAULT_POLICY` now fails closed on any value
-  other than exactly `'allow'`.
-
-### Fixed
-
-- Dependency advisories closed across every workspace: `cryptography`
-  49.0.0 → 50.0.0 (GHSA-g6cj-pr64-35w5 — a PKCS#7 Bleichenbacher oracle;
-  CI/test-only for the Python SDK, which has no runtime dependencies and never
-  touches PKCS#7), `nanoid` (GHSA-2v37-7h3g-55p8) in root, `mcp-server`,
-  `sdk/pq`, `sdk/threshold`, and `cloudflare`, and an `undici` 7.29.0 override in
-  `cloudflare/` closing three advisories pulled in through
-  `wrangler` → `miniflare`.
-
-Wire format unchanged: `7h3/0.1`.
-
-## v0.5.4 — 2026-08-03
-
-### Changed
-
-- **License changed from MIT to Apache-2.0.** 7h3 Protocol is a wire protocol
-  meant to be implemented independently. Apache-2.0 §3 supplies the express,
-  irrevocable patent grant and the patent-retaliation clause that MIT lacks, and
-  it is the license foundations hosting protocol work expect. Relicensing is
-  clean now: copyright is held solely by IceMasterT, the only non-maintainer
-  commits are mechanical dependabot bumps, and no CLA or DCO is in effect.
-- All eight publishable artifacts now declare Apache-2.0 and carry the license
-  text at their own package root: `@7h3/protocol`, `@7h3/protocol-mcp`,
-  `@7h3/protocol-pq`, `@7h3/protocol-threshold`, `@7h3/protocol-browser`,
-  `protocol-7h3` (crates.io), `7h3-protocol` (PyPI), and the Go module.
-- `cloudflare/package.json` declared no license at all; now `Apache-2.0`.
-
-### Security
-
-- **Critical: gateway rate limiting was backed by in-process state** that reset on
-  restart — now backed by persistent state.
-- Queue bindings gained TTL and replay protection.
-- HMAC shared-secret lookup is now bound to the claimed sender.
-- Rust private keys are zeroized on drop and redacted from `Debug` output.
-- `/metrics` is gated by default, and `ttlMs` is capped at 24 h across all SDKs.
-- `@7h3/protocol-pq` no longer derives `keyId` from private key material.
-
-### Fixed
-
-- `scripts/prepare-aip-package.ts` hardcoded `license: 'MIT'` independently of
-  `package.json` and never copied a license file into `dist/npm-protocol`. Every
-  published `@7h3/protocol` tarball to date has shipped with **no license text**,
-  including v0.5.3, despite the repo carrying a `LICENSE` since v0.5.2. The
-  script now declares Apache-2.0 and copies `LICENSE` and `NOTICE` into the
-  tarball.
-- `sdk/rust/Cargo.toml` `include` paths resolve against the package root
-  (`sdk/rust/`), so the repo-root `LICENSE` could never reach crates.io. Every
-  published `protocol-7h3` crate has shipped with no license text. `include` now
-  lists `LICENSE` and `NOTICE`.
-- `mcp-server/package.json` `files` allowlist omitted `NOTICE`. npm force-includes
-  `LICENSE` but not `NOTICE`, so the attribution notice would not have shipped.
-- **`@7h3/protocol/<subpath>` imports were broken in the shipped package** —
-  `gateway`, `http`, `key-registry`, and the rest resolved to per-module `dist`
-  files that vite's single-bundle lib build never produced. This was live, not
-  just a publish-artifact bug: `cloudflare/src/worker.ts` and `middleware.ts`
-  import `createGateway` from `@7h3/protocol/gateway`, and that import threw
-  `ERR_MODULE_NOT_FOUND`. Every subpath's `import` condition now points at
-  `dist/protocol/index.js` (types stay per-module).
-- **`@7h3/protocol-pq@0.5.0` was live and broken on npm.** Its `main`/`types`/
-  `exports` pointed at `./index.js`, but a `rootDir` reaching across the monorepo
-  produced deeply nested paths like `dist/7h3-protocol/sdk/pq/src/index.js` that
-  never matched, so importing it gave `ERR_MODULE_NOT_FOUND`. `sdk/pq/src/index.ts`
-  now imports from the public `@7h3/protocol` package it already declares as a
-  peer dependency, with a self-contained `rootDir: ./src`. Added
-  `prepublishOnly` build steps to `sdk/pq` and `sdk/threshold` so a
-  "published without a fresh build" bug cannot recur.
-- `release-gate.ts` referenced a nonexistent `bench:openloop:adaptive:ci` script,
-  and `policy:validate` had no default path — `npm run release:gate` now runs.
-- The `Dockerfile` swallowed `build:protocol` failures with `|| true`; the build
-  must now succeed, since the runtime stage ships `bin/7h3.js` and runs it with
-  plain `node` instead of tsx-executing TypeScript source.
-- Documentation drift from the pre-rename repo: wrong clone URL, nonexistent npm
-  scripts, and references to UI files that do not exist here in
-  `docs/CLEAN_CLONE_RUNBOOK.md` and `docs/AGENTS.md`; `aip_*` tool names in
-  `mcp-server/README.md`; the `aip/0.1` wire version in `CONTRIBUTING.md`;
-  `AIP_*` env var names in `docs/MCP_WRAPPER.md`; and six operational docs still
-  worded for "GLUV".
-
-### Added
-
-- `NOTICE` — attribution notice required to propagate under Apache-2.0 §4(d),
-  recording copyright in IceMasterT.
-- `## License` section in `README.md`. There was previously only a badge.
-- `createProductionGateway()` — throws unless `defaultPolicy` is explicitly
-  `'deny'` and a `replayStore` is set, instead of silently allowing unmatched
-  routes through unverified or losing replay protection across instances.
-  `createGateway()` now warns once when a signature-requiring policy has no
-  `replayStore`.
-- `scripts/smoke-test-package.ts` — packs the real npm artifact and imports every
-  documented subpath plus the CLI bin through `node_modules`.
-- `npm run install:all` — restores `sdk/pq` and `sdk/threshold` alongside the root
-  install. Previously undocumented, so a fresh clone's root test run failed on
-  missing `@noble/*` deps.
-- Compiled CLI: `bin/7h3.ts` is built to `bin/7h3.js` and shipped in the publish
-  artifact, with internal dynamic imports rewritten to the package's own public
-  subpaths so it works compiled, not just under tsx.
-- Release pipeline: PyPI trusted publishing, crates.io publishing via OIDC
-  trusted publishing (no long-lived `CARGO_REGISTRY_TOKEN`), and `publish-pq` /
-  `publish-threshold` / `mcp-server` jobs, all gated on `publish-protocol`. Every
-  publish job is idempotent and skips work already published.
-
-### Downstream note
-
-Releases up to and including `v0.5.3` were published under MIT. That grant is
-irrevocable and is not being withdrawn; anyone who obtained those versions keeps
-their MIT rights to them permanently. Apache-2.0 applies from `v0.5.4` onward.
-
-Apache-2.0 is incompatible with GPLv2-only code (GPLv3 is unaffected). Projects
-vendoring a 7h3 Protocol SDK into a GPLv2-only codebase should pin `v0.5.3`.
-
-Wire format unchanged: `7h3/0.1`.
-
-## v0.5.3
-
-### Changed
-
-- Internal type-quality sweep: eliminated every `any` from production `src/`
-  (typed `WebSocketLike` listeners, structural `BufferCtorLike`, `unknown`
-  casts), zeroed out ESLint (62 → 0) and `tsc --noEmit` (40 → 0). No behavior
-  change; all 395 tests pass.
-- Supply-chain hardening: all GitHub Actions pinned to commit SHAs, gitleaks
-  secret-scan workflow, `tsc` + fuzz-smoke CI gates, CODEOWNERS,
-  CODE_OF_CONDUCT, branch protection on `main`.
-- Spec: RFC §5.1 now makes nonce entropy normative (CSPRNG, ≥96 bits;
-  timestamp / `Math.random()` nonces forbidden).
-
-## v0.5.2
-
-### Security
-
-- **Rust: constant-time HMAC verification** — `verify_canonical_payload_hmac` previously
-  compared base64 strings with `==`, leaking matching-prefix length as a timing oracle.
-  Now decodes the signature and uses `hmac::Mac::verify_slice` (constant-time). Brings
-  Rust in line with TypeScript (`subtle.verify`) and Python (`hmac.compare_digest`).
-- **Cryptographically secure nonces** — TypeScript `createEnvelope` used `Math.random()`
-  for nonce/messageId defaults; the Rust envelope helper used a timestamp-only nonce
-  (`n-<ms>`, zero entropy, collides within the same millisecond). Both now use CSPRNG
-  output: new exported `randomHex()` (Web Crypto) in TS and `random_nonce()`
-  (`getrandom`) in Rust. Capability token, key rotation, and audit log IDs also moved
-  off `Math.random()`.
-
-### Fixed
-
-- CI/publish workflows referenced nonexistent scripts (`build:aip`/`package:aip`) and
-  the old `dist/npm-aip` output path — corrected to `build:protocol`/`package:protocol`
-  and `dist/npm-protocol`.
-- `SECURITY.md`/`GOVERNANCE.md` still cited the pre-rebrand wire version `aip/0.1` and
-  the removed `src/aip/` path — corrected to `7h3/0.1` and current paths.
-- Repository URLs pointed at the old `7h3-protocol-aip` repo name across package
-  manifests and docs; Cargo `documentation` link fixed to `docs.rs/protocol-7h3`.
-
-### Added
-
-- `LICENSE` file (MIT) — previously declared in manifests but missing from the repo.
-
-### Removed
-
-- Stale compiled `src/protocol.js` (drift risk next to `protocol.ts`).
-- `bench-results/` JSON artifacts untracked and gitignored.
-
-Wire format unchanged: `7h3/0.1` envelopes signed by v0.5.1 verify under v0.5.2 and
-vice versa.
-
-## v0.5.0
-
-### New features
-
-**Feature 1 — Distributed Redis replay cache**
-- RedisReplayStore: atomic SET NX PX prevents cross-instance replay attacks
-- ClusterRedisReplayStore: queries all Redis Cluster nodes
-- InMemoryReplayStore improvements
-- Go SDK: InMemoryReplayStore + RedisReplayStore (inject-your-client)
-- Python SDK: RedisReplayStore using redis-py
-
-**Feature 2 — End-to-end encryption (X25519 + ChaCha20-Poly1305)**
-- sealEnvelope / openEnvelope: encrypt body before signing, verify before decrypting
-- generateX25519KeyPair: ephemeral key pairs for forward secrecy
-- Zero new dependencies: Node.js built-in crypto.ecdh + crypto.createCipheriv('chacha20-poly1305')
-- Python SDK: X25519 + ChaCha20-Poly1305 via cryptography package
-- Go SDK: crypto/ecdh + golang.org/x/crypto/chacha20poly1305
-
-**Feature 3 — Capability tokens and delegation chains**
-- issueCapabilityToken: scoped, time-bounded, cryptographically signed credentials
-- delegateCapabilityToken: sub-delegate with equal or narrower scope
-- verifyCapabilityChain: verify full A→B→C delegation chain
-- Gateway integration: x-7h3-capability header accepted alongside signatures
-- tokenMatchesScope: glob path matching
-
-**Feature 4 — Streaming message signing**
-- SignedStreamWriter / SignedStreamReader: per-chunk HMAC + final Ed25519
-- signStream / verifyStream: convenience wrappers for arrays
-- WebSocket integration: createSignedWebSocketStream / receiveSignedWebSocketStream
-- Tampering detected mid-stream on the failing chunk
-
-**Feature 5 — Prometheus metrics + OpenTelemetry**
-- Protocol7h3Metrics: counters and histograms for all verification events
-- renderPrometheusText: zero-dep Prometheus exposition format
-- createMetricsMiddleware: serve /metrics endpoint
-- CLI: 7h3 gateway --metrics-port N
-- setOtelProvider / withVerificationSpan: optional OTel tracing
-
-**Feature 6 — Post-quantum signatures (ML-DSA) — @7h3/protocol-pq**
-- generatePqKeyPair: ML-DSA-65 and ML-DSA-87 keypairs
-- signEnvelopePq / verifyEnvelopePq: same envelope format, alg: 'ML-DSA-65'
-- Python SDK: Dilithium2/3/5 via dilithium-py
-- Separate package to keep @7h3/protocol at zero runtime deps
-
-**Feature 7 — CBOR binary wire format**
-- encodeCbor / decodeCbor: zero-dep deterministic CBOR (RFC 8949)
-- encodeEnvelopeCbor / decodeEnvelopeCbor: compact numeric-key encoding (~40% smaller)
-- HTTP binding: Content-Type: application/7h3-cbor support
-- Go SDK: EncodeEnvelopeCBOR / DecodeEnvelopeCBOR
-
-**Feature 8 — M-of-N threshold signatures (BLS12-381) — @7h3/protocol-threshold**
-- generateBlsKeyPair: BLS12-381 keypairs
-- signEnvelopeBls: partial signature from one participant
-- aggregateSignatures: combine M-of-N partial sigs into one
-- verifyThresholdEnvelope: single verify call on aggregated sig
-- splitPrivateKey / reconstructPrivateKey: Shamir Secret Sharing over BLS scalar field
-- Separate package (@7h3/protocol-threshold) using @noble/curves
+## Table of Contents
+
+- [The Problem](#the-problem)
+- [Common Attacks](#common-attacks)
+- [What 7h3 Protocol Does](#what-7h3-protocol-does)
+- [How It Works](#how-it-works)
+- [Security Guarantees](#security-guarantees)
+- [Installation](#installation) — [step-by-step guides](./docs/install/README.md)
+- [Quick Start](#quick-start)
+- [Core API](#core-api)
+- [Transports](#transports)
+- [Gateway](#gateway)
+- [Cloudflare Workers](#cloudflare-workers)
+- [AI Coding Agents](#ai-coding-agents)
+- [MCP (Claude Tool Calls)](#mcp-claude-tool-calls)
+- [End-to-End Encryption](#end-to-end-encryption)
+- [Capability Tokens and Delegation](#capability-tokens-and-delegation)
+- [Streaming Message Signing](#streaming-message-signing)
+- [Distributed Replay Cache (Redis)](#distributed-replay-cache-redis)
+- [Binary Wire Format (CBOR)](#binary-wire-format-cbor)
+- [Observability (Prometheus + OpenTelemetry)](#observability-prometheus--opentelemetry)
+- [Post-Quantum Signatures (ML-DSA)](#post-quantum-signatures-ml-dsa)
+- [Threshold Signatures (M-of-N BLS)](#threshold-signatures-m-of-n-bls)
+- [WebMCP](#webmcp)
+- [Step-Up Approval and Provenance](#step-up-approval-and-provenance)
+- [HTTP Message Signatures (RFC 9421) and Web Bot Auth](#http-message-signatures-rfc-9421-and-web-bot-auth)
+- [MCP Tool Pinning and Signed SSE](#mcp-tool-pinning-and-signed-sse)
+- [DPoP (Sender-Constrained Tokens)](#dpop-sender-constrained-tokens)
+- [Agent Identity (Agent Cards, did:key, SPIFFE)](#agent-identity-agent-cards-didkey-spiffe)
+- [Attestation and Key Transparency](#attestation-and-key-transparency)
+- [Payment Mandates](#payment-mandates)
+- [Audit Log](#audit-log)
+- [Rate Limiting](#rate-limiting)
+- [Route Policies](#route-policies)
+- [Key Infrastructure](#key-infrastructure)
+- [Cross-SDK Conformance](#cross-sdk-conformance)
+- [CLI Reference](#cli-reference)
+- [Docker](#docker)
+- [Uninstall](#uninstall)
+- [Changelog](#changelog)
+- [License](#license)
 
 ---
 
-## [0.1.2] — 2026-06-05
+## The Problem
 
-### Added
-- `SECURITY.md` — coordinated vulnerability disclosure process, 48h acknowledgement / 14-day critical patch SLA, Hall of Thanks
-- `CONTRIBUTING.md` — test commands, wire-freeze policy, conformance fixture update requirement, PR workflow
-- `GOVERNANCE.md` — LF Minimum Viable Governance style: single-maintainer stage, decision process, co-maintainership path
-- `.github/dependabot.yml` — weekly npm and GitHub Actions dependency updates; non-security updates grouped to reduce noise
-- `.github/workflows/scorecard.yml` — OpenSSF Scorecard workflow (activates when Actions billing is restored)
-- `.github/workflows/publish.yml` — provenance-enabled npm publish workflow for both `@7h3/protocol` and `@7h3/protocol-mcp` (activates when Actions billing is restored)
-- `src/protocolFuzz.advanced.test.ts` — 8 property-based fuzz tests via fast-check: wire decoder resilience (never throws on arbitrary input), canonicalization determinism (field-order invariant), replay cache uniqueness properties
+AI agent systems are moving fast, and the protocols underpinning them were not built with message-level security in mind.
 
-### Changed
-- README: added Ed25519 production recommendation with code snippet; added Security section linking to SECURITY.md
-- `docs/MCP_WRAPPER.md`: added HMAC vs Ed25519 comparison table and Ed25519 `wrapMcpServer` example
-- `mcp-server`: updated `aip_wrap_mcp_server` tool description to guide toward Ed25519 for production; HMAC boilerplate now includes a production upgrade comment
+**MCP (Model Context Protocol)** is plain JSON-RPC 2.0. A message in flight has no signature. Any intermediary — a rogue proxy, a compromised queue consumer, a misconfigured load balancer — can alter tool call parameters or replay a previously captured request. The MCP handler has no way to know.
 
-### Fixed
-- README: corrected overstated fuzz status (now accurately notes property-based tests exist; formal fuzzing campaign still not done)
+**A2A (Agent-to-Agent)** signs Agent Cards — static configuration — not per-message traffic. Once an agent is "trusted," every message it sends is implicitly trusted regardless of whether that specific message was tampered with in transit or is a replay from ten minutes ago.
+
+**HTTP APIs** default to IP-based rate limiting. IP addresses are trivially spoofed or shared. The same valid signed request can often be submitted multiple times, triggering duplicate writes, payments, or tool executions.
+
+The gap these protocols share is identical: they authenticate *agents* at the connection or identity level, but they do not authenticate *individual messages* at the content level. 7h3 Protocol fills that gap without replacing anything.
 
 ---
 
-## [0.1.1] — 2026-06-05
+## Common Attacks
 
-### Fixed
-- Published package was missing 21 individual `.d.ts` module files — only `index.d.ts` was included, causing TS2305 errors in any consumer using NodeNext or bundler moduleResolution. All 22 declaration files now ship with the package.
-- `scripts/prepare-aip-package.ts`: copy all `.d.ts` files from `dist/aip/` instead of only `index.d.ts`
+Three attacks against agent traffic, and what the protocol does about each. Animated walkthroughs:
 
-### Added
-- `@7h3/protocol-mcp@0.1.0` — MCP server installable into Claude Code (`claude mcp add aip -- npx @7h3/protocol-mcp`). Five tools: `aip_generate_secret`, `aip_generate_keypair`, `aip_wrap_mcp_server`, `aip_sign`, `aip_verify`
+| Tampering and replay | Fake sender | Tricked agent |
+|:---:|:---:|:---:|
+| <img src="./docs/assets/explainer.gif" width="300" alt="Animation: an attacker changes a payment amount and replays a message; signing and nonce checks reject both"> | <img src="./docs/assets/explainer-impersonation.gif" width="300" alt="Animation: an attacker forges a From: Admin message; the signature check rejects it"> | <img src="./docs/assets/explainer-scope.gif" width="300" alt="Animation: a poisoned email makes an agent request a payment; a scoped, expiring capability token refuses it"> |
+| A changed message fails signature verification. A copied message fails nonce and TTL checks. | A claimed sender name is not trusted; only a valid signature from that sender's key is. | The agent can still be deceived, but it can only perform actions its capability token allows, and the token expires. |
 
----
-
-## [0.1.0] — 2026-06-01
-
-### Added
-
-**Core protocol (`aip/0.1`)**
-- `createEnvelope` / `signEnvelopeHmac` / `signEnvelopeEd25519` — envelope construction and signing over a deterministic canonical form (fixed key order).
-- `verifyEnvelopeHmac` / `verifyEnvelopeEd25519` — tamper-evident verification via real WebCrypto (no hand-rolled crypto).
-- `validateEnvelope` — structural + TTL + clock-skew validation with typed diagnostics.
-- `receiveEnvelope` — full receive pipeline: validate → verify → replay-check, composable via `ReceiveEnvelopeOptions`.
-- Wire formats: `json`, `compact` (minified), `binary` (MessagePack); encode/decode via `encodeEnvelope` / `decodeEnvelope`.
-- Polyglot parity: shared conformance fixture set (`conformance/aip_v0_1.json`) proves byte-identical signatures across TypeScript, Python (`aip7h3`), and Rust (`aip7h3`).
-
-**Replay protection**
-- `InMemoryReplayCache` — single-process `(sender, messageId, nonce)` uniqueness window with TTL.
-- `DistributedReplayCache` — wraps any `DistributedReplayStore`; routes batch ops through `reserveMany` when available.
-- `createRedisReplayStore` — atomic `SET NX PX` reserve over a client-agnostic `RedisLikeClient` interface; batch pipeline via `reserveMany`; `errorBehavior: 'fallback' | 'reject' | 'allow'` with graceful degradation to local store and `onDegraded` hook.
-- `InMemoryRedisLikeClient` — reference implementation for tests (no Redis dep required).
-
-**Fleet-wide key revocation**
-- `InMemoryRevocationStore` — single-process; supports time-bounded `untilMs`.
-- `createRedisRevocationStore` — cached reads (`cacheTtlMs` default 5 s), **fail-closed default** (`errorBehavior: 'reject'`), serves stale cache during Redis outage.
-- `withRevocationCheck` — wraps any `SignatureResolver`; revoked key returns `undefined` → verification fails.
-
-**MCP hardening wrapper**
-- `wrapMcpServer` — sign + replay-protect an existing MCP handler with zero handler changes; enforces recipient binding (cross-server relay defense).
-- `wrapMcpClient` / `createMcpClientCodec` — sign outbound requests; enforce sender binding (response-spoof defense) and correlation binding (response-substitution defense); replay protection on by default.
-- Demo: `npm run aip:mcp:wrap` — proves tampered and replayed requests rejected.
-
-**Transport adapters**
-- `serveMcpOverStdio` / `createStdioMcpClient` — newline-delimited; in-order sequential chain prevents response interleaving.
-- `createHttpMcpHandler` / `createHttpMcpClient` — `node:http` handler + `fetch` client; supports `binary` wire format.
-- No new runtime dependencies (uses `node:readline`, `node:http`, `node:stream`, global `fetch`).
-
-**Key management & policy**
-- Key rotation support (`keyRotation`), runtime policy (`runtimePolicy`, `policyEnforcer`), telemetry feedback hooks.
-- Framework adapters (`frameworkAdapters`), agent adapter (`agentAdapter`), MCP gateway (`mcpGateway`).
-
-### Documentation
-- `docs/THREAT_MODEL.md` — full threat coverage matrix.
-- `docs/DISTRIBUTED_REPLAY.md` — Redis store setup, `errorBehavior` table, operational guidance.
-- `docs/KEY_REVOCATION.md` — revocation store setup, cache TTL tuning.
-- `docs/MCP_WRAPPER.md` — threat coverage table, server + client usage, transport examples.
-
-### Test coverage
-- 123 tests / 22 test files — all green.
-- Live-Redis integration test (`redisIntegration.test.ts`) — auto-skips if no server present.
-- Python conformance: `conformance:python`.
-- Rust: `conformance:rust` (7 tests).
+MP4 versions for slides and social posts are in [`docs/assets/`](./docs/assets).
 
 ---
 
-[0.1.0]: https://github.com/IceMasterT/7h3-protocol/releases/tag/v0.1.0
+## What 7h3 Protocol Does
+
+7h3 Protocol wraps every message — regardless of transport — in a **signed envelope**. The envelope is compact, deterministic, and verifiable by any peer that holds the sender's public key.
+
+**Feature set:**
+
+| Feature | Mechanism |
+|---|---|
+| Message authentication | Ed25519 asymmetric signing or HMAC-SHA256 |
+| Replay prevention | TTL + nonce deduplication (in-memory or Redis) |
+| E2E encryption | X25519 key exchange + ChaCha20-Poly1305 AEAD |
+| Capability delegation | Scoped, time-bounded, cryptographic credential chains |
+| Streaming signing | Per-chunk HMAC + final Ed25519 over the full stream |
+| Observability | Zero-dep Prometheus exposition + optional OpenTelemetry |
+| Post-quantum | ML-DSA-65 / ML-DSA-87 (NIST FIPS 204) — `@7h3/protocol-pq` |
+| Binary encoding | Deterministic CBOR (RFC 8949) — ~40% smaller than JSON |
+| Threshold signing | M-of-N BLS12-381 aggregation — `@7h3/protocol-threshold` |
+| WebMCP tool authorization | Signed tool manifests, capability-scoped grants, hash-chained receipts — `@7h3/protocol-webmcp` |
+| Sender-constrained tokens | DPoP (RFC 9449) |
+| MCP tool pinning | Detects tool rug pulls and hidden-text poisoning; signed SSE streams |
+| Agent identity | Signed Agent Cards, `did:key`, SPIFFE policy, attestation, key transparency log |
+| Payment mandates | Payer-signed intent, merchant-signed cart, agent-signed payment; atomic spend ceiling |
+| Transport coverage | HTTP, WebSocket, gRPC, Queues, Webhooks |
+| SDK coverage | TypeScript, Python, Rust, Go, Browser |
+
+---
+
+## How It Works
+
+### Canonical Serialization
+
+Signatures only mean something if everyone signs the same bytes. JSON object key order is unspecified by the spec, so 7h3 Protocol uses deterministic JSON canonicalization: keys are sorted alphabetically at every nesting level, optional absent fields are omitted entirely, and the result is UTF-8 encoded.
+
+The canonical form is byte-identical across TypeScript, Python, Rust, and Go, proven by the shared conformance test vectors in `conformance/7h3_v0_1.json`.
+
+### Envelope Structure
+
+```json
+{
+  "body": {
+    "capability":   "task.plan",
+    "content":      "do something",
+    "correlationId": "req-123",
+    "intent":       "TASK"
+  },
+  "header": {
+    "messageId":   "uuid-here",
+    "nonce":       "random-bytes",
+    "recipient":   "agent.beta",
+    "sender":      "agent.alpha",
+    "timestampMs": 1712500000000,
+    "ttlMs":       60000,
+    "version":     "7h3/0.1"
+  },
+  "signature": {
+    "alg":   "ED25519",
+    "keyId": "k1",
+    "value": "base64url-sig-here"
+  }
+}
+```
+
+Optional fields (`capability`, `correlationId`, `recipient`) are omitted when absent — not `null`, not `""`. This is load-bearing for the canonical form.
+
+### End-to-End Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Sender as Sender Agent
+    participant SDK as 7h3 SDK
+    participant Transport
+    participant Gateway as Gateway / Receiver
+    participant Upstream
+
+    Sender->>SDK: Create envelope with sender, body, and TTL
+    SDK->>SDK: Canonicalize JSON deterministically
+    SDK->>SDK: Sign payload using Ed25519
+    SDK-->>Sender: Return signed envelope
+
+    Sender->>Transport: Send via HTTP, WebSocket, gRPC, queue, or webhook
+    Transport->>Gateway: Deliver signed envelope
+
+    Gateway->>Gateway: Validate TTL
+    Gateway->>Gateway: Reject replayed nonce
+    Gateway->>Gateway: Verify Ed25519 signature
+    Gateway->>Gateway: Apply route policy and rate limit
+
+    Gateway->>Upstream: Forward request with x-7h3-sender header
+    Upstream-->>Gateway: Return response
+    Gateway-->>Sender: Return response, optionally signed
+```
+
+### TTL and Nonce
+
+Every envelope carries `timestampMs`, `ttlMs`, and a random `nonce`. A receiver rejects the envelope if `now > timestampMs + ttlMs`, then checks the nonce against a deduplication store. A replayed envelope fails even if the signature is valid.
+
+---
+
+## Security Guarantees
+
+| Attack | Defense |
+|---|---|
+| Impersonation | Ed25519 — only the private key holder can produce a valid signature |
+| Replay | Nonce deduplication + TTL expiry (in-memory or Redis) |
+| Tampering | Signature covers the full canonical envelope; any modification breaks verification |
+| Unauthorized access | Per-route `allowedSenders` policy — unlisted senders rejected before upstream |
+| Response spoofing | Signed `x-7h3-response` header; `correlationId` binding |
+| Rate abuse | `SlidingWindowRateLimiter` keyed by verified sender identity, not IP |
+| Audit tampering | `InMemoryAuditLog` entries are Ed25519-signed and hash-chained; `verifyAuditChain` detects deletion, modification and reordering |
+| Quantum computers | ML-DSA-65/87 via `@7h3/protocol-pq` (NIST FIPS 204) |
+| Cross-instance replay | `RedisReplayStore` — atomic SET NX PX across all instances |
+| Eavesdropping | X25519 + ChaCha20-Poly1305 E2E encryption |
+
+---
+
+## Installation
+
+> **Step-by-step guides for every install method live in
+> [`docs/install/`](./docs/install/README.md)** — each one verified against this
+> repository before being written down.
+
+| Guide | For |
+|---|---|
+| **[WebMCP](./docs/install/webmcp.md)** | Browser agents calling your page's tools |
+| **[ChatGPT](./docs/install/chatgpt.md)** | Site tools in the built-in browser, and the MCP server for Codex |
+| **[MCP server](./docs/install/mcp-server.md)** | Claude Code, Cursor, Codex, and other MCP clients |
+| **[TypeScript / Node](./docs/install/typescript.md)** | `npm install @7h3/protocol` |
+| **[Python](./docs/install/python.md)** | `pip install 7h3-protocol` |
+| **[Rust](./docs/install/rust.md)** | `cargo add protocol-7h3` |
+| **[Go](./docs/install/go.md)** | `go get .../sdk/go` |
+| **[Browser](./docs/install/browser.md)** | `@7h3/protocol-browser` |
+| **[CLI](./docs/install/cli.md)** | `npx 7h3` — keygen, sign, verify, gateway |
+| **[Cloudflare Workers](./docs/install/cloudflare.md)** | Gateway and drop-in middleware |
+| **[Docker](./docs/install/docker.md)** | Running the gateway as a container |
+| **[Post-quantum](./docs/install/post-quantum.md)** | ML-DSA (FIPS 204) signatures |
+| **[Threshold](./docs/install/threshold.md)** | BLS12-381 M-of-N signing |
+
+The quick versions follow.
+
+### TypeScript / Node.js
+
+```bash
+npm install @7h3/protocol
+# or
+pnpm add @7h3/protocol
+# or
+yarn add @7h3/protocol
+```
+
+Requires Node.js ≥ 20 (CI tests on Node 22). Zero runtime dependencies — uses Node.js built-in `crypto` throughout.
+
+### Python
+
+```bash
+pip install 7h3-protocol
+```
+
+Requires Python ≥ 3.9. Optional extras for advanced features:
+
+```bash
+pip install 7h3-protocol[crypto]   # X25519 + ChaCha20 encryption (cryptography)
+pip install 7h3-protocol[nacl]     # Alternative crypto backend (PyNaCl)
+```
+
+`RedisReplayStore` and ML-DSA post-quantum support have no dedicated extra — install their
+backends directly (`pip install redis`, `pip install dilithium-py`); each module raises a clear
+`ImportError` telling you which package it needs if it's missing.
+
+### Rust
+
+```toml
+# Cargo.toml
+[dependencies]
+protocol-7h3 = "0.5"
+```
+
+### Go
+
+```bash
+go get github.com/IceMasterT/7h3-protocol/sdk/go
+```
+
+### Browser
+
+```bash
+npm install @7h3/protocol-browser
+```
+
+Pure Web Crypto API — no Node.js dependency. Works in Chrome 100+, Firefox 100+, Safari 16+, Edge 100+.
+
+### Post-Quantum Extension
+
+```bash
+npm install @7h3/protocol-pq
+```
+
+Adds ML-DSA-65 and ML-DSA-87 (NIST FIPS 204 / Dilithium). Separate package to keep `@7h3/protocol` at zero runtime dependencies.
+
+### Threshold Signatures Extension
+
+```bash
+npm install @7h3/protocol-threshold
+```
+
+Adds M-of-N BLS12-381 threshold signatures and Shamir Secret Sharing.
+
+---
+
+## Quick Start
+
+```ts
+import {
+  generateEd25519KeypairBase64Url,
+  createEnvelope,
+  signEnvelopeEd25519,
+  verifyEnvelopeEd25519,
+} from '@7h3/protocol'
+
+// 1. Generate keypairs
+const sender   = await generateEd25519KeypairBase64Url()
+const receiver = await generateEd25519KeypairBase64Url()
+
+// 2. Create and sign a message
+const envelope = createEnvelope({
+  sender:  'agent.alpha',
+  intent:  'TASK',
+  content: 'summarize https://example.com',
+  ttlMs:   60_000,
+})
+
+const signed = await signEnvelopeEd25519(envelope, sender.privateKey, 'key-1')
+
+// 3. Transmit `signed` via any transport (HTTP header, WS frame, queue, etc.)
+
+// 4. Verify on the receiving end
+const ok = await verifyEnvelopeEd25519(signed, sender.publicKey)
+if (!ok) throw new Error('signature verification failed')
+
+console.log('Verified sender:', signed.header.sender)  // 'agent.alpha'
+```
+
+---
+
+## Core API
+
+### Key Generation
+
+**TypeScript:**
+
+```ts
+import { generateEd25519KeypairBase64Url } from '@7h3/protocol'
+
+const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
+// publicKey:  SPKI format, base64url, ~44 chars
+// privateKey: PKCS8 format, base64url, ~88 chars
+```
+
+**Python:**
+
+The Python SDK has no built-in keygen helper — generate directly with `cryptography`
+(PKCS8 private / SPKI public, base64url-encoded, matching every other SDK's key format):
+
+```python
+import base64
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import serialization
+
+b64 = lambda b: base64.urlsafe_b64encode(b).decode('ascii').rstrip('=')
+
+priv = Ed25519PrivateKey.generate()
+private_key = b64(priv.private_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption(),
+))
+public_key = b64(priv.public_key().public_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+))
+```
+
+**Rust:**
+
+The Rust SDK only parses PKCS8/SPKI keys — it has no keygen helper either. Generate a
+keypair with the CLI (`npx 7h3 keygen`) or another SDK, then pass the resulting
+base64url strings into `sign_envelope_ed25519` / `verify_envelope_ed25519` (see below).
+
+**Go:**
+
+```go
+import go7h3 "github.com/IceMasterT/7h3-protocol/sdk/go"
+
+publicKey, privateKey, err := go7h3.GenerateKeypair()
+```
+
+**Browser:**
+
+```ts
+import { generateKeypair } from '@7h3/protocol-browser'
+
+const { publicKey, privateKey } = await generateKeypair()
+```
+
+### Creating Envelopes
+
+```ts
+import { createEnvelope } from '@7h3/protocol'
+
+const envelope = createEnvelope({
+  sender:        'agent.alpha',
+  intent:        'TASK',
+  content:       'do something',
+  capability:    'task.plan',     // optional
+  correlationId: 'req-123',       // optional
+  ttlMs:         60_000,          // default: 60000 (1 minute)
+  recipient:     'agent.beta',    // optional
+  messageId:     'custom-uuid',   // optional — auto-generated if omitted
+})
+```
+
+### Signing
+
+**Ed25519 (asymmetric — recommended):**
+
+```ts
+import { signEnvelopeEd25519 } from '@7h3/protocol'
+
+const signed = await signEnvelopeEd25519(envelope, privateKey, 'key-id')
+// signed.signature.alg === 'ED25519'
+```
+
+**HMAC-SHA256 (shared secret):**
+
+```ts
+import { signEnvelopeHmac } from '@7h3/protocol'
+
+const signed = await signEnvelopeHmac(envelope, sharedSecret, 'key-id')
+// signed.signature.alg === 'HS256'
+```
+
+**Python:**
+
+```python
+from protocol_7h3 import sign_envelope_ed25519, sign_envelope_hmac
+
+signed = sign_envelope_ed25519(envelope, private_key, 'k1')
+signed = sign_envelope_hmac(envelope, shared_secret, 'k1')
+```
+
+**Rust:**
+
+```rust
+use protocol_7h3::{sign_envelope_ed25519, sign_envelope_hmac};
+
+let signed = sign_envelope_ed25519(&envelope, &private_key, "k1")?;   // Result<_, String>
+let signed = sign_envelope_hmac(&envelope, &shared_secret, "k1");     // infallible, no `?`
+```
+
+**Go:**
+
+```go
+// Ed25519: keyId is derived internally from the public key, not passed in
+signed, err := go7h3.SignEnvelopeEd25519(env, privateKey)
+signed, err := go7h3.SignEnvelopeHmac(env, sharedSecret, "k1")
+```
+
+### Verifying
+
+**TypeScript:**
+
+```ts
+import { verifyEnvelopeEd25519, verifyEnvelopeHmac } from '@7h3/protocol'
+
+const ok = await verifyEnvelopeEd25519(signed, publicKey)  // Promise<boolean>
+if (!ok) throw new Error('signature verification failed')
+
+const ok2 = await verifyEnvelopeHmac(signed, sharedSecret)
+```
+
+Signature validity alone doesn't check TTL expiry or required fields — call
+`validateEnvelope(signed)` (returns `ProtocolDiagnostic[]`) alongside verification for full checks.
+
+**Python:**
+
+```python
+from protocol_7h3 import verify_envelope_ed25519
+
+if not verify_envelope_ed25519(signed, public_key):  # returns bool
+    raise ValueError('signature verification failed')
+```
+
+**Rust:**
+
+```rust
+use protocol_7h3::verify_envelope_ed25519;
+
+let result = verify_envelope_ed25519(&signed, &public_key)?;
+```
+
+**Go:**
+
+```go
+ok, err := go7h3.VerifyEnvelopeEd25519(signed, publicKey)
+```
+
+---
+
+## Transports
+
+The same signed envelope is carried differently per transport. Verification logic is identical.
+
+### HTTP / REST
+
+The signed envelope travels as a JSON value in the `x-7h3-envelope` header.
+
+**Signing outbound requests:**
+
+```ts
+import { createEnvelope, signHttpRequest } from '@7h3/protocol'
+
+const envelope = createEnvelope({
+  sender:  'agent.alpha',
+  intent:  'TASK',
+  content: JSON.stringify(payload),
+})
+
+const { headers } = await signHttpRequest(envelope, myPrivateKey)
+
+await fetch('https://api.example.com/action', {
+  method:  'POST',
+  headers: { ...headers, 'Content-Type': 'application/json' },
+  body:    JSON.stringify(payload),
+})
+```
+
+**Verifying inbound requests (Express middleware):**
+
+```ts
+import { verifyHttpEnvelope, createStaticKeyRegistry } from '@7h3/protocol'
+
+const keyRegistry = createStaticKeyRegistry(keyStore)   // { [senderId]: publicKey }
+
+app.use(async (req, res, next) => {
+  const result = await verifyHttpEnvelope(req.headers, { keyRegistry })
+  if (!result.ok) return res.status(401).json({ error: result.reason })
+  req.sender = result.envelope.header.sender
+  next()
+})
+```
+
+**Python:**
+
+```python
+from protocol_7h3 import build_signed_request_headers, verify_http_envelope, StaticKeyRegistry
+
+# Signing — convenience wrapper builds the envelope and signs it in one call
+headers = build_signed_request_headers(
+    sender='agent.alpha', private_key=my_private_key,
+    content=json.dumps(payload),
+)
+
+# Verifying (FastAPI/Flask middleware)
+registry = StaticKeyRegistry(key_store)   # { sender_id: public_key }
+ok, envelope, reason = verify_http_envelope(request.headers, registry)
+if not ok:
+    raise ValueError(reason)
+```
+
+**Go:**
+
+```go
+// go7h3.Middleware wraps an http.Handler directly — it verifies each
+// request's envelope before calling next.
+handler := go7h3.Middleware(keyRegistry, myHandler)
+http.ListenAndServe(":8080", handler)
+```
+
+**CBOR encoding (smaller payloads):**
+
+```ts
+const { headers, body } = await signHttpRequest(envelope, myPrivateKey, { format: 'cbor' })
+// headers['content-type'] === 'application/7h3-cbor'
+// body: Uint8Array — send this as the request body instead of JSON
+```
+
+### WebSocket
+
+Every frame is individually signed. Sequence numbers prevent reordering attacks.
+
+```ts
+import { wrapWebSocket, createStaticKeyRegistry } from '@7h3/protocol'
+
+const ws = new WebSocket('wss://api.example.com')
+
+// Sender
+const binding = wrapWebSocket(ws, {
+  sender:      'agent.alpha',
+  privateKey:  myPrivateKey,
+  keyRegistry: createStaticKeyRegistry(keyStore),   // to verify incoming frames too
+})
+await binding.send({ do: 'something' })   // payload is wrapped in a TASK envelope automatically
+
+// Receiver
+binding.onMessage((payload, envelope) => {
+  console.log('Verified from:', envelope.header.sender)
+})
+binding.onVerifyFail((err, rawData) => {
+  console.warn('Rejected frame:', err.message)
+})
+```
+
+### gRPC
+
+Envelope in `7h3-envelope-bin` gRPC metadata (JSON, `-bin` suffix per gRPC convention).
+
+```ts
+import { signGrpcCall, withGrpcVerification, createStaticKeyRegistry } from '@7h3/protocol'
+
+// Client — build metadata to attach to the outbound call
+const metadata = await signGrpcCall({ sender: 'agent.alpha', privateKey, ttlMs: 60_000 })
+const call = client.myMethod(request, metadata)
+
+// Server — wrap any async handler with verify logic
+const verifiedHandler = withGrpcVerification(myHandler, {
+  keyRegistry: createStaticKeyRegistry(keyStore),
+})
+// call.7h3Envelope holds the verified envelope inside myHandler; throws (with a gRPC
+// status `code`) on missing/invalid/expired envelopes
+```
+
+### Message Queues
+
+Envelope wraps payload as `{ envelope, payload }`. Works with SQS, RabbitMQ, Kafka, Pub/Sub.
+
+```ts
+import { signQueueMessage, verifyQueueMessage } from '@7h3/protocol'
+
+// Producer — returns a ready-to-send JSON string: {"envelope": ..., "payload": ...}
+const message = await signQueueMessage(
+  { taskId: '123', action: 'process' },
+  { sender: 'agent.alpha', privateKey, keyId: 'k1' }
+)
+await queue.send(message)
+
+// Consumer — takes the raw JSON string directly; throws on invalid/expired/tampered
+try {
+  const { payload, envelope } = await verifyQueueMessage(rawMessage, { publicKey })
+  processTask(payload)
+} catch (err) {
+  console.warn('Rejected queue message:', err)
+}
+```
+
+Pass the same `replayCache` instance (e.g. `new InMemoryReplayCache()`) to every
+`verifyQueueMessage`/`verifyQueueBatch` call in a consumer process to dedupe replayed messages.
+
+### Webhooks
+
+Compact `x-7h3-sig` header (HMAC or Ed25519) plus `x-7h3-ts` timestamp.
+
+```ts
+import { signWebhookHmac, verifyWebhookHmac, InMemoryWebhookReplayCache } from '@7h3/protocol'
+
+// Sender (HMAC shared-secret — use signWebhook/verifyWebhook for Ed25519 instead)
+const headers = await signWebhookHmac(body, { secret: sharedSecret, ttlMs: 300_000 })
+// Sets: x-7h3-sig, x-7h3-ts
+
+// Receiver — returns a plain boolean; pass a replayCache to reject re-delivery
+const replayCache = new InMemoryWebhookReplayCache()
+const ok = await verifyWebhookHmac(body, req.headers, {
+  secret:    sharedSecret,
+  maxAgeMs:  300_000,
+  replayCache,
+})
+if (!ok) return res.status(401).end()
+```
+
+---
+
+## Gateway
+
+The `Protocol7h3Gateway` is a reverse proxy that verifies envelopes before forwarding to upstream. Drop it in front of any existing service.
+
+`createGateway()` returns a `verify()`/`handle()` object — it doesn't bind a port itself,
+so pair it with any HTTP server (Node's `http`, Express, a Workers `fetch` handler, etc.):
+
+```ts
+import { createServer } from 'node:http'
+import { createGateway } from '@7h3/protocol/gateway'
+import { createStaticKeyRegistry } from '@7h3/protocol/key-registry'
+
+const gateway = createGateway({
+  upstream:    'http://localhost:3001',
+  keyRegistry: createStaticKeyRegistry({
+    'agent.alpha': alphaPublicKey,
+    'agent.beta':  betaPublicKey,
+    'agent.admin': adminPublicKey,
+  }),
+  policies: [
+    {
+      path:           '/api/admin/**',
+      require:        'ed25519',
+      allowedSenders: ['agent.admin'],
+      rateLimit:      { requests: 10, windowMs: 60_000 },
+    },
+    {
+      path:           '/api/**',
+      require:        'ed25519',
+      allowedSenders: ['agent.alpha', 'agent.beta'],
+      rateLimit:      { requests: 100, windowMs: 60_000 },
+    },
+  ],
+  defaultPolicy: 'deny',   // reject anything that doesn't match a policy above
+  signResponses: true,
+  privateKey:    gatewayPrivateKey,
+  sender:        'gateway',
+})
+
+createServer(async (req, res) => {
+  const chunks: Buffer[] = []
+  for await (const chunk of req) chunks.push(chunk)
+  const result = await gateway.handle({
+    method:  req.method ?? 'GET',
+    path:    req.url ?? '/',
+    headers: Object.fromEntries(
+      Object.entries(req.headers).filter(([, v]) => v !== undefined),
+    ) as Record<string, string>,
+    body: chunks.length ? Buffer.concat(chunks).toString('utf8') : undefined,
+  })
+  res.writeHead(result.status, result.headers)
+  res.end(result.body)
+}).listen(3000)
+```
+
+Use `createProductionGateway()` instead of `createGateway()` to fail fast at startup if
+`defaultPolicy` isn't `'deny'` or `replayStore` isn't configured — a misconfiguration you
+want caught at deploy time, not discovered later in production.
+
+**Gateway architecture:**
+
+```mermaid
+flowchart TB
+    subgraph Inbound
+        A[Agent Request\nx-7h3-envelope] --> B[Verify Signature]
+        B --> C[Check TTL + Nonce]
+        C --> D[Match Route Policy]
+        D --> E[Rate Limit by Sender]
+    end
+    subgraph Upstream
+        E -->|pass| F[Service\nx-7h3-sender: agent.alpha\nx-7h3-verified: true]
+        E -->|deny| G[401 / 403 / 429]
+    end
+    subgraph Outbound
+        F --> H[Sign Response\nx-7h3-response: sig]
+        H --> A
+    end
+```
+
+**CLI gateway** — a flag-based, single-policy gateway for quick use without writing code
+(see [CLI Reference](#cli-reference) for the full flag list):
+
+```bash
+7h3 gateway --upstream http://localhost:3001 --port 3000 \
+  --public-key <base64url-key> --sender agent.alpha --require ed25519
+```
+
+The CLI gateway supports one implicit sender/policy pair via flags — it does not read a
+YAML/JSON config file. For multi-policy setups (per-route `allowedSenders`, rate limits,
+mixed algorithms), use `createGateway()` directly as shown above.
+
+---
+
+## Cloudflare Workers
+
+`cloudflare/` contains a complete Cloudflare Workers deployment — a cryptographic reverse proxy that enforces 7h3 signing on all inbound traffic, using KV for distributed key registry and nonce replay protection across all Cloudflare PoPs.
+
+```
+Caller ──[x-7h3-envelope]──▶ 7h3 Gateway Worker ──[clean + x-7h3-sender]──▶ Upstream
+         Ed25519 signed         verify + strip                                 your Worker
+```
+
+### One-command setup
+
+```bash
+cd cloudflare
+npm install
+npm run setup     # generates keypair, creates KV namespaces, stores secret
+```
+
+Then set `UPSTREAM_URL` in `wrangler.toml` and deploy:
+
+```bash
+npm run deploy:staging
+npm run deploy:production
+```
+
+### Middleware for existing Workers
+
+Add 7h3 verification to any existing Worker without a full reverse-proxy setup:
+
+```ts
+import { create7h3Middleware } from './cloudflare/src/middleware'
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const mw = create7h3Middleware(env)
+    const check = await mw.verify(request)
+    if (!check.ok) return check.response   // 401 or 403
+
+    // check.sender holds the verified agent identity
+    return myHandler(request, env, ctx)
+  },
+}
+```
+
+### What's included
+
+| File | Purpose |
+|---|---|
+| `cloudflare/src/worker.ts` | Standalone gateway entry point |
+| `cloudflare/src/middleware.ts` | `create7h3Middleware()` for existing Workers |
+| `cloudflare/src/kv-replay-store.ts` | KV-backed nonce dedup (cross-instance) |
+| `cloudflare/src/kv-key-registry.ts` | KV-backed public key registry |
+| `cloudflare/src/durable-replay.ts` | Durable Object for fully atomic replay |
+| `cloudflare/wrangler.toml` | KV bindings, env vars, staging + production |
+| `cloudflare/scripts/cf-setup.ts` | First-time setup automation |
+| `cloudflare/DEPLOY.md` | Step-by-step deployment guide |
+
+### Replay protection tiers
+
+| Store | Consistency | Setup |
+|---|---|---|
+| `KvReplayStore` (default) | Strong within datacenter, ~60ms global lag | KV namespace (free plan) |
+| `DurableReplayStore` | Fully atomic, zero race window | Durable Objects (paid plan) |
+
+Register trusted agent public keys in KV:
+
+```bash
+wrangler kv:key put --namespace-id <ID> \
+  "7h3:pk:agent@example.com" "<base64url-ed25519-spki-pubkey>"
+```
+
+Key discovery is served automatically at `GET /.well-known/7h3-keys`.
+
+---
+
+## AI Coding Agents
+
+7h3 Protocol includes configuration for AI coding environments. Each tool reads its config automatically; no plugin installation is required.
+
+| Tool | Config file | What it gets |
+|---|---|---|
+| Claude Code | `CLAUDE.md` + MCP server | Live keygen/sign/verify/scaffold tools + full repo context |
+| GPT Codex | `AGENTS.md` | Full integration patterns, snippets, invariants |
+| Opencode | `AGENTS.md` | Same |
+| Grok Builder | `AGENTS.md` | Same |
+
+### Claude Code — MCP server
+
+Install the MCP server once to get live tools in every Claude Code session:
+
+```bash
+claude mcp add 7h3-protocol -- npx -y @7h3/protocol-mcp
+```
+
+Or copy `.claude/settings.example.json` → `.claude/settings.json` in your project.
+
+Available MCP tools:
+
+| Tool | Description |
+|---|---|
+| `7h3_generate_keypair` | Generate an Ed25519 keypair |
+| `7h3_generate_secret` | Generate a 32-byte HMAC secret |
+| `7h3_sign` | Sign a test envelope for debugging |
+| `7h3_verify` | Verify an envelope's signature, TTL, and shape |
+| `7h3_scaffold` | Generate integration code for a framework — `cloudflare-worker`, `nextjs`, `express`, `hono`, `fastify`, `claude-code`, or `raw` (narrower than `7h3 add`'s list below) |
+| `7h3_mcp_config` | Get install config for Claude Code, Cursor, Opencode, Grok |
+| `7h3_wrap_mcp_server` | Generate boilerplate to wrap an MCP handler with 7h3 |
+
+### `7h3 add` — scaffold any project
+
+Generate ready-to-paste integration code from the CLI:
+
+```bash
+# Framework integrations
+npx 7h3 add --framework cloudflare-worker --sender agent@example.com
+npx 7h3 add --framework nextjs            --sender agent@example.com
+npx 7h3 add --framework express           --sender agent@example.com
+npx 7h3 add --framework hono              --sender agent@example.com
+npx 7h3 add --framework fastify           --sender agent@example.com
+
+# AI tool setup instructions
+npx 7h3 add --framework claude-code
+npx 7h3 add --framework opencode
+npx 7h3 add --framework codex
+npx 7h3 add --framework grok
+
+# Write to a file
+npx 7h3 add --framework hono --output middleware/7h3-auth.ts
+```
+
+When called from the MCP server, `7h3_scaffold` does the same — Claude Code can call it directly and paste the result into your file.
+
+---
+
+## MCP (Claude Tool Calls)
+
+Claude's tool-calling mechanism is MCP (Model Context Protocol) — plain JSON-RPC 2.0. 7h3 Protocol hardens MCP traffic without any changes to your handler.
+
+```mermaid
+flowchart LR
+    CA[Claude] -->|Signed JSON-RPC| MW[7h3 MCP Wrapper]
+    MW -->|Verify sig\ncheck replay\nrecipient binding| MH[Your MCP Handler]
+    MH -->|Response| MW
+    MW -->|Sign response\ncorrelation binding| CA
+```
+
+**Server side:**
+
+```ts
+import { wrapMcpServer, signEnvelopeEd25519 } from '@7h3/protocol'
+
+const secureServer = wrapMcpServer(myMcpHandler, {
+  selfAgentId: 'my-mcp-server',
+  sign: (e) => signEnvelopeEd25519(e, serverPrivateKey, 'k1'),
+  receive: {
+    signatureResolver: async (signature, senderId) =>
+      ({ alg: 'ED25519', publicKey: clientPublicKeys[senderId] }),
+  },
+})
+```
+
+**Client side:**
+
+```ts
+import { wrapMcpClient, signEnvelopeEd25519 } from '@7h3/protocol'
+
+const { send } = wrapMcpClient({
+  selfAgentId: 'claude-agent',
+  peerAgentId: 'my-mcp-server',
+  sign: (e) => signEnvelopeEd25519(e, clientPrivateKey, 'k1'),
+  receive: {
+    signatureResolver: async () => ({ alg: 'ED25519', publicKey: serverPublicKey }),
+  },
+})
+
+const result = await send({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, fetch)
+```
+
+The MCP handler itself is unchanged — zero migration. The wrapper handles all envelope logic at the boundary.
+
+---
+
+## End-to-End Encryption
+
+Signing proves authenticity. Encryption proves privacy. `sealEnvelope` combines both: the body is encrypted before signing so it's opaque to any intermediary, and signature is verified before decryption so tampering fails fast.
+
+Forward secrecy is automatic — a fresh ephemeral X25519 keypair is generated per message.
+
+```mermaid
+sequenceDiagram
+    participant S as Alice (Sender)
+    participant R as Bob (Receiver)
+
+    S->>S: generateX25519KeyPair() → ephemeral keypair
+    S->>S: ECDH(ephemeral_priv, bob_x25519_pub) → shared_secret
+    S->>S: HKDF-SHA256(shared_secret, nonce) → encryption_key
+    S->>S: ChaCha20-Poly1305(key, body) → ciphertext
+    S->>S: Ed25519 sign(envelope with encrypted body)
+    S->>R: Sealed envelope (ciphertext only, body invisible)
+    R->>R: Verify Ed25519 signature FIRST
+    R->>R: ECDH(bob_priv, ephemeral_pub) → shared_secret
+    R->>R: HKDF → encryption_key
+    R->>R: ChaCha20-Poly1305 decrypt + verify AEAD tag
+    R->>R: Recover original body
+```
+
+Zero new dependencies — Node.js built-in `crypto.ecdh` + `crypto.createCipheriv('chacha20-poly1305')`.
+
+**TypeScript:**
+
+```ts
+import {
+  generateX25519KeyPair,
+  sealEnvelope,
+  openEnvelope,
+} from '@7h3/protocol'
+
+// Each agent needs an Ed25519 signing keypair + an X25519 encryption keypair
+const aliceSign = await generateEd25519KeypairBase64Url()
+const aliceEnc  = generateX25519KeyPair()   // synchronous
+
+const bobSign = await generateEd25519KeypairBase64Url()
+const bobEnc  = generateX25519KeyPair()
+
+// Alice seals a message for Bob
+const envelope = createEnvelope('alice', { intent: 'TASK', content: 'secret payload' })
+
+const sealed = await sealEnvelope(envelope, {
+  recipientX25519PublicKey: bobEnc.publicKey,
+  senderEd25519PrivateKey:  aliceSign.privateKey,
+})
+// sealed.body.intent === 'ENCRYPTED'
+// sealed.body.content is the encrypted blob — opaque to any eavesdropper
+
+// Bob opens it
+const { body } = await openEnvelope(sealed, {
+  recipientX25519PrivateKey: bobEnc.privateKey,
+  senderEd25519PublicKey:    aliceSign.publicKey,
+})
+// body.content === 'secret payload'
+```
+
+**Python:**
+
+```python
+from protocol_7h3.encryption import generate_x25519_keypair, seal_envelope, open_envelope
+
+alice_enc_pub, alice_enc_priv = generate_x25519_keypair()
+bob_enc_pub,   bob_enc_priv   = generate_x25519_keypair()
+
+sealed = seal_envelope(envelope, bob_enc_pub, alice_sign_priv)
+body   = open_envelope(sealed, bob_enc_priv, alice_sign_pub)
+```
+
+**Go:**
+
+```go
+bobPub, bobPriv, _ := go7h3.GenerateX25519KeyPair()
+
+sealed, _       := go7h3.SealEnvelope(env, bobPub, alicePriv)
+env, body, _    := go7h3.OpenEnvelope(sealed, bobPriv, alicePub)
+```
+
+---
+
+## Capability Tokens and Delegation
+
+Capability tokens let one agent grant another scoped, time-bounded, cryptographically verifiable authority — without sharing keys.
+
+**Example:** service A grants service B permission to call `/api/payments/**` for 5 minutes. B can delegate a narrower scope to C. Any receiver can verify the full A → B → C chain.
+
+```mermaid
+flowchart LR
+    A[Root Agent] -->|"issue(scope:/payments/**)"|B[Agent B]
+    B -->|"delegate(scope:/payments/read)"| C[Agent C]
+    C -->|"x-7h3-capability: [A→B token, B→C token]"| D[Gateway]
+    D -->|"verifyChain"| E{Valid?}
+    E -->|yes| F[Upstream]
+    E -->|no| G[401]
+```
+
+**Issue a token:**
+
+```ts
+import { issueCapabilityToken } from '@7h3/protocol'
+
+const token = await issueCapabilityToken({
+  issuerPrivateKey: rootPrivateKey,
+  issuerId:         'root-agent',
+  subject:          'agent.worker',
+  scopes: [
+    { pathGlob: '/api/payments/**', methods: ['POST'], maxDelegations: 1 },
+  ],
+  ttlMs:          300_000,   // 5 minutes
+  maxDelegations: 1,         // one more delegation hop allowed
+})
+```
+
+**Delegate a narrower scope:**
+
+```ts
+import { delegateCapabilityToken } from '@7h3/protocol'
+
+const delegation = await delegateCapabilityToken({
+  parentToken:         token,
+  delegatorPrivateKey: workerPrivateKey,
+  delegatorId:         'agent.worker',
+  newSubject:          'agent.subworker',
+  scopes: [
+    { pathGlob: '/api/payments/read', methods: ['GET'] },  // must be ⊆ parent
+  ],
+  ttlMs: 60_000,   // must not exceed parent's remaining TTL
+})
+```
+
+**Attach to HTTP request:**
+
+```ts
+import { serializeCapabilityChain, CAP_HEADER } from '@7h3/protocol'
+
+const headers = {
+  [CAP_HEADER]: serializeCapabilityChain([token, delegation]),
+  // x-7h3-capability: [base64-token-1, base64-token-2]
+}
+```
+
+**Verify a chain:**
+
+```ts
+import { verifyCapabilityChain } from '@7h3/protocol'
+
+const result = await verifyCapabilityChain(
+  chain,
+  { getPublicKey: async (id) => keyStore[id] },
+  { requiredPathGlob: '/api/payments/read', requiredMethod: 'GET' }
+)
+// { ok: true, token, chain }  or  { ok: false, reason: '...' }
+```
+
+---
+
+## Streaming Message Signing
+
+LLM outputs are streams of tokens. 7h3 Streaming Signing gives each chunk a per-chunk HMAC and seals the entire stream with a final Ed25519 signature over the full content hash. Clients detect tampering mid-stream.
+
+```mermaid
+sequenceDiagram
+    participant LLM as Server
+    participant C as Client
+
+    LLM->>C: chunk 0: {i:0, d:"Hello ", h:HMAC0, f:false}
+    LLM->>C: chunk 1: {i:1, d:"world", h:HMAC1, f:false}
+    LLM->>C: chunk N: {i:N, d:".", h:HMACn, f:false}
+    LLM->>C: final:   {i:N+1, d:"", h:HMAC_f, f:true, sig:Ed25519}
+
+    C->>C: Verify HMAC on each chunk (tamper detected immediately)
+    C->>C: Verify Ed25519 over full stream on final frame
+```
+
+**Writing a signed stream:**
+
+```ts
+import { SignedStreamWriter } from '@7h3/protocol'
+
+const writer = new SignedStreamWriter({
+  privateKey: serverPrivateKey,
+  sender:     'llm.server',
+  keyId:      'k1',
+})
+
+for await (const token of llmTokenStream) {
+  const chunk = await writer.writeChunk(token)
+  ws.send(JSON.stringify(chunk))
+}
+ws.send(JSON.stringify(await writer.finalize()))
+```
+
+**Reading and verifying:**
+
+```ts
+import { SignedStreamReader } from '@7h3/protocol'
+
+const reader = new SignedStreamReader({ publicKey: serverPublicKey })
+
+ws.on('message', async (raw) => {
+  const chunk = JSON.parse(raw)
+  if (!chunk.f) {
+    const r = await reader.receiveChunk(chunk)
+    if (!r.ok) throw new Error(`Chunk ${chunk.i} tampered: ${r.reason}`)
+    appendToUI(chunk.d)
+  } else {
+    const result = await reader.finalize(chunk)
+    if (!result.ok) throw new Error(result.reason)
+    console.log(`Stream verified — ${result.chunkCount} chunks, ${result.totalBytes} bytes`)
+  }
+})
+```
+
+**Convenience wrappers for complete arrays:**
+
+```ts
+import { signStream, verifyStream } from '@7h3/protocol'
+
+const chunks = await signStream(
+  ['Hello ', 'world', '.'],
+  { privateKey, sender: 'llm', keyId: 'k1' }
+)
+
+const result = await verifyStream(chunks, { publicKey })
+// { ok: true, totalBytes: 12, chunkCount: 3 }
+```
+
+**WebSocket integration:**
+
+```ts
+import { createSignedWebSocketStream, receiveSignedWebSocketStream } from '@7h3/protocol'
+
+// Server side
+const writer = createSignedWebSocketStream(ws, { privateKey, sender: 'llm', keyId: 'k1' })   // synchronous
+
+// Client side
+const result = await receiveSignedWebSocketStream(ws, { publicKey })
+```
+
+---
+
+## Distributed Replay Cache (Redis)
+
+The default in-memory replay cache breaks in multi-instance deployments. A replayed nonce can slip through between two gateway instances. Use `RedisReplayStore` in production.
+
+```ts
+import { createRedisReplayStore } from '@7h3/protocol'
+
+const replayStore = createRedisReplayStore({ redisUrl: 'redis://localhost:6379' })
+
+const gateway = createGateway({ ...opts, replayStore })
+```
+
+**Redis Cluster (queries all nodes — a nonce is seen if ANY node has it):**
+
+```ts
+import { createClusterReplayStore } from '@7h3/protocol'
+
+const replayStore = createClusterReplayStore([
+  'redis://node-1:6379',
+  'redis://node-2:6379',
+  'redis://node-3:6379',
+])
+```
+
+**Inject your own Redis client:**
+
+```ts
+import { RedisReplayStore } from '@7h3/protocol'
+import { createClient } from 'redis'
+
+const client = createClient({ url: 'redis://localhost:6379' })
+await client.connect()
+
+const replayStore = new RedisReplayStore({ client })
+// RedisClientLike: any client implementing set(k, v, opts) + get(k)
+// Works with ioredis, redis, @upstash/redis
+```
+
+**Python:**
+
+```python
+from protocol_7h3.replay import create_redis_replay_store
+
+store = create_redis_replay_store('redis://localhost:6379')
+```
+
+**Go:**
+
+```go
+store := go7h3.NewRedisReplayStore("7h3:nonce:", func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+    return redisClient.SetNX(ctx, key, "1", ttl).Result()
+})
+```
+
+---
+
+## Binary Wire Format (CBOR)
+
+CBOR (RFC 8949 deterministic mode) produces ~40% smaller payloads compared to JSON. Uses numeric field keys for maximum compactness.
+
+```ts
+import { encodeEnvelopeCbor, decodeEnvelopeCbor, CBOR_CONTENT_TYPE } from '@7h3/protocol'
+
+// Encode
+const bytes: Uint8Array = encodeEnvelopeCbor(signedEnvelope)
+// bytes.length ≈ 60% of JSON.stringify(signedEnvelope).length
+
+// Decode
+const envelope = decodeEnvelopeCbor(bytes)
+
+// HTTP
+await fetch(url, {
+  method:  'POST',
+  headers: { 'Content-Type': CBOR_CONTENT_TYPE },  // 'application/7h3-cbor'
+  body:    bytes,
+})
+```
+
+**General-purpose CBOR (zero runtime deps):**
+
+```ts
+import { encodeCbor, decodeCbor } from '@7h3/protocol'
+
+const bytes = encodeCbor({ any: 'value', nested: [1, 2, 3], ok: true })
+const value = decodeCbor(bytes)
+```
+
+**Go:**
+
+```go
+bytes, err := go7h3.EncodeEnvelopeCBOR(env)
+env, err   := go7h3.DecodeEnvelopeCBOR(bytes)
+```
+
+---
+
+## Observability (Prometheus + OpenTelemetry)
+
+### Prometheus Metrics
+
+Zero new dependencies — implements the Prometheus exposition format from scratch.
+
+```ts
+import { metrics, renderPrometheusText, createMetricsMiddleware } from '@7h3/protocol'
+
+// Serve /metrics on your existing Express app
+app.use(createMetricsMiddleware('/metrics'))
+
+// Or render manually
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', 'text/plain; version=0.0.4')
+  res.send(renderPrometheusText(metrics))
+})
+```
+
+**Available metrics:**
+
+| Metric | Type | Labels |
+|---|---|---|
+| `7h3_verifications_total` | counter | `result` (ok\|fail), `alg`, `transport` |
+| `7h3_verification_duration_ms` | histogram | — |
+| `7h3_rate_limit_hits_total` | counter | `sender`, `path` |
+| `7h3_sender_denials_total` | counter | `sender`, `path` |
+| `7h3_replay_detections_total` | counter | `transport` |
+| `7h3_audit_entries_total` | counter | `type` |
+| `7h3_active_connections` | counter | `transport` |
+
+**CLI gateway:**
+
+```bash
+7h3 gateway --upstream http://localhost:3001 --metrics-port 9090
+# http://localhost:9090/metrics
+```
+
+### OpenTelemetry
+
+No hard dependency — inject any OTel-compatible SDK:
+
+```ts
+import { setOtelProvider } from '@7h3/protocol'
+import { trace } from '@opentelemetry/api'
+
+setOtelProvider(trace.getTracerProvider())
+// Spans emitted automatically for each verification:
+// Span name: '7h3.verify', attributes: messageId, sender, alg, result
+```
+
+---
+
+## Post-Quantum Signatures (ML-DSA)
+
+Ed25519 is broken by a sufficiently large quantum computer. ML-DSA (Dilithium, NIST FIPS 204, 2024) is the standardized post-quantum signature algorithm. `@7h3/protocol-pq` is a drop-in replacement for the signing functions — same envelope format, different `alg` field.
+
+```ts
+import { generatePqKeyPair, signEnvelopePq, verifyEnvelopePq } from '@7h3/protocol-pq'
+import { createEnvelope } from '@7h3/protocol'
+
+// Generate a post-quantum keypair
+const { publicKey, privateKey, algorithm } = generatePqKeyPair('ML-DSA-65')
+// publicKey: 1,952 bytes, base64url
+
+// Sign (same envelope format)
+const envelope = createEnvelope('agent.alpha', { intent: 'TASK', content: 'hello' })
+const signed   = await signEnvelopePq(envelope, privateKey, 'ML-DSA-65')
+// signed.signature.alg === 'ML-DSA-65'
+
+// Verify
+const ok = await verifyEnvelopePq(signed, publicKey)
+```
+
+| Algorithm | NIST Level | Public key | Signature size | SDKs |
+|---|---|---|---|---|
+| `ML-DSA-44` | 2 (128-bit post-quantum) | 1,312 bytes | 2,420 bytes | Python only |
+| `ML-DSA-65` | 3 (192-bit post-quantum) | 1,952 bytes | 3,293 bytes | TypeScript, Python |
+| `ML-DSA-87` | 5 (256-bit post-quantum) | 2,592 bytes | 4,595 bytes | TypeScript, Python |
+
+**Python:**
+
+```python
+from protocol_7h3.pq import generate_ml_dsa_keypair, sign_envelope_pq, verify_envelope_pq
+
+pub, secret = generate_ml_dsa_keypair(level=65)
+signed      = sign_envelope_pq(envelope, secret, level=65)
+ok          = verify_envelope_pq(signed, pub, level=65)
+```
+
+---
+
+## Threshold Signatures (M-of-N BLS)
+
+High-stakes operations require M of N agents to co-sign before a message is valid. BLS12-381 aggregation: M agents sign independently, any party combines the M signatures into one, any verifier checks it with a single verify call identical to a regular verify.
+
+```mermaid
+flowchart LR
+    subgraph "5 Participants (sign independently)"
+        A1[Agent 1] --> Agg
+        A2[Agent 2] --> Agg
+        A3[Agent 3] --> Agg
+    end
+    Agg["Aggregate\n3 sigs → 1 sig"] --> V[Verifier]
+    V -->|Single verify call| Up[Upstream]
+    style Agg fill:#6366f1,color:#fff
+```
+
+```ts
+import {
+  generateBlsKeyPair,
+  signEnvelopeBls,
+  aggregateSignatures,
+  verifyThresholdEnvelope,
+} from '@7h3/protocol-threshold'
+
+// Setup: 5 participants, require 3 to sign
+const keys   = Array.from({ length: 5 }, () => generateBlsKeyPair())
+const config = { m: 3, n: 5 }
+
+// Create the envelope (unsigned)
+const envelope = createEnvelope('council', { intent: 'TASK', content: 'deploy v2' })
+
+// Any 3 participants sign independently — order doesn't matter
+const partial1 = await signEnvelopeBls(envelope, keys[0].privateKey, 'agent-1')
+const partial2 = await signEnvelopeBls(envelope, keys[1].privateKey, 'agent-2')
+const partial3 = await signEnvelopeBls(envelope, keys[2].privateKey, 'agent-3')
+
+// Any party aggregates the 3 partial signatures
+const publicKeys = {
+  'agent-1': keys[0].publicKey,
+  'agent-2': keys[1].publicKey,
+  'agent-3': keys[2].publicKey,
+}
+const thresholdEnvelope = await aggregateSignatures(
+  [partial1, partial2, partial3],
+  publicKeys,
+  envelope,
+  config,
+)
+
+// Verifier performs a single verify call
+const allPublicKeys = Object.fromEntries(keys.map((k, i) => [`agent-${i+1}`, k.publicKey]))
+const ok = await verifyThresholdEnvelope(thresholdEnvelope, allPublicKeys, config)
+```
+
+**Shamir Secret Sharing** — split one master BLS key into N shares; any M reconstruct it:
+
+```ts
+import { splitPrivateKey, reconstructPrivateKey } from '@7h3/protocol-threshold'
+
+const masterKey = generateBlsKeyPair().privateKey
+const shares    = splitPrivateKey(masterKey, 3, 5)   // split into 5 shares, need 3
+
+// Distribute shares to 5 participants.
+// Later, any 3 combine their shares to reconstruct the master key:
+const recovered = reconstructPrivateKey([shares[0], shares[2], shares[4]], 3)
+// recovered === masterKey
+```
+
+---
+
+## WebMCP
+
+`@7h3/protocol-webmcp` ([`sdk/webmcp`](./sdk/webmcp)) applies the protocol to
+[WebMCP](https://webmachinelearning.github.io/webmcp/) tools registered on
+`document.modelContext`. Tool calls are capability-scoped, replay-protected, and
+recorded with cryptographic receipts. Verification is deterministic: a refusal is
+a failed signature or an uncovered scope.
+
+| Feature | Mechanism |
+|---|---|
+| Signed tool manifests | The origin signs its tool surface at deploy time and serves it at `/.well-known/7h3-webmcp-manifest.json`; injected or reworded tools fail verification |
+| Capability-scoped execution | Scoped, expiring, revocable grants held page-side; spend ceilings are bound inside the signed token |
+| Hash-chained receipts | Every call is recorded, allowed or refused; deleting or reordering history breaks verification |
+
+Integration is an import, a constructor, and one field per tool. See the
+[WebMCP install guide](./docs/install/webmcp.md), the
+[ChatGPT guide](./docs/install/chatgpt.md), and
+[`sdk/webmcp/README.md`](./sdk/webmcp/README.md) for the API and threat model,
+including what it does not protect against. A reference application is in
+[`demo/`](./demo); see [`docs/TESTING.md`](./docs/TESTING.md).
+
+---
+
+## Step-Up Approval and Provenance
+
+Capability tokens bound what an agent may do; they do not stop a tricked agent from doing something within those bounds. Two features add a check for that case:
+
+- **Approval grants** — a named approver countersigns one specific action (bound to the acting agent, method, path and body hash; short-lived; single use). Agents can never approve themselves.
+- **Provenance claims** — the sender's runtime signs where an action's inputs came from (`trusted` / `untrusted`). Verification fails closed.
+
+A route can require approval `always`, or only when a request's inputs were untrusted:
+
+```ts
+policies: [
+  { path: '/api/payments', require: 'ed25519',
+    approval: { require: 'untrusted', approvers: ['alice'] } },
+]
+```
+
+7h3 does not detect prompt injection. The provenance label is asserted by the agent runtime's own taint tracking, and is only as good as that tracking. See [`docs/APPROVAL_AND_PROVENANCE.md`](./docs/APPROVAL_AND_PROVENANCE.md).
+
+---
+
+## HTTP Message Signatures (RFC 9421) and Web Bot Auth
+
+Sign or verify standard HTTP requests and responses without the 7h3 envelope, so a gateway can authenticate any RFC 9421 client and 7h3 agents can call servers that only speak the standard. Includes Content-Digest (RFC 9530) and Web Bot Auth (JWK-thumbprint key ids, `Signature-Agent`, key directories).
+
+```ts
+policies: [{ path: '/crawl/**', require: 'http-signature', allowedSenders: ['bot.example'] }]
+```
+
+Verification is policy-driven: a valid signature that covers too little is refused, signatures are freshness-bounded and single-use, and the algorithm comes from your key, never the message. Checked against the RFC 9421 Appendix B vectors. See [`docs/HTTP_MESSAGE_SIGNATURES.md`](./docs/HTTP_MESSAGE_SIGNATURES.md).
+
+---
+
+## MCP Tool Pinning and Signed SSE
+
+Message signing does not stop a trusted MCP server from changing a tool's description after you approved it (rug pull), or hiding instructions in characters a reviewer cannot see (tool poisoning). Tool pinning records a digest of everything the model reads about each approved tool, refuses hidden-character text, and makes the client filter `tools/list` and refuse `tools/call` for anything changed or unpinned. Signed SSE makes MCP's streamable HTTP transport tamper-, gap-, reorder-, splice- and truncation-evident.
+
+```ts
+const { call } = guardMcpClient(rawCall, new ToolGuard(pins))
+```
+
+Pinning does not judge visible text; approving the pin set is the trust decision. See [`docs/MCP_TOOL_PINNING_AND_SSE.md`](./docs/MCP_TOOL_PINNING_AND_SSE.md).
+
+---
+
+## DPoP (Sender-Constrained Tokens)
+
+DPoP (RFC 9449) ties an OAuth access token to a key the client holds, so a token leaked from a log, a prompt or a tool result is useless without that key. Supports ES256 and Ed25519 proofs, single-use `jti`, server nonces, and `require: 'dpop'` gateway routes. Verified against the RFC's own example proof. See [`docs/DPOP.md`](./docs/DPOP.md).
+
+---
+
+## Agent Identity (Agent Cards, did:key, SPIFFE)
+
+Bind a key to an identity in forms other ecosystems already use: A2A-compatible signed Agent Cards (JWS over RFC 8785 canonical JSON, EdDSA and ES256, with origin pinning so a valid card can't be lifted onto another host), self-certifying `did:key` identifiers, and SPIFFE ID policy. A signature proves key possession; who the operator is depends on the keys you trust. See [`docs/AGENT_IDENTITY.md`](./docs/AGENT_IDENTITY.md).
+
+---
+
+## Attestation and Key Transparency
+
+Attestation binds an agent's key to what is actually running: a trusted attester signs "agent A, key K, measured as {image, config, toolPins}", and you approve the digests. `createAttestedKeyRegistry` makes it structural: an agent on an unapproved build has no key. The key log records every key registration, rotation and revocation in a signed hash chain with checkpoints, so a silently swapped key or a rewritten history is detectable. 7h3 does not verify hardware attestation evidence itself, and the log is tamper-evident rather than tamper-proof. See [`docs/ATTESTATION_AND_KEY_LOG.md`](./docs/ATTESTATION_AND_KEY_LOG.md).
+
+---
+
+## Payment Mandates
+
+Verifiable authority for an agent to spend: a payer-signed intent (agent, currency, total and per-purchase limits, merchants, categories, expiry), a merchant-signed cart, and an agent-signed payment. `verifyPayment` recomputes the money, enforces the constraints, holds a cumulative ceiling through an atomic ledger so a payment can't be charged twice, and requires a human approval above a threshold. Integer minor units only. Modelled on the intent, cart, payment structure of agentic-commerce protocols but not wire-compatible with them. See [`docs/PAYMENT_MANDATES.md`](./docs/PAYMENT_MANDATES.md).
+
+---
+
+## Audit Log
+
+Each event is logged as an independently Ed25519-signed entry — `log.verify()` proves a
+given entry wasn't altered after being written. This is not a Cloudflare-Worker-native
+gateway feature: the gateway does not write to it automatically, and entries aren't
+chained to each other (there's no cross-entry tamper detection) — call `log.log(...)`
+yourself wherever you want an entry recorded.
+
+```ts
+import { createAuditLog } from '@7h3/protocol'
+
+const log = createAuditLog(auditPrivateKey, { maxEntries: 10_000 })
+
+await log.log({
+  type:   'verify-ok',   // 'verify-ok' | 'verify-fail' | 'rate-limited' | 'sender-denied' | 'response-signed'
+  sender: 'agent.alpha',
+  path:   '/api/action',
+  envelopeId: 'msg-1',
+})
+
+// Read entries
+const entries = await log.query({ sender: 'agent.alpha', limit: 100 })
+
+// Verify a single entry's signature
+const valid = await log.verify(entries[0], auditPublicKey)
+// valid === true; false if that entry was tampered with
+```
+
+---
+
+## Rate Limiting
+
+`SlidingWindowRateLimiter` is keyed by verified sender identity, not IP. VPN and NAT do not grant extra quota.
+
+```ts
+import { SlidingWindowRateLimiter } from '@7h3/protocol'
+
+// { maxKeys? } bounds total tracked senders (LRU-evicted); the rate-limit
+// policy itself is passed per call, not at construction time.
+const limiter = new SlidingWindowRateLimiter({ maxKeys: 50_000 })
+
+const policy = { requests: 100, windowMs: 60_000 }
+
+const result = limiter.consume('agent.alpha', policy)
+// { allowed: true, remaining: 99, resetMs: 60000 }
+
+const check = limiter.check('agent.alpha', policy)   // read-only, doesn't record a hit
+```
+
+---
+
+## Route Policies
+
+Glob-matched path policies enforce sender allowlists per route.
+
+```ts
+import { matchPolicy, isAllowedSender } from '@7h3/protocol'
+
+const policies = [
+  { path: '/api/admin/**', require: 'ed25519', allowedSenders: ['agent.admin'] },
+  { path: '/api/**',       require: 'ed25519', allowedSenders: ['agent.alpha', 'agent.beta'] },
+]
+
+const matched = matchPolicy(policies, req.path)
+if (matched && !isAllowedSender(matched, verifiedSender)) {
+  return res.status(403).json({ error: 'sender not authorized' })
+}
+```
+
+**Glob rules:**
+
+| Pattern | Matches |
+|---|---|
+| `**` | Any number of path segments (including `/`) |
+| `*` | Any characters within a single segment |
+| `?` | Any single character |
+
+---
+
+## Key Infrastructure
+
+### Static Registry
+
+```ts
+import { createStaticKeyRegistry } from '@7h3/protocol'
+
+const registry = createStaticKeyRegistry({
+  'agent.alpha': 'base64url-public-key',
+  'agent.beta':  'base64url-public-key',
+})
+```
+
+### Caching Registry (remote keys with TTL)
+
+`createCachingKeyRegistry` wraps another `KeyRegistry` — it doesn't take a bare fetch
+function directly:
+
+```ts
+import { createCachingKeyRegistry, type KeyRegistry } from '@7h3/protocol'
+
+const remoteRegistry: KeyRegistry = {
+  getPublicKey: async (senderId) => {
+    const res = await fetch(`https://keys.example.com/${senderId}`)
+    return (await res.json()).publicKey
+  },
+}
+
+const registry = createCachingKeyRegistry(remoteRegistry, { ttlMs: 300_000 })
+```
+
+### Key Rotation
+
+`KeyRotationManager` tracks a rolling set of keys with an overlap window, so a just-rotated
+key keeps verifying for a grace period while peers catch up on the new one:
+
+```ts
+import { KeyRotationManager, generateEd25519KeypairBase64Url } from '@7h3/protocol'
+
+const rotator = new KeyRotationManager({ maxAgeMs: 86_400_000, overlapMs: 3_600_000 })  // daily, 1h overlap
+
+const { publicKey, privateKey } = await generateEd25519KeypairBase64Url()
+rotator.addKey({ id: 'key-1', publicKey, privateKey, createdAt: Date.now() })
+
+// Call periodically (e.g. on a cron); returns the new key only when rotation happened
+const rotated = await rotator.rotateIfNeeded()
+if (rotated) await publishPublicKey(rotated.id, rotated.publicKey)
+
+// Serve /.well-known/7h3-keys directly from the manager
+const doc = rotator.getWellKnownDocument()
+
+// Or use it as a live KeyRegistry (falls back to null for unmanaged senders)
+const registry = rotator.toKeyRegistry()
+```
+
+---
+
+## Cross-SDK Conformance
+
+All SDKs produce byte-identical canonical JSON. The shared conformance vector:
+
+```json
+{
+  "body":   { "capability":"task.plan","content":"route:alpha->beta","correlationId":"corr-1","intent":"TASK" },
+  "header": { "messageId":"vec-1","nonce":"nonce-vec-1","recipient":"agent.beta","sender":"agent.alpha","timestampMs":1712500000000,"ttlMs":60000,"version":"7h3/0.1" }
+}
+```
+
+Each SDK verifies this exact byte sequence in its test suite. See `conformance/7h3_v0_1.json` for the complete vector set.
+
+---
+
+## CLI Reference
+
+```bash
+# Install globally
+npm install -g @7h3/protocol
+
+# Generate a keypair
+7h3 keygen
+# { "publicKey": "...", "privateKey": "...", ... }
+
+# Sign a message — prefer --private-key-file <path> or $P7H3_PRIVATE_KEY over
+# --private-key directly; a raw key on the command line lands in shell history
+7h3 sign \
+  --private-key-file ./my-key.txt \
+  --sender agent.alpha \
+  --payload "hello world"
+
+# Verify an envelope
+7h3 verify --public-key <base64url-key> --envelope "$(cat envelope.json)"
+
+# Inspect an envelope without verifying
+7h3 inspect --envelope "$(cat envelope.json)"
+
+# Run the gateway (refuses to start unverified unless --allow-unverified is passed)
+7h3 gateway --upstream http://localhost:3001 --public-key <base64url-key> --sender agent.alpha
+
+# Run the gateway with metrics
+7h3 gateway --upstream http://localhost:3001 --public-key <base64url-key> \
+  --sender agent.alpha --metrics-port 9090
+
+# Serve a key registry (one key/id pair)
+7h3 keys serve --public-key <base64url-key> --key-id agent.alpha --port 3010
+```
+
+### `7h3 add` — scaffold integrations
+
+Generate ready-to-paste code for any framework or AI coding tool:
+
+```bash
+# Framework integrations
+npx 7h3 add --framework cloudflare-worker  --sender <sender-id>
+npx 7h3 add --framework nextjs             --sender <sender-id>
+npx 7h3 add --framework express            --sender <sender-id>
+npx 7h3 add --framework hono               --sender <sender-id>
+npx 7h3 add --framework fastify            --sender <sender-id>
+
+# AI coding tool setup instructions
+npx 7h3 add --framework claude-code   # prints MCP install + CLAUDE.md snippet
+npx 7h3 add --framework opencode      # prints AGENTS.md snippet
+npx 7h3 add --framework codex         # prints AGENTS.md snippet
+npx 7h3 add --framework grok          # prints AGENTS.md snippet
+
+# Write to a file instead of stdout
+npx 7h3 add --framework hono --sender agent@example.com --output middleware/7h3.ts
+```
+
+Supported `--framework` values: `cloudflare-worker`, `nextjs`, `express`, `hono`, `fastify`, `claude-code`, `opencode`, `codex`, `grok`
+
+---
+
+## Docker
+
+No image is published to a registry — build it locally from the included multi-stage `Dockerfile`.
+Its `ENTRYPOINT` already runs `7h3 gateway`, so `docker run` arguments are gateway flags directly:
+
+```bash
+docker build -t 7h3-gateway .
+
+docker run -p 8080:8080 \
+  7h3-gateway --upstream http://host.docker.internal:3001 --public-key <base64url-key> --sender agent.alpha
+```
+
+**`docker-compose.yaml` (included in repo)** — brings up the gateway plus a minimal example
+upstream on an internal network:
+
+```yaml
+services:
+  gateway:
+    build: .
+    ports:
+      - "8080:8080"
+    command: ["--port", "8080", "--upstream", "http://api:3000", "--require", "ed25519"]
+    depends_on:
+      api:
+        condition: service_started
+
+  api:                    # minimal example upstream — replace with your real service
+    image: node:22-alpine
+    expose:
+      - "3000"
+```
+
+```bash
+docker compose up --build
+```
+
+---
+
+## Uninstall
+
+```bash
+# npm
+npm uninstall @7h3/protocol @7h3/protocol-pq @7h3/protocol-threshold
+
+# Python
+pip uninstall 7h3-protocol
+
+# Rust — remove from Cargo.toml, then:
+cargo update
+
+# Go
+go mod edit -droprequire github.com/IceMasterT/7h3-protocol/sdk/go
+go mod tidy
+```
+
+---
+
+## Changelog
+
+### v0.5.6
+
+- Fixed a CLI build regression from v0.5.5's release (`RedisReplayStore` was passed an
+  incompatible client type in `bin/7h3.ts`'s default gateway replay store) with a small
+  dedicated in-memory `ReplayStore` implementation
+
+### v0.5.5
+
+- **Gateway**: capability-token authentication now enforces `allowedSenders` and rate
+  limits — previously it bypassed both on a valid capability chain
+- **Path traversal fix**: gateway request paths are normalized once and reused for both
+  policy matching and upstream forwarding, closing a bypass via encoded `..` segments
+- Added optional replay-protection caches to `webhookBinding` and `wsBinding` (a captured
+  valid webhook/WebSocket frame could otherwise be replayed within its TTL window)
+- `SlidingWindowRateLimiter` now bounds tracked sender keys with LRU eviction
+- CLI: `--private-key-file` and `P7H3_PRIVATE_KEY`/`GATEWAY_PRIVATE_KEY` env vars as
+  alternatives to passing `--private-key` on the command line
+- Non-finite `timestampMs`/`ttlMs` values can no longer defeat TTL, clock-skew, or replay
+  checks; CBOR map decoding no longer allows `__proto__` prototype pollution
+- Closed `cryptography` (Python, GHSA-g6cj-pr64-35w5) and `nanoid` (GHSA-2v37-7h3g-55p8)
+  advisories across every workspace
+
+### v0.5.4
+
+- **Relicensed from MIT to Apache-2.0** (see [License](#license) for what this means for
+  releases up to `v0.5.3`)
+- **Critical**: gateway rate limiting now backed by persistent state (was resettable);
+  queue bindings gained TTL/replay protection; HMAC shared-secret lookups are now bound to
+  the claimed sender
+- Rust: private keys are zeroized on drop and redacted from `Debug` output
+- `/metrics` is gated by default; `ttlMs` is capped at 24h across all SDKs
+- Repaired broken subpath exports and shipped the compiled CLI in the published package
+- PyPI trusted publishing and crates.io publishing added to the release pipeline;
+  `@7h3/protocol-pq` and `@7h3/protocol-threshold` wired into `publish.yml`
+
+### v0.5.3
+
+- Lint and typecheck gates turned fully green in CI
+- Supply-chain hardening: SHA-pinned GitHub Actions, gitleaks scanning, CI gates, a
+  documented nonce-entropy spec
+
+### v0.5.2
+
+- Constant-time HMAC verification in the Rust SDK; CSPRNG-sourced nonces
+- LICENSE and post-rename branding fixes; CI corrections
+
+### v0.5.1
+
+- **Cloudflare Workers gateway** — `cloudflare/` directory: standalone reverse-proxy Worker (`worker.ts`), drop-in middleware (`create7h3Middleware`), KV-backed key registry (`KvKeyRegistry`), KV nonce replay store (`KvReplayStore`), Durable Object atomic replay store (`DurableReplayStore`); one-command setup script (`cf-setup.ts`) with `execFileSync` shell-injection protection; staging + production environments in `wrangler.toml`; key discovery at `GET /.well-known/7h3-keys`
+- **AI coding agent integration** — `CLAUDE.md` (auto-loaded by Claude Code), `AGENTS.md` (auto-loaded by GPT Codex, Opencode, Grok Builder); MCP server v0.5.0 with 7 tools (`7h3_generate_keypair`, `7h3_generate_secret`, `7h3_sign`, `7h3_verify`, `7h3_scaffold`, `7h3_mcp_config`, `7h3_wrap_mcp_server`); one-line MCP install: `claude mcp add 7h3-protocol -- npx -y @7h3/protocol-mcp`
+- **`7h3 add` CLI** — `npx 7h3 add --framework <name>` generates ready-to-paste integration code for 9 targets: `cloudflare-worker`, `nextjs`, `express`, `hono`, `fastify`, `claude-code`, `opencode`, `codex`, `grok`; optional `--output <file>` flag
+- **MCP server renamed** — binary `aip-mcp` → `7h3-mcp`; env prefix `AIP_*` → `P7H3_*`; package `@7h3/protocol-mcp` v0.5.0
+
+### v0.5.0
+
+- **Redis replay cache** — `RedisReplayStore` / `ClusterRedisReplayStore` (atomic SET NX PX); injectable `RedisClientLike` interface; Go + Python SDKs
+- **E2E encryption** — `sealEnvelope` / `openEnvelope` (X25519 + ChaCha20-Poly1305); ephemeral keypairs for forward secrecy; zero new deps; Python + Go SDKs
+- **Capability tokens** — `issueCapabilityToken` / `delegateCapabilityToken` / `verifyCapabilityChain`; `x-7h3-capability` gateway header; glob-matched scope enforcement
+- **Streaming signing** — `SignedStreamWriter` / `SignedStreamReader`; per-chunk HMAC + final Ed25519; WebSocket integration; `signStream` / `verifyStream` convenience API
+- **Prometheus + OpenTelemetry** — zero-dep Prometheus text format; `createMetricsMiddleware`; CLI `--metrics-port`; optional OTel provider injection
+- **Post-quantum** — `@7h3/protocol-pq`: ML-DSA-65 and ML-DSA-87 via `@noble/post-quantum`; Python via `dilithium-py`
+- **CBOR** — zero-dep deterministic CBOR encoder/decoder (RFC 8949); `encodeEnvelopeCbor` / `decodeEnvelopeCbor`; HTTP CBOR binding; Go SDK
+- **Threshold signatures** — `@7h3/protocol-threshold`: BLS12-381 M-of-N via `@noble/curves`; Shamir `splitPrivateKey` / `reconstructPrivateKey`
+
+### v0.4.0
+
+- API Gateway (`Protocol7h3Gateway`) with per-route policies, rate limiting, signed responses
+- Go SDK (pure stdlib)
+- Browser SDK (pure Web Crypto API)
+- CLI (`7h3 keygen`, `sign`, `verify`, `inspect`, `gateway`, `keys serve`)
+- Tamper-evident audit log (`InMemoryAuditLog`, Ed25519-signed chain)
+- gRPC transport binding
+- Dockerized gateway
+
+### v0.3.0
+
+- Python SDK — signing, verifying, conformance vectors
+- Rust SDK — signing, verifying, canonical serialization
+- Queue and Webhook transport bindings
+- MCP wrapper (`wrapMcpServer`, `wrapMcpClient`)
+
+### v0.2.0
+
+- Renamed from `aip7h3` to `7h3-protocol` / `@7h3/protocol`
+- WebSocket binding with sequence number protection
+- Sliding window rate limiter keyed by verified sender
+- Per-route policy engine with glob matching
+
+### v0.1.0
+
+- Core protocol: `createEnvelope`, `signEnvelopeEd25519`, `verifyEnvelopeEd25519`, `signEnvelopeHmac`, `verifyEnvelopeHmac`
+- HTTP transport binding
+- TypeScript SDK, zero runtime dependencies
+- Canonical JSON serialization, cross-platform byte-identical
+
+---
+
+## License
+
+Apache License 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
+
+`SPDX-License-Identifier: Apache-2.0`
+
+7h3 Protocol is a wire protocol meant to be implemented independently. Apache-2.0
+§3 grants every user an express, irrevocable patent license from each contributor,
+and terminates that grant for anyone who initiates patent litigation over the
+work. MIT, which this project used through v0.5.3, is silent on patents.
+
+Releases up to and including `v0.5.3` were published under the MIT license. That
+grant is irrevocable and is not being withdrawn — anyone who obtained those
+versions keeps their MIT rights to them permanently. Apache-2.0 applies from
+`v0.5.4` onward.
+
+Apache-2.0 is incompatible with GPLv2-only code (GPLv3 is unaffected). If you
+vendor a 7h3 Protocol SDK into a GPLv2-only codebase, pin `v0.5.3`.
+
+---
+
+<div align="center">
+  <sub>Wire version <code>7h3/0.1</code> is immutable — all v0.x releases are backwards-compatible at the wire level.</sub><br/>
+  <sub>Apache License 2.0 © 2024–2026 IceMasterT</sub>
+</div>
