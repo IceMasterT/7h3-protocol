@@ -34,6 +34,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `canonicalizeJcs` (checked against RFC 8785's samples), `did:key` for Ed25519
   (checked against the did:key spec, incl. the derived X25519 key), and SPIFFE ID
   parsing and policy.
+- **Workload attestation** (`attestation.ts`): signed statements binding an agent
+  key to measured builds, verified against attester and digest allow-lists;
+  `createAttestedKeyRegistry` yields keys only for attested agents (fails closed);
+  `toolPinsDigest` ties attestation to approved MCP tool lists.
+- **Key transparency log** (`keyLog.ts`): signed, hash-chained log of key
+  registrations, rotations and revocations with rule enforcement (a revoked key can
+  never return), signed checkpoints, rewrite and equivocation detection, and
+  `createKeyLogRegistry`.
 - `jose.ts`: shared, strict ES256/EdDSA JWS and JWK primitives (now also used by DPoP).
 - `MemoryReplayStore`: single-process `ReplayStore` that fails closed at capacity.
 
