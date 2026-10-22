@@ -70,7 +70,7 @@ export const MAX_TOOL_TEXT_LENGTH = 8_000
 const MAX_SCAN_DEPTH = 32
 const MAX_SCAN_STRINGS = 5_000
 
-function classify(cp: number): ToolFindingKind | null {
+export function classifyCodePoint(cp: number): ToolFindingKind | null {
   if (cp >= 0xe0000 && cp <= 0xe007f) return 'tag-character' // Unicode "tag" block: renders as nothing, carries ASCII
   if ((cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069)) return 'bidi-control'
   if (
@@ -103,7 +103,7 @@ export function scanTool(tool: McpTool): ToolFinding[] {
     if (s.length > MAX_TOOL_TEXT_LENGTH) findings.push({ kind: 'oversized-text', path })
     for (const ch of s) {
       const cp = ch.codePointAt(0)!
-      const kind = classify(cp)
+      const kind = classifyCodePoint(cp)
       if (!kind) continue
       const key = `${kind}:${path}:${cp}`
       if (seen.has(key)) continue

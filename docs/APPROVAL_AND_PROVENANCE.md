@@ -10,7 +10,7 @@ and Go SDKs do not implement these yet.
 
 ## What they do, and what they do not
 
-**They do not detect prompt injection.** Nothing here inspects content. A
+**They do not detect prompt injection.** Nothing here inspects content. The runtime side that produces an honest label, and refuses dangerous tool calls once untrusted content has been read, is `InjectionGuard` ([`PROMPT_INJECTION.md`](./PROMPT_INJECTION.md)). A
 provenance claim is a label the *sender's runtime* asserts and signs. The value is
 that the label cannot be altered or moved to another action in transit, the sender
 is accountable for it, and a gateway can enforce policy on it.

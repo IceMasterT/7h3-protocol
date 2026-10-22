@@ -49,6 +49,7 @@ The following are in scope:
 - HTTP Message Signatures, Web Bot Auth and DPoP
   (`src/httpMessageSignatures.ts`, `src/webBotAuth.ts`, `src/dpop.ts`)
 - MCP hardening: tool pinning and signed SSE (`src/mcpToolPinning.ts`, `src/mcpSse.ts`)
+- Prompt-injection containment: tool policy, egress and canary checks (`src/injectionGuard.ts`)
 - Agent identity, attestation and the key log
   (`src/agentIdentity.ts`, `src/attestation.ts`, `src/keyLog.ts`, `src/keyInfra.ts`)
 
