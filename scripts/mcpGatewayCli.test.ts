@@ -11,7 +11,12 @@ interface JsonRpcEnvelope {
   }
 }
 
-function waitForLine(child: ChildProcessWithoutNullStreams, timeoutMs = 8_000): Promise<string> {
+// Starting through `npm run` takes well under a second on an idle machine and many seconds on a
+// saturated one, so the tests wait for the gateway's answer. These only bound a gateway that never answers.
+const LINE_TIMEOUT_MS = 40_000
+const TEST_TIMEOUT_MS = LINE_TIMEOUT_MS + 10_000
+
+function waitForLine(child: ChildProcessWithoutNullStreams, timeoutMs = LINE_TIMEOUT_MS): Promise<string> {
   return new Promise((resolve, reject) => {
     let buffer = ''
     const timer = setTimeout(() => {
@@ -95,7 +100,7 @@ describe('AIP MCP gateway CLI', () => {
     } finally {
       await stopGateway(child)
     }
-  })
+  }, TEST_TIMEOUT_MS)
 
   it('returns method-not-found for disallowed method from env policy', async () => {
     const child = startGateway({ AIP_ALLOWED_METHODS: 'tools/call' })
@@ -112,5 +117,5 @@ describe('AIP MCP gateway CLI', () => {
     } finally {
       await stopGateway(child)
     }
-  })
+  }, TEST_TIMEOUT_MS)
 })

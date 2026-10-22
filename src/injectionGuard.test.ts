@@ -125,6 +125,9 @@ describe('scanForInjection: ordinary text is not suspicious', () => {
   })
 })
 
+// These scan hundreds of kilobytes; on a saturated machine that exceeds vitest's default 5 s.
+const SLOW_MACHINE_MS = 60_000
+
 describe('scanForInjection: limits', () => {
   it('examines the start and the end of an oversized input and says it truncated', () => {
     const filler = 'lorem ipsum '.repeat(MAX_SCAN_CHARS / 8)
@@ -134,14 +137,23 @@ describe('scanForInjection: limits', () => {
       expect(r.truncated).toBe(true)
       expect(r.findings.map((f) => f.kind)).toEqual(expect.arrayContaining(['instruction-override', 'oversized-input']))
     }
-  })
+  }, SLOW_MACHINE_MS)
 
   it('stays fast on input built to make a bounded pattern backtrack', () => {
+    // Compared with ordinary text of the same size rather than against a clock, so a busy
+    // machine slows both sides equally. Catastrophic backtracking would be thousands of times slower.
+    const time = (text: string): number => {
+      const start = performance.now()
+      scanForInjection(text)
+      return performance.now() - start
+    }
     const hostile = 'ignore '.repeat(30_000) + 'x'.repeat(100_000)
-    const start = Date.now()
-    scanForInjection(hostile)
-    expect(Date.now() - start).toBeLessThan(2_000)
-  })
+    const benign = 'lorem '.repeat(30_000) + 'x'.repeat(100_000)
+    time(benign) // warm up
+    const baseline = Math.min(time(benign), time(benign), time(benign))
+    const worst = Math.min(time(hostile), time(hostile), time(hostile))
+    expect(worst).toBeLessThan(baseline * 50 + 200)
+  }, SLOW_MACHINE_MS)
 })
 
 describe('spotlight', () => {
