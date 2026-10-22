@@ -10,7 +10,7 @@
   [![npm threshold](https://img.shields.io/npm/v/@7h3/protocol-threshold?style=flat-square&color=a5b4fc&logo=npm&logoColor=white&label=%407h3%2Fprotocol-threshold)](https://www.npmjs.com/package/@7h3/protocol-threshold)
   [![PyPI](https://img.shields.io/pypi/v/7h3-protocol?style=flat-square&color=818cf8&logo=python&logoColor=white)](https://pypi.org/project/7h3-protocol/)
   [![Crates.io](https://img.shields.io/crates/v/protocol-7h3?style=flat-square&color=a5b4fc&logo=rust&logoColor=white)](https://crates.io/crates/protocol-7h3)
-  [![Tests](https://img.shields.io/badge/tests-1280%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
+  [![Tests](https://img.shields.io/badge/tests-1377%20passing-4ade80?style=flat-square&logo=vitest&logoColor=white)](https://github.com/IceMasterT/7h3-protocol/tree/main/src)
   [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-a5b4fc?style=flat-square)](./package.json)
   [![Wire](https://img.shields.io/badge/wire-7h3%2F0.1-818cf8?style=flat-square)](./docs/VERSIONING_POLICY.md)
   [![License](https://img.shields.io/badge/license-Apache--2.0-94a3b8?style=flat-square)](./LICENSE)
@@ -55,6 +55,7 @@
 - [Agent Identity (Agent Cards, did:key, SPIFFE)](#agent-identity-agent-cards-didkey-spiffe)
 - [Attestation and Key Transparency](#attestation-and-key-transparency)
 - [Payment Mandates](#payment-mandates)
+- [Prompt Injection Containment](#prompt-injection-containment)
 - [Audit Log](#audit-log)
 - [Rate Limiting](#rate-limiting)
 - [Route Policies](#route-policies)
@@ -117,6 +118,7 @@ MP4 versions for slides and social posts are in [`docs/assets/`](./docs/assets).
 | MCP tool pinning | Detects tool rug pulls and hidden-text poisoning; signed SSE streams |
 | Agent identity | Signed Agent Cards, `did:key`, SPIFFE policy, attestation, key transparency log |
 | Payment mandates | Payer-signed intent, merchant-signed cart, agent-signed payment; atomic spend ceiling |
+| Prompt-injection containment | Taint tracking, tool policy (lethal-trifecta rule), egress and canary checks, spotlighting, injection scanner |
 | Transport coverage | HTTP, WebSocket, gRPC, Queues, Webhooks |
 | SDK coverage | TypeScript, Python, Rust, Go, Browser |
 
@@ -1491,7 +1493,7 @@ policies: [
 ]
 ```
 
-7h3 does not detect prompt injection. The provenance label is asserted by the agent runtime's own taint tracking, and is only as good as that tracking. See [`docs/APPROVAL_AND_PROVENANCE.md`](./docs/APPROVAL_AND_PROVENANCE.md).
+7h3 does not detect prompt injection by reading content. The provenance label is asserted by the agent runtime's own taint tracking, and is only as good as that tracking; `InjectionGuard` produces it (see [Prompt Injection Containment](#prompt-injection-containment)). See [`docs/APPROVAL_AND_PROVENANCE.md`](./docs/APPROVAL_AND_PROVENANCE.md).
 
 ---
 
@@ -1540,6 +1542,24 @@ Attestation binds an agent's key to what is actually running: a trusted attester
 ## Payment Mandates
 
 Verifiable authority for an agent to spend: a payer-signed intent (agent, currency, total and per-purchase limits, merchants, categories, expiry), a merchant-signed cart, and an agent-signed payment. `verifyPayment` recomputes the money, enforces the constraints, holds a cumulative ceiling through an atomic ledger so a payment can't be charged twice, and requires a human approval above a threshold. Integer minor units only. Modelled on the intent, cart, payment structure of agentic-commerce protocols but not wire-compatible with them. See [`docs/PAYMENT_MANDATES.md`](./docs/PAYMENT_MANDATES.md).
+
+---
+
+## Prompt Injection Containment
+
+A model cannot reliably tell instructions from data, so this does not bet on spotting the attack. `InjectionGuard` records every input in code as it enters, then decides each tool call from what the session has read and what the tool can do. A session that holds private data and has read untrusted content cannot reach a tool that sends data out; changes of state need a human; undeclared tools are assumed to do everything. Around that: `checkEgress` refuses links and images to unlisted hosts and URLs that carry a known secret, `createCanary` / `leaksCanary` catch a planted token leaving, `spotlight` marks untrusted text as data, and `scanForInjection` flags known attack shapes (including text smuggled in invisible characters). The first two are guarantees; spotlighting and scanning only lower the odds and are never used to grant trust.
+
+```ts
+const guard = new InjectionGuard({
+  tools: { read_inbox: { readsPrivate: true }, send_email: { sendsExternal: true }, delete_file: { mutates: true } },
+  allowedHosts: ['docs.example.com'],
+})
+guard.ingest({ kind: 'user', trust: 'trusted', text: userMessage })
+const call = guard.wrapMcpCall(guardMcpClient(rawCall, toolGuard).call) // read_inbox, then send_email: refused
+const claim = await signProvenance({ /* ... */ sources: guard.provenanceSources() })
+```
+
+See [`docs/PROMPT_INJECTION.md`](./docs/PROMPT_INJECTION.md) for the decision table and the limits.
 
 ---
 

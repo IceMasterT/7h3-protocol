@@ -10,6 +10,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- **Prompt-injection containment** (`injectionGuard.ts`): `InjectionGuard` records each
+  input in code as it enters the agent runtime, decides every tool call from that taint
+  and the tool's declared effects (a session holding private data and untrusted content
+  cannot reach a tool that sends data out; state changes need a human; undeclared tools
+  are assumed to do everything), and wraps MCP clients (`wrapMcpCall`) so results are
+  tainted and marked as data. Also `checkEgress` (host allow-list, secrets in URLs),
+  `createCanary` / `leaksCanary`, `spotlight` (delimit, datamark, encode) and
+  `scanForInjection` (a heuristic that also reads text smuggled in Unicode tag
+  characters and base64). The tool policy and output checks are deterministic; spotlighting
+  and scanning are documented as probabilistic and never grant trust. See
+  `docs/PROMPT_INJECTION.md`.
 - **Step-up approval** (`approval.ts`): a named approver countersigns one action,
   bound to the acting agent, method, normalized path and body hash; max 10 minute
   lifetime; single use; no self-approval; a failed presentation does not consume

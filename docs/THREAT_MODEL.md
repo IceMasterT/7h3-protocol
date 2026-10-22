@@ -16,6 +16,7 @@ In scope: everything the `@7h3/protocol` package and its sibling packages do.
 | Message signing and transport | `protocol.ts`, `protocolTransport.ts`, `protocolReplay.ts`, `replayStores.ts`, `httpBinding.ts`, `wsBinding.ts`, `grpcBinding.ts`, `queueBinding.ts`, `webhookBinding.ts`, `encryption.ts`, `stream.ts` |
 | Gateway and policy | `gateway.ts`, `routePolicy.ts`, `rateLimiter.ts`, `signedResponse.ts`, `auditLog.ts`, `cloudflare/` |
 | Authority | `capability.ts`, `approval.ts`, `provenance.ts`, `mandate.ts`, `actionBinding.ts` |
+| Agent runtime | `injectionGuard.ts` |
 | Standards interop | `httpMessageSignatures.ts`, `webBotAuth.ts`, `dpop.ts`, `jose.ts` |
 | MCP | `mcpWrapper.ts`, `mcpTransports.ts`, `mcpGateway.ts`, `mcpToolPinning.ts`, `mcpSse.ts`, `mcp-server/` |
 | Identity and keys | `agentIdentity.ts`, `attestation.ts`, `keyLog.ts`, `keyInfra.ts`, `keyRegistry.ts`, `keyRotation.ts`, `revocation.ts` |
@@ -24,7 +25,7 @@ In scope: everything the `@7h3/protocol` package and its sibling packages do.
 
 **Status by runtime.** The signed envelope, canonicalization, replay and conformance
 vectors are implemented in TypeScript, Python, Rust and Go and must agree byte for byte.
-Approval, provenance, mandates, RFC 9421, Web Bot Auth, DPoP, MCP tool pinning, signed SSE,
+Approval, provenance, the injection guard, mandates, RFC 9421, Web Bot Auth, DPoP, MCP tool pinning, signed SSE,
 Agent Cards, `did:key`, attestation and the key log are **TypeScript only**. A deployment
 that needs them in another language does not have them.
 
@@ -102,6 +103,9 @@ history; money; the audit trail.
 | Agent exceeds its scope | Scoped, expiring capability tokens; delegation can only narrow (scope, TTL, depth) and this is re-checked on every hop at verification | |
 | Agent tricked into a damaging action inside its scope | Step-up approval (`approval.ts`): a named approver countersigns one action, bound to agent, method, normalized path and body hash; at most 10 minutes; single use; no self-approval; a failed presentation does not consume the grant | The approver must actually look. See non-goals |
 | Untrusted content drove the action | Provenance claims (`provenance.ts`): signed trusted/untrusted labels bound to the action; a route can require approval only when inputs were untrusted; a missing or invalid claim counts as untrusted | Does not detect injection; the label comes from the agent runtime's taint tracking and is only as good as that |
+| A steered agent reads private data and sends it out (exfiltration) | `InjectionGuard` (`injectionGuard.ts`): the runtime records each input as it enters; once private data and untrusted content are both in the session, any tool that can send data out is refused, with no approval offered; changes of state need a human; undeclared tools are assumed to do everything. The decision never reads the content | Only as good as the tool effect declarations and as complete as the inputs routed through the guard. See `docs/PROMPT_INJECTION.md` |
+| Model output leaks data through a link or image | `checkEgress`: every URL is parsed, the real host is judged against an allow-list, and URLs carrying a known secret (plain, URL-encoded, hex, base64) are refused; `leaksCanary` catches a planted token, including spelled out or encoded | Side channels that are not URLs (a filename, DNS, timing) are not covered |
+| Injected text reaches the model | `spotlight` marks untrusted text as data and strips hidden characters; `scanForInjection` flags known attack shapes, including text smuggled in Unicode tag characters and one level of base64 | Probabilistic and heuristic: both are bypassable and neither is ever used to grant trust |
 | Approval reused elsewhere | Bound to subject, action digest, expiry and a single-use store; the grant is stripped before forwarding | |
 | Agent overspends | Payment mandates (`mandate.ts`): payer-signed intent, merchant-signed cart, agent-signed payment; recomputed totals, digest-bound carts, merchant, category and per-purchase limits, a cumulative ceiling through an atomic idempotent ledger, human approval above a threshold | The default ledger is per process; a replicated processor needs an atomic store |
 
@@ -154,7 +158,7 @@ history; money; the audit trail.
 
 ## What this does not protect against
 
-- **Prompt injection is not detected.** Nothing inspects content. Provenance labels and approvals limit the damage of a tricked agent; they do not stop it being tricked, and a provenance label is only as honest as the runtime that produced it. A model must never be allowed to write its own label.
+- **A model being steered.** Nothing here can prevent it: no filter reliably separates instructions from data, and the scanner and spotlighting only lower the odds. What is controlled is the damage: structural tool policy, egress checks, approvals and signed provenance bound it. A permitted action can still be harmful, and a provenance label is only as honest as the runtime that produced it. A model must never be allowed to write its own label.
 - **A stolen private key.** Whoever holds it is the agent until it is revoked.
 - **A compromised endpoint.** An agent host that is fully compromised can request approvals, present valid provenance and sign anything its key allows.
 - **A careless approver.** An approval is only as good as the human's review.
@@ -175,7 +179,7 @@ history; money; the audit trail.
 | `did:key` implemented correctly | The did:key specification's example round-trips and derives the X25519 key its DID document lists |
 | Parsers do not crash | TypeScript fuzz harnesses (`fuzz/`, decoder and verifier) run in CI on every push (`npm run fuzz:ts`). Rust `cargo-fuzz` targets exist in `sdk/rust/fuzz` but are not run in CI. The new modules have no dedicated fuzz harness: their coverage is hostile-input unit tests |
 | Security checks actually bite | Each new security control was mutation-tested: the check was removed and the suite had to fail. Survivors were either closed with a new test or recorded as equivalent (redundant defense in depth). This found real gaps, for example a missing unsigned-envelope injection test and a cache that survived a key rotation |
-| Overall | 1,108 TypeScript tests plus 106 Python, 35 Go and 31 Rust |
+| Overall | 1,205 TypeScript tests plus 106 Python, 35 Go and 31 Rust |
 
 Not done: an independent third-party audit (see `SECURITY.md`), and formal verification.
 The internal review of 2026-06-05 (`SECURITY_REVIEW_2026-06-05.md`) predates most of the
@@ -183,7 +187,7 @@ modules above and was performed by the same AI assistant that co-developed parts
 
 ## Remaining risks (open)
 
-- Approval, provenance, mandates, RFC 9421, DPoP, MCP hardening and the identity modules exist only in TypeScript.
+- Approval, provenance, the injection guard, mandates, RFC 9421, DPoP, MCP hardening and the identity modules exist only in TypeScript.
 - Replay, revocation, approval, nonce and spend state depends on a correctly provisioned shared store; the in-memory defaults do not span instances or restarts. The default `SpendLedger` is atomic only within one process.
 - The key log is linear-time and single-operator, and split-view detection needs an exchange of checkpoints that nothing in the library performs.
 - An attestation's trust is exactly the attester's.
@@ -196,5 +200,6 @@ modules above and was performed by the same AI assistant that co-developed parts
 - Wire a shared revocation store (`createRedisRevocationStore` + `withRevocationCheck`) and enforce key rotation, expiry and revocation.
 - Set `allowedDomains` on `createHttpKeyRegistry`, an allow-list in every `resolveKey`/`resolveKeys` that can fetch, and `expectedOrigin` when verifying Agent Cards.
 - Require approval on routes that can spend, delete or send, and produce provenance labels from the agent runtime's own data-flow tracking, never from the model.
+- Route every input the model reads through `InjectionGuard.ingest` or `wrapMcpCall`, declare each tool's effects (a fetch tool sends data out), register pasted third-party text as untrusted, and run `checkOutput` before rendering model output.
 - Pin MCP tools from a reviewed pin set and keep `maxListAgeMs` short where descriptions matter.
 - Hold on to a key-log checkpoint and exchange checkpoints with other relying parties if you rely on the log to detect a malicious operator.
