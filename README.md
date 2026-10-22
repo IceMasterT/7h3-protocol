@@ -1833,6 +1833,11 @@ go mod tidy
 
 ## Changelog
 
+### Unreleased
+
+- Added prompt-injection containment (`InjectionGuard`): inputs are tainted in code as they enter, tool calls are decided from that taint and each tool's declared effects (private data plus untrusted content blocks every tool that sends data out), MCP results are tainted and marked as data, and model output is checked for links to unlisted hosts, secrets in URLs and leaked canaries. Includes a spotlighting helper and a heuristic injection scanner, both documented as probabilistic. See [Prompt Injection Containment](#prompt-injection-containment) and [`docs/PROMPT_INJECTION.md`](./docs/PROMPT_INJECTION.md).
+- The full list for this update, including approval, provenance, RFC 9421, DPoP, MCP tool pinning, agent identity and payment mandates, is in [`CHANGELOG.md`](./CHANGELOG.md).
+
 ### v0.5.6
 
 - Fixed a CLI build regression from v0.5.5's release (`RedisReplayStore` was passed an
