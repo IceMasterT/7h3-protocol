@@ -1,7 +1,7 @@
 {
   "version": "7h3-webmcp-manifest/1",
   "origin": "7h3-webmcp-ledger",
-  "issuedAt": 1788426663279,
+  "issuedAt": 1792651047490,
   "tools": [
     {
       "name": "list_invoices",
@@ -76,5 +76,5 @@
   ],
   "surfaceDigest": "1b7d39a7f621e7fe90f13ef5e8633d131bfd5cd802644fa4658341be4c4bf03c",
   "keyId": "7h3-webmcp-ledger-origin-k1",
-  "signature": "6CzbZrfQqavgBDbmCkYvOEzz-8EzzzAl12wpzDqyurXo3WdUFFJ29R2YM0cJPpbK1-1jY-zakChTYdaX23gcAQ"
+  "signature": "swWo8PwKrrT0nxI9Q6LO3GKmeuWEm8rOcQwumMJz_z_zjiMFnCN9zicT1v-BB-ujUnPpnrauTTRqrfJZpbNDCQ"
 }
