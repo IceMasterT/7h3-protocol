@@ -6,7 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## Unreleased
+## v0.7.0 — `@7h3/protocol` 0.7.0
+
+Authority, standards and agent-identity release: step-up approval, provenance,
+prompt-injection containment, RFC 9421 / Web Bot Auth / DPoP, MCP tool pinning
+and signed SSE, agent identity and key transparency, and payment mandates. All
+additive; TypeScript only. Only `@7h3/protocol` is republished: the other
+packages changed only in development dependencies.
 
 ### Added
 
